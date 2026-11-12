@@ -270,7 +270,7 @@ export default function GameDetail({ gameId }: { gameId: number }) {
               const paths = Array.isArray(sel) ? sel : typeof sel === "string" ? [sel] : [];
               if (!paths.length) return;
               const r = await api.importScreenshots(p.id, game.id, paths);
-              toast(t("{imported} importada(s){v1}{v2}", { imported: r.imported, v1: r.duplicates ? `, ${r.duplicates} já existia(m)` : "", v2: r.failed.length ? `. Erro: ${r.failed[0]}` : "" }), r.failed.length && !r.imported ? "err" : "ok");
+              toast(t("{imported} importada(s){v1}{v2}", { imported: r.imported, v1: r.duplicates ? t(", {n} já existia(m)", { n: r.duplicates }) : "", v2: r.failed.length ? t(". Erro: {msg}", { msg: r.failed[0] }) : "" }), r.failed.length && !r.imported ? "err" : "ok");
               await loadCaps();
             })}>{t("Importar capturas")}</Button>
           }>

@@ -10,7 +10,7 @@ export const EMULATOR_PRESETS: EmulatorPreset[] = [
   { name: "PPSSPP", platforms: ["PSP"], formats: ["iso"], args: '"{rom}"' },
   { name: "Vita3K", platforms: ["Ps Vita"], formats: ["vpk"], args: "",
     note: tk("Arquivos .vpk precisam ser instalados no Vita3K; depois inicie o jogo pelo próprio emulador.") },
-  { name: "Emulador de Switch (Ryujinx ou compatível)", platforms: ["Nintendo Switch"], formats: ["nsp"], args: '"{rom}"' },
+  { name: tk("Emulador de Switch (Ryujinx ou compatível)"), platforms: ["Nintendo Switch"], formats: ["nsp"], args: '"{rom}"' },
   { name: "Lichii", platforms: ["Nintendo Switch 2"], formats: ["nsp", "nup"], args: '"{rom}"',
     note: tk("Argumentos de ponto de partida: confira na documentação do Lichii como ele recebe o caminho do jogo.") },
   { name: "xemu", platforms: ["XBOX"], formats: ["iso"], args: '-dvd_path "{rom}"' },

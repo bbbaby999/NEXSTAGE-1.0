@@ -10,7 +10,6 @@ import UpdatePanel from "../components/UpdatePanel";
 import RaSettings from "../components/RaSettings";
 import SteamSettings from "../components/SteamSettings";
 import DataSources from "../components/DataSources";
-import AchToastTest from "../components/AchToastTest";
 import { applyHomeBlur, applyParticles, applyTheme, applyWaves, clampHomeBlur, CUSTOM_THEME, CustomColors, DEFAULT_CUSTOM, DEFAULT_THEME, parseCustom, resolveCustom, setCustomColors, setLedSync, THEMES } from "../lib/theme";
 import ColorPicker from "../components/ColorPicker";
 import Select from "../components/Select";
@@ -634,7 +633,7 @@ export default function Settings() {
           <div className="settings">
             <div className="setting">
               {/* "Language" fica sempre visível em inglês: quem caiu num idioma que não lê ainda acha a opção */}
-              <div><strong>{t("Idioma")}{currentLang() !== "en" && <span className="muted"> · Language</span>}</strong><small>{t("Idioma da interface do NEXSTAGE. O instalador já usa o idioma escolhido nele.")}</small></div>
+              <div><strong>{t("Idioma")}{currentLang() !== "en" && <span className="muted"> · Language</span>}</strong></div>
               <Select<Lang> value={currentLang()} width={240} title={t("Idioma")}
                 onChange={(l) => { setLang(l).then(() => saveApp("language", l)).catch((e) => toast(errMsg(e), "err")); }}
                 options={LANGS.map((l): [string, Lang] => [l.name, l.id])} />
@@ -742,18 +741,24 @@ export default function Settings() {
             <div className="setting">
               <div><strong>{t("Notificações de conquistas")}</strong><small>{t("Cartão com som quando você desbloqueia uma conquista (Steam e RetroAchievements), por cima do jogo e do app. Cada plataforma também pode ser desligada na própria seção.")}</small></div>
               <div className="row">
-                <AchToastTest />
                 <Button variant={achToast ? "primary" : "default"} onClick={() => { const v = !achToast; setAchToast(v); saveApp("ach_toast", v ? "1" : "0"); }}>{achToast ? t("Ligadas") : t("Desligadas")}</Button>
               </div>
             </div>
             <div className="setting">
               <div><strong>{t("Notificações de controles")}</strong><small>{t("Cartão com som quando um controle é conectado ou desconectado e quando a bateria chega a 15% ou menos, por cima do jogo e do app.")}</small></div>
               <div className="row">
-                <Button variant="ghost" onClick={() => api.previewPadToast("connected", t("Controle de teste")).catch(() => {})}>{t("Testar conexão")}</Button>
-                <Button variant="ghost" onClick={() => api.previewPadToast("disconnected", t("Controle de teste")).catch(() => {})}>{t("Testar desconexão")}</Button>
-                <Button variant="ghost" onClick={() => api.previewPadToast("battery", t("Controle de teste")).catch(() => {})}>{t("Testar bateria fraca")}</Button>
                 <Button variant={padToast ? "primary" : "default"} onClick={() => { const v = !padToast; setPadToast(v); saveApp("pad_toast", v ? "1" : "0"); }}>{padToast ? t("Ligadas") : t("Desligadas")}</Button>
               </div>
+            </div>
+            <div className="setting">
+              <div><strong>{t("Notificação de captura")}</strong><small>{t("Mostra a miniatura no canto inferior direito, por cima do jogo, sem tirar o foco dele. Em tela cheia exclusiva (alguns jogos antigos) o Windows não permite exibi-la.")}</small></div>
+              <Button variant={shotNotify ? "primary" : "default"} onClick={() => { const v = !shotNotify; setShotNotify(v); saveApp("shot_notify", v ? "1" : "0"); }}>{shotNotify ? t("Ligada") : t("Desligada")}</Button>
+            </div>
+            <div className="setting">
+              <div><strong>{t("Duração da notificação")}</strong><small>{t("Tempo até ela desaparecer sozinha.")}</small></div>
+              <Select<number> value={shotSecs} width={180} title={t("Duração da notificação")} disabled={!shotNotify}
+                onChange={(v) => { setShotSecs(v); saveApp("shot_notify_secs", String(v)); }}
+                options={[[t("2 segundos"), 2], [t("3 segundos"), 3], [t("4 segundos"), 4], [t("5 segundos"), 5], [t("7 segundos"), 7], [t("10 segundos"), 10]]} />
             </div>
           </div>
 
@@ -793,16 +798,6 @@ export default function Settings() {
                 <Button onClick={() => api.openCapturesFolder().catch((e) => toast(errMsg(e), "err"))}>{t("Abrir pasta")}</Button>
                 <Button onClick={() => api.takeScreenshot().then(() => toast(t("Captura salva."))).catch((e) => toast(errMsg(e), "err"))}>{t("Testar captura")}</Button>
               </div>
-            </div>
-            <div className="setting">
-              <div><strong>{t("Notificação de captura")}</strong><small>{t("Mostra a miniatura no canto inferior direito, por cima do jogo, sem tirar o foco dele. Em tela cheia exclusiva (alguns jogos antigos) o Windows não permite exibi-la.")}</small></div>
-              <Button variant={shotNotify ? "primary" : "default"} onClick={() => { const v = !shotNotify; setShotNotify(v); saveApp("shot_notify", v ? "1" : "0"); }}>{shotNotify ? t("Ligada") : t("Desligada")}</Button>
-            </div>
-            <div className="setting">
-              <div><strong>{t("Duração da notificação")}</strong><small>{t("Tempo até ela desaparecer sozinha.")}</small></div>
-              <Select<number> value={shotSecs} width={180} title={t("Duração da notificação")} disabled={!shotNotify}
-                onChange={(v) => { setShotSecs(v); saveApp("shot_notify_secs", String(v)); }}
-                options={[[t("2 segundos"), 2], [t("3 segundos"), 3], [t("4 segundos"), 4], [t("5 segundos"), 5], [t("7 segundos"), 7], [t("10 segundos"), 10]]} />
             </div>
           </div>
 

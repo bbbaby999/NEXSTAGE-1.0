@@ -2041,5 +2041,17 @@ export const KEYS: string[] = [
  "Oriental",
  "Vincule um dispositivo em “Editar dados” para ver se este controle está conectado.",
  "Sem vínculo",
- "Sons e notificações"
+ "Sons e notificações",
+ ", {n} já existiam",
+ ", {n} com erro",
+ "Adicionar {n} à galeria",
+ "Adicionar à galeria",
+ "Domínio público",
+ "Emulador de Switch (Ryujinx ou compatível)",
+ ", {n} já existia(m)",
+ ". Erro: {msg}",
+ "Novas funcionalidades",
+ "Melhorias e otimizações",
+ "Correções de bugs",
+ "Alterações na interface"
 ];

@@ -3,7 +3,6 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import Button from "./Button";
 import Select from "./Select";
 import { TrophyIcon } from "./RaUnlockToasts";
-import AchToastTest from "./AchToastTest";
 import { api, errMsg } from "../lib/api";
 import { raAgo, useRaEvents } from "../lib/ra";
 import { useSession } from "../state/session";
@@ -133,7 +132,6 @@ export default function RaSettings() {
       <div className="setting">
         <div><strong>{t("Avisar novos desbloqueios")}</strong><small>{t("Cartão no estilo dos consoles, embaixo no centro da tela, por cima do jogo (sem tirar o foco), com som. Conquistas raras têm estilo dourado e som próprio.")}</small></div>
         <div className="row">
-          <AchToastTest />
           <Button variant={notify ? "primary" : "default"} onClick={() => { const v = !notify; setNotify(v); save("ra_notify", v ? "1" : "0"); }}>{notify ? t("Ligado") : t("Desligado")}</Button>
         </div>
       </div>

@@ -8,7 +8,7 @@ import { compatiblePaths, counts, selectable, STATUS_LABEL, summarize } from "..
 import { formatBytes } from "../lib/format";
 import { useSession } from "../state/session";
 import type { Emulator, ScanDone, ScanItem, ScanProgress } from "../types";
-import { t } from "../lib/i18n";
+import { currentLang, t } from "../lib/i18n";
 
 /**
  * Importação por pasta: 1) varredura em segundo plano com progresso; 2) pré-visualização com
@@ -65,7 +65,7 @@ export default function FolderImport({ profileId, folder, folderId, onClose, onI
       const r = await api.importScanItems(profileId, folder, chosen.map((i) => ({
         path: i.path, ext: i.ext, platform: i.platform!, title: i.name, emulatorId: i.kind === "windows" ? null : choice.get(i.path) ?? null,
       })));
-      toast(t("{imported} jogo(s) importado(s){v1}{v2}.", { imported: r.imported, v1: r.duplicates ? `, ${r.duplicates} já existiam` : "", v2: r.failed.length ? `, ${r.failed.length} com erro` : "" }), r.failed.length && !r.imported ? "err" : "ok");
+      toast(t("{imported} jogo(s) importado(s){v1}{v2}.", { imported: r.imported, v1: r.duplicates ? t(", {n} já existiam", { n: r.duplicates }) : "", v2: r.failed.length ? t(", {n} com erro", { n: r.failed.length }) : "" }), r.failed.length && !r.imported ? "err" : "ok");
       if (r.failed.length) toast(r.failed[0], "err");
       onImported();
       onClose();
@@ -82,7 +82,7 @@ export default function FolderImport({ profileId, folder, folderId, onClose, onI
           style={progress?.phase === "analyzing" && progress.found ? { width: `${Math.min(100, (progress.scanned / progress.found) * 100)}%` } : undefined} /></div>
         <p>{progress ? (progress.phase === "walking" ? t("Percorrendo as pastas…") : t("Identificando as plataformas…")) : t("Iniciando…")}</p>
         <div className="stats">
-          <div className="stat"><strong>{progress?.phase === "walking" ? progress.scanned.toLocaleString("pt-BR") : "—"}</strong><span>{t("Arquivos verificados")}</span></div>
+          <div className="stat"><strong>{progress?.phase === "walking" ? progress.scanned.toLocaleString(currentLang()) : "—"}</strong><span>{t("Arquivos verificados")}</span></div>
           <div className="stat"><strong>{progress?.found ?? 0}</strong><span>{t("Arquivos de jogo encontrados")}</span></div>
         </div>
         <p className="muted note path">{progress?.current}</p>

@@ -87,8 +87,8 @@ export default function Emulators() {
             {!draft.id && (
               <label>{t("Começar por uma sugestão")}<Select<string> value="" width="100%" title={t("Sugestões de emuladores")} onChange={(v) => {
                   const p = EMULATOR_PRESETS.find((x) => x.name === v);
-                  if (p) { setDraft({ ...draft, name: p.name, platforms: p.platforms, formats: p.formats, args: p.args }); setNote(p.note ? t(p.note) : p.note); }
-                }} options={[[t("Personalizado (preencher à mão)"), ""], ...EMULATOR_PRESETS.map((p): [string, string] => [p.name, p.name])]} />
+                  if (p) { setDraft({ ...draft, name: t(p.name), platforms: p.platforms, formats: p.formats, args: p.args }); setNote(p.note ? t(p.note) : p.note); }
+                }} options={[[t("Personalizado (preencher à mão)"), ""], ...EMULATOR_PRESETS.map((p): [string, string] => [t(p.name), p.name])]} />
               </label>
             )}
             {note && <p className="muted note">{note}</p>}

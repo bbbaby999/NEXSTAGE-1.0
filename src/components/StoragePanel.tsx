@@ -3,7 +3,7 @@ import Button from "./Button";
 import { api, errMsg } from "../lib/api";
 import { formatBytes } from "../lib/format";
 import type { Drive } from "../types";
-import { t } from "../lib/i18n";
+import { currentLang, t } from "../lib/i18n";
 
 interface Slice { key: string; label: string; bytes: number; cls: string; note?: string }
 
@@ -121,7 +121,7 @@ export default function StoragePanel() {
   ];
   const total = d.totalBytes || slices.reduce((a, s) => a + s.bytes, 0);
   const pctOf = (v: number) => (total ? (v / total) * 100 : 0);
-  const fmtPct = (v: number) => { const p = pctOf(v); return p > 0 && p < 0.1 ? "<0,1%" : `${p.toLocaleString("pt-BR", { maximumFractionDigits: p < 10 ? 1 : 0 })}%`; };
+  const fmtPct = (v: number) => { const p = pctOf(v); return p > 0 && p < 0.1 ? "<0,1%" : `${p.toLocaleString(currentLang(), { maximumFractionDigits: p < 10 ? 1 : 0 })}%`; };
   const ang = angles(slices, total);
   const hv = slices.find((s) => s.key === hover) ?? null;
   const usedPct = Math.round(pctOf(d.usedBytes));

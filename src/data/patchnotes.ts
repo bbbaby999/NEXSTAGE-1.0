@@ -3,6 +3,8 @@
  * a versão do package.json (única fonte) igual à primeira entrada.
  * Seções: new = novas funcionalidades · improve = melhorias e otimizações · fix = correções · ui = interface.
  */
+import { tk } from "../lib/i18n";
+
 export type NoteType = "new" | "improve" | "fix" | "ui";
 export interface PatchNote {
   version: string;
@@ -12,10 +14,28 @@ export interface PatchNote {
 }
 
 export const NOTE_LABEL: Record<NoteType, string> = {
-  new: "Novas funcionalidades", improve: "Melhorias e otimizações", fix: "Correções de bugs", ui: "Alterações na interface",
+  new: tk("Novas funcionalidades"), improve: tk("Melhorias e otimizações"), fix: tk("Correções de bugs"), ui: tk("Alterações na interface"),
 };
 
 export const PATCH_NOTES: PatchNote[] = [
+  {
+    version: "1.0.1",
+    date: "2026-11-12",
+    summary: "Traduções completas nos 10 idiomas, configurações mais organizadas e um app mais seguro e leve.",
+    sections: [
+      { type: "improve", items: [
+        "Traduções completas em inglês, espanhol, francês, alemão, italiano, russo, japonês, coreano e chinês: Central de Controles, Backup e restauração, notas de atualização da Steam e os demais textos que ainda apareciam em português.",
+        "Datas, horário do relógio e números seguem o idioma escolhido.",
+        "O NEXSTAGE abre uma cópia só: abrir de novo (atalho ou início com o Windows) traz a janela que já está aberta para a frente.",
+        "As chaves do SteamGridDB e do RAWG passam a ser guardadas cifradas pelo Windows, como as demais credenciais (as já salvas são convertidas automaticamente).",
+        "Abertura mais leve: as telas menos usadas são carregadas em segundo plano.",
+      ] },
+      { type: "ui", items: [
+        "A notificação de captura (e a duração dela) foi para Configurações → Sons e notificações, junto das demais notificações.",
+        "Removidos os botões de teste das notificações de conquistas e de controles.",
+      ] },
+    ],
+  },
   {
     version: "1.0.0",
     date: "2026-11-04",

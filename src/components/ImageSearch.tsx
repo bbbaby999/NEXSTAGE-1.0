@@ -208,7 +208,7 @@ export default function ImageSearch({ mode, term, platform, onConfirm, onClose }
         <Button variant="ghost" onClick={onClose}>{t("Cancelar")}</Button>
         {game && images && (
           <Button variant="primary" disabled={!picked.length || saving} onClick={confirm}>
-            {saving ? t("Aplicando…") : multi ? `Adicionar ${picked.length || ""} à galeria`.replace("  ", " ") : t("Usar esta imagem")}
+            {saving ? t("Aplicando…") : multi ? (picked.length ? t("Adicionar {n} à galeria", { n: picked.length }) : t("Adicionar à galeria")) : t("Usar esta imagem")}
           </Button>
         )}
       </div>

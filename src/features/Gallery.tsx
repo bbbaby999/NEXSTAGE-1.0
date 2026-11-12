@@ -121,7 +121,7 @@ export default function Gallery() {
       const paths = Array.isArray(sel) ? sel : typeof sel === "string" ? [sel] : [];
       if (!paths.length) return;
       const r = await api.importScreenshots(p.id, target === "" ? null : target, paths);
-      toast(t("{imported} importada(s){v1}{v2}.", { imported: r.imported, v1: r.duplicates ? `, ${r.duplicates} já existia(m)` : "", v2: r.failed.length ? `, ${r.failed.length} com erro` : "" }), r.failed.length && !r.imported ? "err" : "ok");
+      toast(t("{imported} importada(s){v1}{v2}.", { imported: r.imported, v1: r.duplicates ? t(", {n} já existia(m)", { n: r.duplicates }) : "", v2: r.failed.length ? t(", {n} com erro", { n: r.failed.length }) : "" }), r.failed.length && !r.imported ? "err" : "ok");
       if (r.failed.length) toast(r.failed[0], "err");
       await load();
     } catch (e) { toast(errMsg(e), "err"); }

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import Button from "./Button";
-import AchToastTest from "./AchToastTest";
 import Select from "./Select";
 import SteamImport from "./SteamImport";
 import { api, errMsg } from "../lib/api";
@@ -172,7 +171,6 @@ export default function SteamSettings() {
         <div className="setting">
           <div><strong>{t("Avisar novos desbloqueios")}</strong><small>{t("Assim que você desbloqueia uma conquista num jogo da Steam, mostra o cartão no estilo dos consoles por cima do jogo, com som. Precisa da chave da Web API.")}</small></div>
           <div className="row">
-            <AchToastTest />
             <Button variant={notify ? "primary" : "default"} onClick={() => { const v = !notify; setNotify(v); api.setAppSetting("steam_notify", v ? "1" : "0").catch(() => {}); }}>{notify ? t("Ligado") : t("Desligado")}</Button>
           </div>
         </div>

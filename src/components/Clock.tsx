@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { currentLang } from "../lib/i18n";
 
 export default function Clock() {
   const [now, setNow] = useState(new Date());
@@ -8,8 +9,8 @@ export default function Clock() {
   }, []);
   return (
     <div className="clock">
-      <strong>{now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</strong>
-      <small>{now.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })}</small>
+      <strong>{now.toLocaleTimeString(currentLang(), { hour: "2-digit", minute: "2-digit" })}</strong>
+      <small>{now.toLocaleDateString(currentLang(), { day: "numeric", month: "long", year: "numeric" })}</small>
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { currentLang } from "./i18n";
+
 export function formatDuration(sec: number): string {
   if (sec < 60) return sec <= 0 ? "0 min" : "< 1 min";
   const h = Math.floor(sec / 3600);
@@ -9,7 +11,7 @@ export function formatDuration(sec: number): string {
 export function formatDate(s: string | null): string {
   if (!s) return "Nunca";
   const d = new Date(s.replace(" ", "T") + "Z");
-  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString(currentLang(), { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export function formatBytes(b: number): string {
@@ -22,7 +24,7 @@ export function formatBytes(b: number): string {
 export function formatDateTime(s: string | null): string {
   if (!s) return "—";
   const d = new Date(s.replace(" ", "T") + "Z");
-  return isNaN(d.getTime()) ? "—" : d.toLocaleString("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return isNaN(d.getTime()) ? "—" : d.toLocaleString(currentLang(), { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 export function sortRecent(a: { lastPlayedAt: string | null }, b: { lastPlayedAt: string | null }) {
