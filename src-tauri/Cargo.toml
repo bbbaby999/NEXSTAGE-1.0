@@ -1,0 +1,60 @@
+[package]
+name = "nexstage"
+# Versão do crate (interna). A versão do app vem do package.json — ver build.rs.
+version = "1.0.0"
+description = "NEXSTAGE - ALL GAMES. ONE STAGE."
+edition = "2021"
+
+[lib]
+name = "nexstage_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+serde_json = "1"
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-global-shortcut = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled", "backup"] }
+thiserror = "1"
+tauri-plugin-opener = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-autostart = "2"
+# Uma cópia do app por vez (banco, controles e atalhos globais são exclusivos).
+tauri-plugin-single-instance = "2"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "rustls-tls-native-roots", "json"] }
+base64 = "0.22"
+hidapi = "2"
+sha2 = "0.10"
+png = "0.17"
+sysinfo = { version = "0.32", default-features = false, features = ["disk"] }
+# Espera entre requisições ao RetroAchievements (o tokio já vem com o Tauri; só ativa o timer).
+tokio = { version = "1", features = ["time"] }
+# Backup protegido por senha: chave derivada com Argon2id (salt aleatório).
+argon2 = "0.5"
+getrandom = "0.2"
+# Backup: AES-256-GCM (arquivos do backup protegidos por senha; a chave vem do Argon2id). Já vem com o rustls.
+ring = "0.17"
+
+# Bateria dos controles Xbox (inclusive por Bluetooth, onde o XInput não informa): Windows.Gaming.Input.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Foundation", "Foundation_Collections", "Gaming_Input", "Devices_Power", "System_Power"] }
+
+# Compilação de distribuição: binário menor e um pouco mais rápido, sem mudar comportamento.
+# - lto + codegen-units=1: otimização entre crates (remove código não usado das dependências);
+# - strip: tira símbolos de depuração do .exe (não são usados pelo app instalado).
+# Não usar panic = "abort": a varredura de pastas usa catch_unwind para não travar a interface.
+# Argon2 sem otimização fica lento demais na compilação de desenvolvimento.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "NEXSTAGE",
+  "version": "../package.json",
+  "identifier": "app.nexstage.launcher",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "visible": false,
+        "title": "NEXSTAGE",
+        "width": 1600,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "transparent": false,
+        "backgroundColor": "#05060a",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required"
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self' ipc: http://ipc.localhost",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' asset: http://asset.localhost data: blob: https:",
+        "media-src": "'self' asset: http://asset.localhost data: blob:",
+        "font-src": "'self' data:",
+        "connect-src": "'self' ipc: http://ipc.localhost asset: http://asset.localhost",
+        "object-src": "'none'",
+        "frame-src": "https://www.youtube-nocookie.com",
+        "base-uri": "'self'",
+        "form-action": "'none'"
+      },
+      "dangerousDisableAssetCspModification": [
+        "style-src"
+      ],
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPDATA/**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "languages": [
+          "PortugueseBR",
+          "English",
+          "Spanish",
+          "French",
+          "German",
+          "Italian",
+          "Russian",
+          "Japanese",
+          "Korean",
+          "SimpChinese"
+        ],
+        "displayLanguageSelector": true,
+        "installerHooks": "./windows/hooks.nsh"
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVGNTg2Qjg5OTgwMzQ1MEUKUldRT1JRT1lpV3RZN3lPM1JENXZOVzdWcFdOQjhLTG9pSHpma200aHFycUZ0eThvdzFqNUlST1cK",
+      "endpoints": [
+        "https://github.com/bbbaby999/NEXSTAGE-1.0/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

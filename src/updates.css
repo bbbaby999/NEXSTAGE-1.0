@@ -1,0 +1,72 @@
+/* =====================================================================
+   NEXSTAGE · Home → "Últimas atualizações" (notas oficiais da Steam)
+   ===================================================================== */
+.upd{position:relative;z-index:1;padding:0 0 var(--s7)}
+.upd .section-head{margin-top:var(--s3)}
+.upd-tools{display:flex;align-items:center;gap:var(--s3)}
+.upd-status{display:inline-flex;align-items:center;gap:8px;color:var(--text-dim);font-size:.82rem}
+.upd-spin{width:12px;height:12px;border-radius:50%;border:2px solid rgba(var(--br),.25);border-top-color:var(--b);animation:upd-rot .8s linear infinite}
+@keyframes upd-rot{to{transform:rotate(360deg)}}
+
+/* destaque */
+.upd-hero{position:relative;display:grid;grid-template-columns:auto 1fr;gap:var(--s5);padding:var(--s5);border-radius:var(--r-xl);overflow:hidden;isolation:isolate;
+  border:1px solid var(--glass-line);background:linear-gradient(180deg,var(--glass-hi),var(--glass));box-shadow:var(--elev-2),inset 0 1px 0 var(--glass-hi)}
+/* arte do jogo desfocada ao fundo, bem discreta */
+.upd-hero::before{content:"";position:absolute;inset:-30px;z-index:-2;background:var(--upd-cover) center/cover;filter:blur(36px) saturate(1.3);opacity:.28;transform:scale(1.1)}
+.upd-hero::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(5,7,12,.55),rgba(5,7,12,.85) 60%)}
+.upd-cover{width:150px;aspect-ratio:2/3;border-radius:var(--r-md);border:1px solid rgba(255,255,255,.12);cursor:pointer;padding:0;
+  background:#0d1018 center/cover no-repeat;box-shadow:0 18px 36px -12px rgba(0,0,0,.8);transition:transform var(--dur) var(--ease)}
+.upd-cover:hover{transform:translateY(-3px)}
+.upd-body{display:flex;flex-direction:column;gap:var(--s2);min-width:0}
+.upd-kicker{display:flex;gap:var(--s2);flex-wrap:wrap}
+.upd-badge{font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 10px;border-radius:999px;border:1px solid}
+.upd-badge.official{color:var(--b);border-color:rgba(var(--br),.45);background:rgba(var(--ar),.16)}
+.upd-badge.likely{color:var(--text-dim);border-color:var(--glass-line);background:var(--glass)}
+.upd-badge.new{color:#06150d;border-color:#34d399;background:#34d399;box-shadow:0 0 16px rgba(52,211,153,.5)}
+.upd-game{font-size:1.55rem;font-weight:500;letter-spacing:-.01em;overflow-wrap:anywhere}
+.upd-title{font-weight:600;color:var(--text)}
+.upd-when{color:var(--text-dim)}
+.upd-sum{margin:var(--s1) 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px;color:var(--text);line-height:1.45;max-width:880px}
+.upd-sum li::marker{color:var(--b)}
+.upd-sum-text{line-height:1.5;max-width:880px}
+.upd-actions{display:flex;gap:var(--s3);flex-wrap:wrap;margin-top:var(--s3)}
+
+/* demais jogos */
+.upd-others{margin-top:var(--s5)}
+.upd-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--s3)}
+.upd-row{display:flex;gap:var(--s3);align-items:center;padding:10px;text-align:left;cursor:pointer;color:var(--text);font:inherit;
+  border-radius:var(--r-md);border:1px solid var(--glass-line);background:linear-gradient(180deg,var(--glass-hi),var(--glass))}
+.upd-row:hover{background:rgba(var(--ar),.14)}
+.upd-thumb{flex:none;width:46px;aspect-ratio:2/3;border-radius:8px;background:#0d1018 center/cover no-repeat}
+.upd-row-text{display:flex;flex-direction:column;min-width:0}
+.upd-row-text strong,.upd-row-text small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.upd-row-text small{color:var(--text-dim)}
+.upd-row-text em{font-style:normal;font-size:.75rem;color:var(--lab)}
+
+/* estados */
+.upd-empty{display:flex;align-items:center;justify-content:space-between;gap:var(--s4);flex-wrap:wrap;padding:var(--s4) var(--s5);
+  border-radius:var(--r-lg);border:1px dashed var(--glass-line);background:var(--glass);color:var(--text-dim)}
+.upd-none{color:var(--text-dim);font-size:.9rem}
+.upd-skel{display:grid;place-items:center;min-height:160px;border-radius:var(--r-xl);color:var(--text-dim);font-size:.9rem;
+  background:linear-gradient(100deg,var(--glass) 30%,rgba(255,255,255,.06) 50%,var(--glass) 70%) 0 0/200% 100%;animation:upd-shine 1.6s linear infinite;
+  border:1px solid var(--glass-line)}
+@keyframes upd-shine{to{background-position:-200% 0}}
+
+/* notas completas */
+.upd-modal-meta{margin-top:-8px;margin-bottom:var(--s3)}
+.upd-notes{max-height:60vh;overflow-y:auto;padding:var(--s4);border-radius:var(--r-md);background:rgba(0,0,0,.25);border:1px solid var(--glass-line);user-select:text}
+.bbcode{display:flex;flex-direction:column;gap:8px;line-height:1.55}
+.bbcode h4{font-size:1.05rem;color:var(--lab);margin-top:var(--s2)}
+.bbcode h5{font-size:.95rem;margin-top:var(--s1)}
+.bbcode ul,.bbcode ol{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:3px}
+.bbcode li::marker{color:var(--b)}
+.bbcode blockquote{margin:0;padding:8px 12px;border-left:3px solid rgba(var(--br),.5);background:var(--glass)}
+.bbcode code{font-family:ui-monospace,Consolas,monospace;font-size:.88em}
+.bbcode hr{border:none;border-top:1px solid var(--glass-line)}
+.bb-table{overflow-x:auto}
+.bb-table td,.bb-table th{border:1px solid var(--glass-line);padding:4px 8px}
+.bb-link{background:none;border:none;padding:0;color:var(--b);font:inherit;cursor:pointer;text-decoration:underline}
+
+@media (max-width:760px){.upd-hero{grid-template-columns:1fr}.upd-cover{width:110px}}
+html[data-motion="reduced"] :is(.upd-spin,.upd-skel){animation:none}
+@media (prefers-reduced-motion:reduce){html:not([data-motion="full"]) :is(.upd-spin,.upd-skel){animation:none}}

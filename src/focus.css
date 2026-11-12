@@ -1,0 +1,36 @@
+/* =====================================================================================================
+ * Indicador de foco unificado (carregado por último).
+ * Antes cada componente redefinia `transition` sem incluir box-shadow (.btn, .seg, .tab, menus...):
+ * o anel aparecia e sumia "seco" em uns e suave em outros, e campos de texto tinham um anel mais
+ * fraco que os botões. Aqui: mesmo anel na cor do tema para tudo que navega, entrada suave do halo
+ * e saída suave do anel. Os destaques próprios (capas, cartões da Home, PIN...) continuam valendo.
+ * ===================================================================================================== */
+
+/* Anel: transição de entrada/saída em todos os navegáveis (as durações de cada componente são mantidas) */
+html [data-focus]{transition-property:transform,box-shadow,background,background-color,color,border-color,opacity}
+
+/* Halo: surge com um leve "acender" e depois respira (só opacity/transform: barato) */
+html [data-focus]:not(.pad-card):focus::after{animation:focus-in .22s var(--ease,ease-out) both,halo 3.2s ease-in-out .22s infinite}
+@keyframes focus-in{from{opacity:0;transform:scale(.96)}to{opacity:.5;transform:none}}
+
+/* Campos de texto, listas nativas e barras deslizantes: o mesmo anel dos botões */
+html :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea):focus{
+  outline:none;border-color:var(--b);box-shadow:inset 0 2px 6px rgba(0,0,0,.45),0 0 0 2px var(--b),0 0 18px rgba(var(--br),.35);
+  transition:box-shadow var(--dur-fast,140ms) var(--ease,ease),border-color var(--dur-fast,140ms)}
+html input[type=range]:focus{outline:none}
+html input[type=range]:focus-visible::-webkit-slider-thumb,html input[type=range]:focus::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--b),0 0 16px rgba(var(--br),.55)}
+html :is(input[type=checkbox],input[type=radio]):focus{outline:2px solid var(--b);outline-offset:2px}
+
+/* Seletores em linha: a opção focada fica clara mesmo quando não é a escolhida */
+html .seg button:focus:not(.on){background:rgba(var(--br),.14);color:var(--text,#fff)}
+
+/* Abas/seções atuais em menus laterais e barras de abas: o foco nunca fica "escondido" atrás do destaque de ativo */
+html :is(.set-nav button,.pad-cat,.dp-tabs button).on:focus{box-shadow:0 0 0 2px var(--b),0 0 22px rgba(var(--br),.45)}
+
+/* O anel não é cortado pelo contêiner rolável da página em itens colados na borda */
+html .main{scroll-padding:24px}
+
+@media (prefers-reduced-motion: reduce){
+  html [data-focus]:focus::after{animation:none;opacity:.6}
+}
+html[data-motion="reduced"] [data-focus]:focus::after{animation:none;opacity:.6}

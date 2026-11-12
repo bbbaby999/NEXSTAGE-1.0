@@ -1,0 +1,222 @@
+/* =====================================================================
+   NEXSTAGE · RetroAchievements (central, painel do jogo, avisos)
+   Segue a camada de design (design.css): vidro sem blur, cor do tema com
+   moderação; dourado só para Hardcore/maestria. Anima apenas transform/opacity.
+   ===================================================================== */
+:root{--ra-gold:#f5c451;--ra-gold-rgb:245,196,81}
+
+/* ---------- selos ---------- */
+.ra-hc{display:inline-block;font-style:normal;font-size:.62rem;font-weight:800;letter-spacing:.08em;padding:1px 6px;border-radius:6px;
+  color:#1b1300;background:linear-gradient(180deg,#ffe08a,var(--ra-gold));box-shadow:0 0 10px rgba(var(--ra-gold-rgb),.35);margin-left:6px;vertical-align:middle}
+.ra-cover-badge{position:absolute;right:8px;bottom:8px;z-index:1;font-style:normal;font-size:.62rem;font-weight:800;letter-spacing:.1em;padding:2px 7px;border-radius:7px;
+  color:var(--ra-gold);background:rgba(8,10,18,.78);border:1px solid rgba(var(--ra-gold-rgb),.45);pointer-events:none}
+.chips .ra-chip-tag{display:inline-flex;align-items:center;gap:4px;border-color:rgba(var(--ra-gold-rgb),.5);color:var(--ra-gold)}
+.ra-warn{margin:10px 0;padding:10px 14px;border-radius:var(--r-md);background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.3);color:#ffc2cd;font-size:.86rem}
+.ra-err{display:block;color:#ff9fb2}
+.ra-icon-ph,.ra-user-ph{display:grid;place-items:center;color:var(--muted);background:var(--glass);border:1px solid var(--glass-line)}
+
+/* ---------- central ---------- */
+.ra-sync-state{font-size:.82rem;color:var(--text-dim);max-width:420px}
+.ra-sync-state.err{color:#ff9fb2}
+.ra-hero{display:flex;gap:var(--s5);align-items:stretch;flex-wrap:wrap;padding:var(--s5);border-radius:var(--r-xl);position:relative;overflow:hidden;
+  background:radial-gradient(600px 220px at 0% 0%,rgba(var(--ar),.28),transparent 70%),linear-gradient(180deg,var(--glass-hi),var(--glass));
+  border:1px solid var(--glass-line);box-shadow:var(--elev-2),inset 0 1px 0 var(--glass-hi)}
+.ra-hero::after{content:"";position:absolute;inset:auto -40px -60px auto;width:260px;height:260px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,rgba(var(--ra-gold-rgb),.12),transparent 65%)}
+.ra-user{display:flex;align-items:center;gap:var(--s3);background:none;border:none;cursor:pointer;text-align:left;border-radius:var(--r-lg);padding:6px 10px 6px 6px;min-width:240px}
+.ra-user img,.ra-user .ra-user-ph{width:72px;height:72px;border-radius:18px;object-fit:cover;flex:none;border:1px solid rgba(var(--br),.4);box-shadow:0 0 24px rgba(var(--br),.2)}
+.ra-user b{display:block;font-size:1.3rem;font-weight:600}
+.ra-user small{display:block;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ra-stats{flex:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--s3)}
+.ra-stat{padding:14px 16px;border-radius:var(--r-md);background:rgba(0,0,0,.18);border:1px solid var(--glass-line);display:flex;flex-direction:column;gap:2px}
+.ra-stat strong{font-size:1.6rem;font-weight:300;font-variant-numeric:tabular-nums;color:var(--text)}
+.ra-stat.main strong{color:var(--ra-gold);text-shadow:0 0 18px rgba(var(--ra-gold-rgb),.35)}
+.ra-stat span{font-size:.78rem;color:var(--text-dim)}
+.ra-note{margin:var(--s3) 0 0;font-size:.82rem;color:var(--text-dim);max-width:980px;line-height:1.5}
+.ra-toolbar{display:flex;gap:var(--s3);align-items:center;flex-wrap:wrap;margin-top:var(--s5)}
+.ra-toolbar .search{width:240px}
+.ra-empty{max-width:640px;margin:0 auto}
+.ra-empty h2{font-weight:400;color:var(--text)}
+.ra-empty svg{color:var(--ra-gold)}
+
+.ra-recent{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(150px,170px);gap:var(--s3);overflow-x:auto;padding:4px 4px 12px;scroll-snap-type:x proximity}
+.ra-recent-item{scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:14px 10px;border-radius:var(--r-lg);cursor:pointer;
+  background:linear-gradient(180deg,var(--glass-hi),var(--glass));border:1px solid var(--glass-line);color:inherit}
+.ra-recent-item img{width:64px;height:64px;border-radius:12px;box-shadow:0 8px 18px -8px #000,0 0 0 1px rgba(255,255,255,.08)}
+.ra-recent-item b{font-size:.86rem;font-weight:600;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ra-recent-item small{font-size:.72rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ra-recent-item em{font-style:normal;font-size:.7rem;color:var(--lab)}
+.ra-recent-item:hover{transform:translateY(-2px)}
+
+.ra-games{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:var(--s3)}
+.ra-game{display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:var(--r-lg);cursor:pointer;text-align:left;color:inherit;
+  background:linear-gradient(180deg,var(--glass-hi),var(--glass));border:1px solid var(--glass-line);box-shadow:var(--elev-1)}
+.ra-game:hover{transform:translateY(-2px);border-color:rgba(var(--br),.35)}
+.ra-game-top{display:flex;gap:12px;align-items:center;min-width:0}
+.ra-game-top img,.ra-game-top .ra-icon-ph{width:56px;height:56px;border-radius:12px;flex:none}
+.ra-game-top div{min-width:0}
+.ra-game-top strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ra-game-top small{display:block;font-size:.74rem}
+
+/* ---------- progresso ---------- */
+.ra-prog{display:flex;flex-direction:column;gap:6px}
+.ra-bar{position:relative;height:8px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
+.ra-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;transition:width var(--dur-slow) var(--ease)}
+.ra-bar i.soft{background:linear-gradient(90deg,rgba(var(--ar),.7),rgba(var(--br),.7))}
+.ra-bar i.hc{background:linear-gradient(90deg,#d9a52e,var(--ra-gold));box-shadow:0 0 10px rgba(var(--ra-gold-rgb),.5)}
+.ra-prog.compact .ra-bar{height:6px}
+.ra-prog-meta{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.78rem;color:var(--text-dim)}
+.ra-prog-meta b{color:var(--text);font-weight:600}
+.ra-hc-txt{color:var(--ra-gold)}
+.ra-award{font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:1px 8px;border-radius:99px;border:1px solid rgba(var(--br),.45);color:var(--b)}
+.ra-award.mastered,.ra-award.beaten-hardcore{border-color:rgba(var(--ra-gold-rgb),.6);color:var(--ra-gold)}
+
+/* ---------- listas de conquistas ---------- */
+.ra-ach-list{display:flex;flex-direction:column;gap:8px;margin-top:var(--s3)}
+.ra-ach{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:14px;align-items:center;padding:10px 14px 10px 10px;border-radius:var(--r-md);cursor:pointer;text-align:left;color:inherit;
+  background:linear-gradient(180deg,var(--glass-hi),var(--glass));border:1px solid var(--glass-line)}
+.ra-ach:hover{border-color:rgba(var(--br),.35)}
+.ra-badge{width:56px;height:56px;border-radius:10px;overflow:hidden;display:grid;place-items:center;background:rgba(0,0,0,.25);color:var(--muted)}
+.ra-badge img{width:100%;height:100%;object-fit:cover}
+.ra-ach.locked .ra-badge img{filter:grayscale(1) brightness(.75)}
+.ra-ach.locked strong{color:var(--text-dim)}
+.ra-ach-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ra-ach-text strong{font-weight:600}
+.ra-ach-text span{font-size:.84rem;color:var(--text-dim)}
+.ra-ach-text small{font-size:.72rem;color:var(--muted)}
+.ra-ach-side{display:flex;flex-direction:column;align-items:center;min-width:44px}
+.ra-ach-side b{font-size:1.1rem;font-weight:600;font-variant-numeric:tabular-nums}
+.ra-ach.done .ra-ach-side b{color:var(--b)}
+.ra-ach-side small{font-size:.66rem;text-transform:uppercase;letter-spacing:.1em}
+.ra-ach-side .ra-hc{margin:4px 0 0}
+.ra-ach-list.mini .ra-ach{grid-template-columns:40px minmax(0,1fr) auto;padding:6px 10px 6px 6px}
+.ra-ach-list.mini .ra-badge{width:40px;height:40px}
+.ra-ach-list.mini .ra-ach-text span{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+
+/* ---------- modal do jogo ---------- */
+.ra-gm-head{display:flex;gap:16px;align-items:center;margin-bottom:12px}
+.ra-gm-icon{width:72px;height:72px;border-radius:14px;flex:none}
+.ra-gm-info{flex:1;display:flex;flex-direction:column;gap:8px}
+.ra-gm-tools{margin-top:6px}
+.modal .ra-ach-list{max-height:52vh;overflow-y:auto;padding-right:4px}
+
+/* ---------- painel na página do jogo ---------- */
+.ra-sec{display:flex;align-items:center;gap:8px}
+.ra-sec svg{color:var(--ra-gold)}
+.ra-panel{display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:var(--r-lg);
+  background:linear-gradient(180deg,var(--glass-hi),var(--glass));border:1px solid var(--glass-line);box-shadow:var(--elev-1),inset 0 1px 0 var(--glass-hi)}
+.ra-panel p{margin:0}
+.ra-panel-game{display:flex;gap:12px;align-items:center}
+.ra-panel-game img{width:48px;height:48px;border-radius:10px}
+.ra-panel-game small{display:block}
+.ra-cands{display:flex;flex-direction:column;gap:8px}
+.ra-cands.scroll{max-height:50vh;overflow-y:auto;padding-right:4px}
+.ra-cand{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 10px 8px 8px;border-radius:var(--r-md);background:rgba(0,0,0,.18);border:1px solid var(--glass-line)}
+.ra-cand img,.ra-cand .ra-icon-ph{width:44px;height:44px;border-radius:10px}
+.ra-cand strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ra-cand small{display:block;font-size:.74rem}
+
+/* ---------- configurações ---------- */
+.ra-acc{flex-wrap:wrap}
+.ra-acc-id{display:flex;gap:14px;align-items:center;min-width:0}
+.ra-acc-id img,.ra-acc-id .ra-user-ph{width:52px;height:52px;border-radius:14px;flex:none;object-fit:cover}
+.ra-confirm{border-color:rgba(255,77,109,.35)}
+.ra-check{display:flex;align-items:center;gap:10px;font-size:.9rem;cursor:pointer}
+.ra-check input{width:18px;height:18px;padding:0;accent-color:var(--a)}
+.ra-emus{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;width:100%}
+.ra-emus li{display:grid;grid-template-columns:minmax(120px,auto) auto 1fr;gap:4px 14px;align-items:baseline;padding:10px 12px;border-radius:var(--r-md);background:rgba(0,0,0,.18);border:1px solid var(--glass-line)}
+.ra-emus li small{grid-column:1/-1}
+.ra-emu-mode{font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:1px 8px;border-radius:99px;border:1px solid var(--glass-line);color:var(--muted);justify-self:start}
+.ra-emus li.realtime .ra-emu-mode{border-color:rgba(var(--ra-gold-rgb),.55);color:var(--ra-gold)}
+.ra-emus li.polling .ra-emu-mode{border-color:rgba(var(--br),.45);color:var(--b)}
+
+/* ---------- aviso dentro do app ---------- */
+.ra-toasts{position:fixed;top:86px;right:28px;z-index:120;display:flex;flex-direction:column;gap:10px;pointer-events:none;width:min(380px,calc(100vw - 32px))}
+.ra-toast{display:flex;align-items:center;gap:14px;padding:12px 16px 12px 12px;border-radius:18px;
+  background:linear-gradient(180deg,rgba(24,30,50,.96),rgba(8,11,20,.97));border:1px solid rgba(var(--ra-gold-rgb),.35);
+  box-shadow:0 18px 40px -16px rgba(0,0,0,.9),0 0 30px rgba(var(--ra-gold-rgb),.12),inset 0 1px 0 rgba(255,255,255,.08);
+  animation:ra-in .5s cubic-bezier(.2,.9,.25,1.05) both}
+.ra-toast.more{justify-content:center;font-size:.82rem;color:var(--text-dim);padding:8px}
+.ra-toast-icon{width:56px;height:56px;border-radius:12px;overflow:hidden;flex:none;display:grid;place-items:center;color:var(--ra-gold);background:rgba(0,0,0,.3)}
+.ra-toast-icon img{width:100%;height:100%;object-fit:cover}
+.ra-toast-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ra-toast-text strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ra-toast-text small{font-size:.76rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ra-kicker{display:flex;align-items:center;gap:6px;font-size:.66rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ra-gold)}
+@keyframes ra-in{from{opacity:0;transform:translateX(36px) scale(.96)}to{opacity:1;transform:none}}
+
+/* ---------- conquista desbloqueada: cartão por cima de qualquer janela (janela de notificação) ----------
+   Comportamento no estilo dos consoles: o círculo com o ícone surge embaixo, no centro, expande numa
+   cápsula com o texto e, no fim, recolhe de volta ao círculo. Comum: grafite + anel na cor do tema.
+   Rara: borda dourada girando, brilho passando, faíscas em volta do ícone. */
+@property --ach-ang{syntax:"<angle>";inherits:false;initial-value:0deg}
+.ach-toast{--h:84px;position:relative;display:flex;align-items:center;gap:14px;height:var(--h);width:100%;margin:0 auto;padding:10px 22px 10px 10px;
+  border-radius:999px;overflow:hidden;color:#eef2ff;border:1px solid rgba(255,255,255,.14);
+  background:linear-gradient(180deg,rgba(38,42,56,.97),rgba(14,16,24,.98));
+  box-shadow:0 18px 38px -14px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.1);
+  animation:ach-grow .95s cubic-bezier(.2,.85,.25,1) both}
+.ach-toast.leaving{animation:ach-shrink .6s cubic-bezier(.5,0,.75,.2) forwards}
+@keyframes ach-grow{
+  0%{width:var(--h);transform:scale(.25);opacity:0}
+  22%{width:var(--h);transform:scale(1.1);opacity:1}
+  34%{width:var(--h);transform:scale(1)}
+  100%{width:100%;transform:none;opacity:1}}
+@keyframes ach-shrink{
+  0%{width:100%}
+  60%{width:var(--h);transform:scale(1);opacity:1}
+  100%{width:var(--h);transform:scale(.3);opacity:0}}
+.ach-badge{position:relative;flex:none;width:64px;height:64px}
+.ach-icon{width:64px;height:64px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:#0b0d14;color:#cfd6ea;
+  box-shadow:0 0 0 3px rgba(var(--br),.9),0 0 18px rgba(var(--br),.45)}
+.ach-icon img{width:100%;height:100%;object-fit:cover}
+.ach-body{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;animation:ach-text .35s .6s both}
+.ach-toast.leaving .ach-body{animation:ach-text-out .18s ease-in forwards}
+@keyframes ach-text{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+@keyframes ach-text-out{to{opacity:0}}
+.ach-kicker{display:flex;align-items:center;gap:6px;font-size:.64rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--b)}
+.ach-kicker b{font-size:.6rem;padding:0 5px;border-radius:4px;background:rgba(var(--ra-gold-rgb),.2);color:var(--ra-gold);letter-spacing:.06em}
+.ach-body strong{font-size:1rem;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ach-body small{font-size:.74rem;color:rgba(230,236,255,.68);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ach-src{position:absolute;top:8px;right:16px;font-size:.56rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.32);animation:ach-text .35s .7s both}
+
+/* rara */
+.ach-toast.rare{border:2px solid transparent;color:#fff8e6;
+  background:linear-gradient(180deg,#2a2010,#120d05) padding-box,
+    conic-gradient(from var(--ach-ang),#7a4e0c,#ffd56b,#fff4cf,#d4931f,#7a4e0c,#ffd56b,#7a4e0c) border-box;
+  box-shadow:0 18px 40px -14px rgba(0,0,0,.95),0 0 26px -4px rgba(255,196,64,.45);
+  animation:ach-grow .95s cubic-bezier(.2,.85,.25,1) both,ach-spin 3s linear infinite}
+.ach-toast.rare.leaving{animation:ach-shrink .6s cubic-bezier(.5,0,.75,.2) forwards,ach-spin 3s linear infinite}
+@keyframes ach-spin{to{--ach-ang:360deg}}
+.ach-toast.rare::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(105deg,transparent 35%,rgba(255,240,190,.38) 50%,transparent 65%);transform:translateX(-120%);
+  animation:ach-shine 1.4s 1s ease-in-out 2}
+@keyframes ach-shine{to{transform:translateX(120%)}}
+.ach-toast.rare .ach-icon{box-shadow:0 0 0 3px #ffd56b,0 0 22px rgba(255,200,80,.75);color:#ffd56b}
+.ach-toast.rare .ach-kicker{color:#ffd56b}
+.ach-toast.rare .ach-body small{color:rgba(255,236,190,.75)}
+.ach-spark{position:absolute;width:10px;height:10px;z-index:2;pointer-events:none;opacity:0;
+  background:radial-gradient(circle,#fff 0 18%,transparent 20%),conic-gradient(from 45deg,transparent 0 10%,#ffe9a8 12% 13%,transparent 15% 35%,#ffe9a8 37% 38%,transparent 40% 60%,#ffe9a8 62% 63%,transparent 65% 85%,#ffe9a8 87% 88%,transparent 90%);
+  animation:ach-spark 1.6s ease-out infinite}
+.ach-spark.s1{top:-2px;left:2px;animation-delay:.35s}
+.ach-spark.s2{top:4px;right:-4px;animation-delay:.75s}
+.ach-spark.s3{bottom:-3px;right:6px;animation-delay:1.1s}
+.ach-spark.s4{bottom:6px;left:-5px;animation-delay:1.45s}
+@keyframes ach-spark{0%{opacity:0;transform:scale(.2) rotate(0)}30%{opacity:1;transform:scale(1.2) rotate(45deg)}100%{opacity:0;transform:scale(.4) rotate(90deg)}}
+
+html[data-motion="reduced"] .ra-toast,html[data-motion="reduced"] .ra-game:hover,html[data-motion="reduced"] .ra-recent-item:hover{animation:none;transform:none}
+
+/* Aba Conquistas: seletor RetroAchievements | Steam, ao lado do título */
+.page-head .ach-source{margin-right:auto}
+
+/* Avisos de controle (mesmo cartão das conquistas): conectado = verde, desconectado = cinza,
+   bateria fraca = vermelho pulsando. */
+.ach-toast.pad .ach-icon{color:#e6ecff}
+.ach-toast.pad.ev-connected .ach-icon{box-shadow:0 0 0 3px #3ddc84,0 0 18px rgba(61,220,132,.5);color:#7cf0b0}
+.ach-toast.pad.ev-connected .ach-kicker{color:#5fe39b}
+.ach-toast.pad.ev-disconnected .ach-icon{box-shadow:0 0 0 3px #7d869c,0 0 10px rgba(125,134,156,.35);color:#a9b1c4}
+.ach-toast.pad.ev-disconnected .ach-kicker{color:#a9b1c4}
+.ach-toast.pad.ev-disconnected strong{color:#c9cfdd}
+.ach-toast.pad.ev-battery{border-color:rgba(255,90,79,.45)}
+.ach-toast.pad.ev-battery .ach-icon{color:#ff6b61;animation:pad-low 1s ease-in-out infinite}
+.ach-toast.pad.ev-battery .ach-kicker{color:#ff7a70}
+@keyframes pad-low{0%,100%{box-shadow:0 0 0 3px #ff5a4f,0 0 10px rgba(255,90,79,.35)}50%{box-shadow:0 0 0 3px #ff5a4f,0 0 24px rgba(255,90,79,.85)}}

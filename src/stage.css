@@ -1,0 +1,574 @@
+/* =============================================================================================
+   NEXSTAGE — atualização visual: Home (palco + Volte a jogar), indicadores adaptativos, screenshots
+   da internet, Gameboot e notificação de captura. Carregado depois de styles.css e design.css.
+   ============================================================================================= */
+
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* ---------- Indicadores de ombro (L1/R1 · LB/RB · L/R) ---------- */
+.pill.shoulder{min-width:3.2rem;text-align:center;padding:6px 14px;letter-spacing:.06em;color:var(--text-dim);animation:shoulder-in .32s var(--ease) both}
+.pill.shoulder.playstation{border-radius:8px 8px 4px 4px}
+.pill.shoulder.xbox,.pill.shoulder.generic{border-radius:10px 10px 5px 5px}
+.pill.shoulder.nintendo{border-radius:999px}
+@keyframes shoulder-in{from{opacity:0;transform:translateY(-4px) scale(.9)}to{opacity:1;transform:none}}
+
+/* ---------- Home: a barra de páginas fica no topo (como nas outras telas); o conteúdo ocupa a altura toda ---------- */
+.shell.home-mode .main{display:flex;flex-direction:column}
+.shell.home-mode .main>.page{flex:1;display:flex;flex-direction:column;min-height:0}
+
+/* ---------- Home: palco do jogo em destaque ---------- */
+.ps-home.stage{flex:1;min-height:100%;padding:0;display:flex;flex-direction:column}
+.ps-home.stage.empty-stage{justify-content:center}
+/* Destaque logo abaixo da barra superior; "Volte a jogar" em seguida (aproveita a altura da tela). */
+.stage-top{display:flex;flex-direction:column;justify-content:flex-start;padding-top:clamp(8px,3.5vh,44px)}
+.stage-hero{display:flex;gap:clamp(22px,2.4vw,40px);align-items:stretch;padding:0 0 clamp(20px,4vh,44px);animation:stage-in .6s var(--ease) both}
+@keyframes stage-in{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+
+.stage-cover{
+  --cw:clamp(11rem,15vw,19.5rem);width:var(--cw);aspect-ratio:4/5;flex:none;padding:0;cursor:pointer;
+  border-radius:14px;background:linear-gradient(160deg,#1b2650,#0c1020) center/cover;
+  display:grid;place-items:center;font-size:5rem;font-weight:800;color:rgba(255,255,255,.2);
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 34px 70px -24px rgba(0,0,0,.95),0 0 0 1px rgba(var(--br),.08),0 0 50px -10px rgba(var(--ar),.35);
+  --s:1;--ty:0px;position:relative;
+  transform:translateY(var(--ty)) perspective(800px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) scale(var(--s));
+  transition:transform var(--dur) var(--ease),box-shadow var(--dur)
+}
+.stage-cover:hover,.stage-cover:focus{will-change:transform;--ty:-4px;--s:1.05}
+/* reflexo que acompanha o mouse (o mesmo das capas da Biblioteca) */
+.stage-cover::before,.replay-cover::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity var(--dur);
+  background:radial-gradient(circle at var(--mx,50%) var(--my,0%),rgba(255,255,255,.2),transparent 55%)}
+.stage-cover:hover::before,.stage-cover:focus::before,.replay-card:hover .replay-cover::before,.replay-card:focus .replay-cover::before{opacity:1}
+/* 4. favorito no canto da capa, longe do nome */
+.stage-cover .fav{top:10px;right:12px;z-index:1;font-size:1.25rem;pointer-events:none}
+
+.stage-info{display:flex;flex-direction:column;justify-content:space-between;gap:18px;min-width:0;padding:6px 0 0}
+.stage-head{display:flex;flex-direction:column;gap:14px}
+.stage-title{font-size:clamp(2rem,3.1vw,3.3rem);font-weight:600;letter-spacing:-.01em;line-height:1.08;text-shadow:0 4px 28px rgba(0,0,0,.65)}
+.stage-tags{display:flex;gap:8px;flex-wrap:wrap}
+.stage-tags span{padding:4px 11px;border-radius:7px;background:rgba(10,14,26,.62);border:1px solid rgba(255,255,255,.14);font-size:.8rem;color:#dbe2f4;letter-spacing:.01em}
+.stage-tags .fav{color:#ffd76a;border-color:rgba(255,215,106,.35)}
+.stage-when{color:rgba(214,222,244,.62);font-size:.8rem}
+
+.stage-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.stage-actions .btn{padding:14px 28px;font-size:1.04rem;font-weight:600}
+.stage-play.btn.primary{min-width:clamp(9.5rem,11vw,12.5rem);justify-content:center;color:#fff;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--b) 38%,var(--a)),var(--a));
+  box-shadow:0 12px 32px -10px rgba(var(--ar),.95),inset 0 1px 0 rgba(255,255,255,.35)}
+.stage-open.btn{background:rgba(12,16,28,.72);border:1px solid rgba(255,255,255,.14);box-shadow:var(--elev-1)}
+.stage-open.btn:hover{background:rgba(26,32,50,.85)}
+.stage-more{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:#e6ecff;
+  background:rgba(12,16,28,.72);border:1px solid rgba(255,255,255,.14);transition:background var(--dur-fast),transform var(--dur-fast)}
+.stage-more:hover{background:rgba(26,32,50,.85)}
+
+.stage-shots{display:flex;gap:12px}
+.stage-shot{width:clamp(7.5rem,8.8vw,10.5rem);aspect-ratio:16/9;padding:0;border-radius:8px;overflow:hidden;cursor:pointer;
+  background:rgba(10,12,20,.6);border:1px solid rgba(255,255,255,.16);color:var(--text);font-weight:700;display:grid;place-items:center;
+  box-shadow:0 14px 30px -14px rgba(0,0,0,.9);transition:transform var(--dur) var(--ease),border-color var(--dur)}
+.stage-shot img{width:100%;height:100%;object-fit:cover;display:block}
+.stage-shot:hover,.stage-shot:focus{transform:translateY(-2px) scale(1.05);border-color:rgba(255,255,255,.85);z-index:2}
+
+/* ---------- Home: carrossel "Volte a jogar" ---------- */
+.replay{padding:6px 0 26px;animation:stage-in .6s .12s var(--ease) both}
+.replay-head{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.replay-head .section{margin:0}
+.replay-track{display:flex;gap:18px;overflow-x:auto;scroll-behavior:smooth;scroll-snap-type:x proximity;padding:16px 8px 18px;margin:0 -8px;scrollbar-width:none;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 44px,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(90deg,transparent,#000 44px,#000 calc(100% - 44px),transparent)}
+.replay-track.at-start{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 44px),transparent)}
+.replay-track.at-end{-webkit-mask-image:linear-gradient(90deg,transparent,#000 44px);mask-image:linear-gradient(90deg,transparent,#000 44px)}
+.replay-track.at-start.at-end{-webkit-mask-image:none;mask-image:none}
+.replay-track::-webkit-scrollbar{display:none}
+.replay-card{flex:none;width:clamp(8.5rem,9.6vw,11.5rem);display:flex;flex-direction:column;gap:6px;padding:0;background:none;border:none;color:var(--text);
+  text-align:left;cursor:pointer;scroll-snap-align:start}
+.replay-inner{display:flex;flex-direction:column;gap:6px;min-width:0;animation:replay-in .45s calc(var(--i) * 45ms + .15s) var(--ease) both}
+@keyframes replay-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.replay-cover{aspect-ratio:3/4;border-radius:12px;background:linear-gradient(160deg,#1b2650,#0c1020) center/cover;display:grid;place-items:center;
+  font-size:2.4rem;font-weight:800;color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.12);box-shadow:var(--elev-2);
+  --s:1;--ty:0px;position:relative;
+  transform:translateY(var(--ty)) perspective(800px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) scale(var(--s));
+  transition:transform var(--dur) var(--ease),box-shadow var(--dur),border-color var(--dur)}
+.replay-card strong{font-weight:600;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
+.replay-card small{font-size:.74rem;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.replay-card:focus{box-shadow:none}
+.replay-card:focus strong{color:#fff}
+.replay-card:focus::after{display:none}
+.replay-card:hover .replay-cover{will-change:transform;--ty:-4px;--s:1.05;border-color:rgba(255,255,255,.3)}
+.replay-card:focus .replay-cover{will-change:transform;--ty:-4px;--s:1.05;border-color:transparent;
+  box-shadow:0 0 0 2px var(--b),0 0 30px 2px rgba(var(--br),.5),var(--elev-3)}
+
+/* ---------- Confirmações (ex.: Excluir captura): destaque claro do botão em foco ---------- */
+.modal .btn.ghost:focus{background:rgba(255,255,255,.1);color:#fff}
+.modal .btn.danger:focus{background:rgba(255,77,109,.3);border-color:#ff4d6d;color:#fff;box-shadow:0 0 0 2px #ff4d6d,0 0 26px rgba(255,77,109,.45)}
+.modal .btn.danger:focus::after{box-shadow:0 0 28px 2px rgba(255,77,109,.55)}
+
+/* Fundo da Home: preenche a tela sem zoom exagerado; parallax leve; sombra só onde há texto */
+.bg-layer{transform:translate3d(calc(var(--px,0)*-12px),calc(var(--py,0)*-8px),0) scale(1.035)}
+.bg-layer.soft{transform:translate3d(calc(var(--px,0)*-12px),calc(var(--py,0)*-8px),0) scale(1.16)}
+.bg-shade{background:
+  linear-gradient(90deg,rgba(4,6,12,.86) 0%,rgba(4,6,12,.5) 26%,rgba(4,6,12,.1) 54%,transparent 70%),
+  linear-gradient(0deg,rgba(4,6,12,.9) 0%,rgba(4,6,12,.42) 24%,transparent 50%),
+  linear-gradient(180deg,rgba(4,6,12,.6) 0%,transparent 17%)}
+
+@media (max-width:1180px){
+  .stage-hero{gap:20px}
+  .stage-actions .btn{padding:12px 20px}
+}
+
+/* ---------- Página do jogo: screenshots da internet ---------- */
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:var(--s6) 0 var(--s3)}
+.section-head .section{margin:0}
+.web-search{display:inline-flex;align-items:center;gap:9px;padding:9px 16px;border-radius:12px;cursor:pointer;font:inherit;font-size:.86rem;font-weight:600;
+  color:#e8f1ff;background:rgba(var(--ar),.1);border:1px solid rgba(var(--br),.55);
+  box-shadow:0 0 0 1px rgba(var(--br),.08),0 0 22px -6px rgba(var(--br),.55);transition:background var(--dur-fast),box-shadow var(--dur-fast)}
+.web-search:hover{background:rgba(var(--ar),.2);box-shadow:0 0 0 1px rgba(var(--br),.2),0 0 28px -4px rgba(var(--br),.7)}
+.web-search:disabled{opacity:.7;cursor:progress}
+.web-search[aria-busy="true"] svg{animation:spin-soft 1.1s linear infinite}
+@keyframes spin-soft{to{transform:rotate(360deg)}}
+
+.web-shots{margin-top:var(--s5);animation:fade .4s ease both}
+.section.sub{margin:0 0 var(--s3)}
+.web-big{position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:#05060a;isolation:isolate}
+.web-big::before{content:"";position:absolute;inset:-30px;background:var(--img) center/cover;filter:blur(30px) saturate(1.2) brightness(.55);z-index:-1}
+.web-big img{width:100%;height:100%;object-fit:contain;display:block;animation:fade .35s ease both;image-rendering:auto}
+.web-cap{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding:28px 16px 12px;
+  background:linear-gradient(0deg,rgba(4,6,12,.85),transparent);font-size:.84rem}
+.web-cap span{display:flex;gap:10px;align-items:center;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.web-cap b{font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--b);flex:none}
+.web-cap small{flex:none;color:var(--text-dim)}
+
+/* ---------- Remover screenshots (página do jogo) ---------- */
+.shotman{max-height:58vh;overflow-y:auto;padding:2px 6px 8px 2px;margin-bottom:var(--s4)}
+.shotman .section.sub{margin:var(--s4) 0 var(--s3)}
+.shotman .section.sub small{letter-spacing:0;text-transform:none;color:var(--text-dim)}
+.shotman-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
+.shotman-tile{display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:var(--r-md);background:var(--glass);border:1px solid var(--glass-line);transition:border-color var(--dur),background var(--dur)}
+.shotman-tile img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;display:block;background:#05060a}
+.shotman-tile .btn{width:100%;justify-content:center;padding:8px 12px;font-size:.84rem}
+.shotman-tile.armed{border-color:rgba(255,77,109,.55);background:rgba(255,77,109,.07)}
+.shotman-tile.armed img{opacity:.55;filter:grayscale(.6)}
+.shotman-tile .btn.danger:focus{background:rgba(255,77,109,.3);border-color:#ff4d6d;color:#fff;box-shadow:0 0 0 2px #ff4d6d,0 0 22px rgba(255,77,109,.45)}
+
+/* ---------- Gameboot (ao iniciar um jogo) ---------- */
+.gb-root{position:fixed;inset:0;z-index:250;background:radial-gradient(ellipse at 50% 45%,#0b1226 0%,#03050c 62%,#010208 100%);
+  display:grid;place-items:center;overflow:hidden;cursor:none;animation:gb-in .35s ease both}
+/* fim da animação: o conteúdo escurece (o fundo continua opaco) → o jogo é iniciado → a camada some */
+.gb-root.out>*:not(.sr-only){animation:gb-dark .6s ease forwards}
+.gb-root.fast>*:not(.sr-only){animation:gb-dark .3s ease forwards}
+.gb-root.out,.gb-root.fast{background:#010208;transition:background .5s ease}
+.gb-root.closing{animation:gb-close .38s ease forwards}
+.gb-root.closing>*{opacity:0}
+@keyframes gb-dark{to{opacity:0;filter:brightness(1.3) blur(3px)}}
+@keyframes gb-close{to{opacity:0}}
+@keyframes gb-in{from{opacity:0}to{opacity:1}}
+.gb-canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.gb-center{position:relative;display:flex;flex-direction:column;align-items:center;gap:14px;transform:translateY(-4vh)}
+.gb-cover{position:relative;width:clamp(150px,15vw,240px);aspect-ratio:3/4;border-radius:14px;overflow:hidden;
+  background:linear-gradient(160deg,#1b2650,#0c1020) center/cover;display:grid;place-items:center;font-size:4rem;font-weight:800;color:rgba(255,255,255,.25);
+  border:1px solid rgba(255,255,255,.22);box-shadow:0 0 0 1px rgba(var(--br),.15),0 0 60px -6px rgba(var(--br),.55),0 30px 60px -20px #000;
+  -webkit-box-reflect:below 10px linear-gradient(transparent 62%,rgba(255,255,255,.16));
+  opacity:0;transform:scale(.86) translateY(10px);filter:blur(10px) brightness(1.6);
+  animation:gb-cover .75s var(--t-cover) cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes gb-cover{to{opacity:1;transform:none;filter:none}}
+.gb-sweep{position:absolute;inset:-20%;background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.55) 49%,rgba(255,255,255,.1) 53%,transparent 62%);
+  transform:translateX(-110%);animation:gb-sweep .75s var(--t-sweep) ease-in-out forwards;mix-blend-mode:screen}
+@keyframes gb-sweep{to{transform:translateX(110%)}}
+.gb-title{margin-top:clamp(40px,7vh,72px);max-width:70vw;text-align:center;font-size:clamp(1.2rem,2vw,1.9rem);font-weight:300;letter-spacing:.32em;padding-left:.32em;
+  color:#eef6ff;text-transform:uppercase;text-shadow:0 0 18px rgba(var(--br),.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  opacity:0;filter:blur(8px);animation:gb-text .8s var(--t-title) ease forwards}
+.gb-sub{font-size:.72rem;letter-spacing:.4em;padding-left:.4em;color:rgba(200,220,255,.6);text-transform:uppercase;opacity:0;animation:gb-text .8s calc(var(--t-title) + .2s) ease forwards}
+.gb-sub span{color:var(--b)}
+@keyframes gb-text{to{opacity:1;filter:none}}
+
+/* ---------- Notificação de captura (janela própria, por cima do jogo) ---------- */
+html.toast-window,html.toast-window body{background:transparent!important;overflow:hidden}
+html.toast-window body::before{display:none}
+html.toast-window #root{display:flex;align-items:flex-end;justify-content:flex-end;padding:10px 10px 12px}
+.shot-toast{position:relative;display:flex;align-items:center;gap:14px;width:100%;height:100%;padding:12px 16px 14px 12px;border-radius:18px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(24,30,50,.94),rgba(8,11,20,.96));border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 18px 40px -16px rgba(0,0,0,.9),0 0 0 1px rgba(var(--br),.1),inset 0 1px 0 rgba(255,255,255,.08);
+  color:var(--text);animation:st-in .42s cubic-bezier(.2,.9,.25,1.05) both}
+.shot-toast.leaving{animation:st-out .38s ease-in forwards}
+@keyframes st-in{from{opacity:0;transform:translateX(40px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes st-out{to{opacity:0;transform:translateX(30px)}}
+.shot-toast img{width:140px;aspect-ratio:16/9;object-fit:cover;border-radius:10px;flex:none;border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 6px 16px -6px #000;animation:st-flash .5s ease both}
+@keyframes st-flash{from{filter:brightness(2.2)}to{filter:none}}
+.st-text{display:flex;flex-direction:column;gap:3px;min-width:0}
+.st-kicker{display:flex;align-items:center;gap:6px;font-size:.68rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--b)}
+.st-text strong{font-size:.98rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st-text small{font-size:.76rem;color:var(--text-dim)}
+.st-bar{position:absolute;left:0;bottom:0;height:3px;width:100%;background:linear-gradient(90deg,var(--a),var(--b));transform-origin:left;
+  animation:st-bar var(--secs) linear forwards;box-shadow:0 0 10px rgba(var(--br),.7)}
+@keyframes st-bar{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+
+/* ---------- Bateria: controle com cabo (só o raio) ---------- */
+.batt.wired{color:var(--b);filter:drop-shadow(0 0 6px rgba(var(--br),.55))}
+
+/* ---------- Home: tipografia (Sora), contraste e cor dinâmica da capa ----------
+   --game-rgb vem da capa do jogo em destaque (src/lib/accent.ts); sem capa colorida, usa o tema.
+   Legibilidade sobre qualquer arte: sombra curta e escura que contorna as letras + sombra larga
+   difusa; o brilho colorido é só um toque por cima. */
+.ps-home.stage{--game-rgb:var(--br);--home-font:"Sora Variable","Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;font-family:var(--home-font)}
+.ps-home.stage .btn{font-family:var(--home-font);letter-spacing:.01em}
+
+/* véu muito suave atrás do bloco de texto: invisível em artes escuras, segura o contraste nas claras */
+.stage-info{position:relative}
+.stage-info::before{content:"";position:absolute;inset:-40px -80px -30px -60px;z-index:-1;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(4,6,12,.5),rgba(4,6,12,.18) 60%,transparent)}
+
+.stage-title{font-family:var(--home-font);font-weight:650;letter-spacing:-.025em;font-size:clamp(2.1rem,3.3vw,3.6rem);line-height:1.04;color:#fff;
+  text-shadow:0 1px 1px rgba(0,0,0,.6),0 2px 12px rgba(0,0,0,.5),0 0 38px rgba(var(--game-rgb),.32);
+  font-feature-settings:"ss01" 1}
+.stage-head::after{content:"";order:1;width:64px;height:3px;border-radius:3px;margin-top:-4px;
+  background:linear-gradient(90deg,rgb(var(--game-rgb)),rgba(var(--game-rgb),0));box-shadow:0 0 14px rgba(var(--game-rgb),.7)}
+.stage-head .stage-tags{order:2}
+.stage-head .stage-when{order:3}
+.stage-tags span{font-family:var(--home-font);font-weight:500;font-size:.78rem;letter-spacing:.02em;color:#eef2ff;
+  background:rgba(8,11,20,.62);border:1px solid rgba(var(--game-rgb),.32);
+  -webkit-backdrop-filter:blur(10px) saturate(1.4);backdrop-filter:blur(10px) saturate(1.4);text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.stage-tags span:first-child{color:rgb(var(--game-rgb));border-color:rgba(var(--game-rgb),.6);font-weight:600;
+  background:linear-gradient(180deg,rgba(var(--game-rgb),.16),rgba(8,11,20,.62))}
+.stage-tags .fav{color:#ffd76a;border-color:rgba(255,215,106,.4)}
+.stage-when{font-family:var(--home-font);font-size:.8rem;font-weight:400;letter-spacing:.01em;color:rgba(236,241,255,.84);text-shadow:0 1px 3px rgba(0,0,0,.85)}
+
+.stage-play.btn.primary{font-weight:650;letter-spacing:.02em;
+  box-shadow:0 12px 32px -10px rgba(var(--ar),.95),0 0 26px -6px rgba(var(--game-rgb),.55),inset 0 1px 0 rgba(255,255,255,.35)}
+.stage-open.btn{-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+
+
+/* "Volte a jogar" */
+.replay-head .section{font-family:var(--home-font);font-weight:650;font-size:.8rem;letter-spacing:.24em;
+  color:color-mix(in srgb,rgb(var(--game-rgb)) 70%,white);text-shadow:0 1px 3px rgba(0,0,0,.8),0 0 18px rgba(var(--game-rgb),.35);
+  display:flex;align-items:center;gap:14px}
+.replay-head .section::after{content:"";width:48px;height:1px;background:linear-gradient(90deg,rgba(var(--game-rgb),.8),transparent)}
+.replay-card strong{font-family:var(--home-font);font-weight:600;font-size:.9rem;letter-spacing:-.005em;color:#f3f6ff;text-shadow:0 1px 3px rgba(0,0,0,.85)}
+.replay-card small{font-family:var(--home-font);font-size:.72rem;color:rgba(222,229,250,.76);text-shadow:0 1px 2px rgba(0,0,0,.8)}
+.replay-card:focus .replay-cover{box-shadow:0 0 0 2px rgb(var(--game-rgb)),0 0 30px 2px rgba(var(--game-rgb),.5),var(--elev-3)}
+.replay-card:focus strong{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 10px rgba(var(--game-rgb),.3)}
+
+/* ---------- Barra superior: relógio fixo à esquerda do perfil ---------- */
+.topbar .who-wrap{gap:var(--s4)}
+.topbar .clock{position:static;display:flex;flex-direction:column;align-items:flex-end;line-height:1.1;padding-right:var(--s2);
+  border-right:1px solid var(--glass-line);margin-right:var(--s1)}
+.topbar .clock strong{font-size:1.15rem;font-weight:500;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.topbar .clock small{font-size:.6rem;letter-spacing:.14em}
+
+/* ---------- Selo da plataforma na capa (Biblioteca) ---------- */
+.plat-badge{position:absolute;left:8px;bottom:8px;z-index:1;display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 6px;
+  border-radius:7px;color:rgba(255,255,255,.88);background:rgba(6,8,14,.58);border:1px solid rgba(255,255,255,.12);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 2px 8px rgba(0,0,0,.35);pointer-events:none;
+  transition:color var(--dur),background var(--dur)}
+.plat-badge svg{display:block;overflow:visible;filter:drop-shadow(0 1px 1px rgba(0,0,0,.4))}
+.plat-badge b{font-size:.58rem;font-weight:700;letter-spacing:.04em;line-height:1}
+.card:hover .plat-badge,.card:focus .plat-badge,.card.active .plat-badge,
+.replay-card:hover .plat-badge,.replay-card:focus .plat-badge{color:#fff;background:rgba(6,8,14,.72)}
+.replay-cover .plat-badge{left:7px;bottom:7px}
+
+/* ---------- Selo da plataforma na página do jogo: igual ao do jogo em destaque da Home ---------- */
+.chips .plat-tag{--game-rgb:var(--br);padding:4px 11px;border-radius:7px;
+  font-family:"Sora Variable","Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;
+  font-weight:600;font-size:.78rem;letter-spacing:.02em;color:rgb(var(--game-rgb));border:1px solid rgba(var(--game-rgb),.6);
+  background:linear-gradient(180deg,rgba(var(--game-rgb),.16),rgba(8,11,20,.62));
+  -webkit-backdrop-filter:blur(10px) saturate(1.4);backdrop-filter:blur(10px) saturate(1.4);text-shadow:0 1px 2px rgba(0,0,0,.6)}
+
+/* ---------- Pesquisa inteligente de imagens (escolher jogo → escolher imagens) ---------- */
+.is-body{max-height:min(66vh,760px);overflow-y:auto;padding:2px 6px 10px 2px;margin-bottom:var(--s3)}
+.is-search{display:flex;gap:var(--s3);align-items:center}
+.is-search .search{flex:1;min-width:0}
+.is-body .note{margin:var(--s2) 0 var(--s4)}
+.is-loading{padding:48px 12px;text-align:center;color:var(--text-dim)}
+.is-hits{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.is-hit{display:flex;gap:14px;align-items:center;padding:10px;border-radius:var(--r-md);text-align:left;cursor:pointer;color:var(--text);font:inherit;
+  background:var(--glass);border:1px solid var(--glass-line);transition:background var(--dur-fast),border-color var(--dur-fast),transform var(--dur-fast)}
+.is-hit:hover{background:rgba(var(--ar),.12);border-color:rgba(var(--br),.35)}
+.is-hit:disabled{opacity:.6;cursor:progress}
+.is-hit-cover{position:relative;flex:none;width:64px;aspect-ratio:3/4;border-radius:8px;overflow:hidden;display:grid;place-items:center;
+  background:linear-gradient(160deg,#1b2650,#0c1020);border:1px solid rgba(255,255,255,.1)}
+.is-hit-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.is-hit-cover b{font-size:1.4rem;color:rgba(255,255,255,.25)}
+.is-hit-text{display:flex;flex-direction:column;gap:3px;min-width:0}
+.is-hit-text strong{font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.is-hit-text small{color:var(--b);font-size:.78rem}
+.is-hit-text i{font-style:normal;font-size:.7rem;color:var(--text-dim)}
+.is-picked-head{display:flex;align-items:center;gap:var(--s4);margin-bottom:var(--s3)}
+.is-picked-head div{display:flex;flex-direction:column}
+.is-picked-head small{color:var(--b)}
+.is-preview{position:relative;height:clamp(180px,30vh,320px);border-radius:var(--r-md);overflow:hidden;background:#05060a center/cover;isolation:isolate;margin-bottom:var(--s2)}
+.is-preview::before{content:"";position:absolute;inset:-30px;background:inherit;filter:blur(26px) brightness(.5);z-index:-1}
+.is-preview img{width:100%;height:100%;object-fit:contain;display:block;animation:fade .3s ease both}
+.is-preview span{position:absolute;left:10px;bottom:8px;font-size:.72rem;padding:3px 8px;border-radius:6px;background:rgba(4,6,12,.7);color:var(--text-dim)}
+.is-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.is-grid.tall{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+.is-tile{position:relative;padding:0;border-radius:10px;overflow:hidden;cursor:pointer;background:#05060a;border:2px solid transparent;aspect-ratio:16/9;
+  transition:border-color var(--dur-fast),transform var(--dur-fast)}
+.is-grid.tall .is-tile{aspect-ratio:3/4}
+.is-tile img{width:100%;height:100%;object-fit:cover;display:block}
+.is-tile:hover{transform:translateY(-2px)}
+.is-tile.on{border-color:var(--b);box-shadow:0 0 0 1px var(--b),0 0 18px rgba(var(--br),.45)}
+.is-check{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:800;
+  font-size:.8rem;color:#03101c;background:var(--b);box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.is-foot{align-items:center}
+.is-foot small{margin-right:auto}
+
+/* ---------- Emuladores: capa visual (imagem personalizada ou arte padrão do console) ---------- */
+.emu{flex-direction:row;align-items:flex-start;gap:var(--s4)}
+.emu-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--s3)}
+.emu-body .path{overflow-wrap:anywhere}
+.emu-cover{position:relative;flex:none;width:7.5rem;aspect-ratio:3/4;border-radius:12px;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px;text-align:center;color:#fff;
+  background:radial-gradient(120% 80% at 50% 20%,rgba(var(--tone),.85),rgba(var(--tone),.25) 60%,rgba(8,10,18,.95)),#0b0e18;
+  border:1px solid rgba(255,255,255,.14);box-shadow:var(--elev-2),inset 0 1px 0 rgba(255,255,255,.18)}
+.emu-cover::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(155deg,rgba(255,255,255,.16),transparent 40%)}
+.emu-cover.custom{background:#0b0e18 center/cover no-repeat}
+.emu-cover-mark{display:grid;place-items:center;min-height:46px;filter:drop-shadow(0 4px 12px rgba(0,0,0,.45))}
+.emu-cover-mark .plat-glyph{display:inline-flex;align-items:center;gap:6px}
+.emu-cover-mark .plat-glyph svg{display:block;overflow:visible}
+.emu-cover-mark .plat-glyph b{font-size:1rem;font-weight:800;letter-spacing:.04em}
+.emu-cover-letter{font-size:2.6rem;font-weight:800;line-height:1;color:rgba(255,255,255,.85)}
+.emu-cover-name{font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;line-height:1.25;
+  color:rgba(255,255,255,.92);text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.emu-cover-more{position:absolute;right:7px;bottom:7px;padding:2px 7px;border-radius:7px;font-size:.66rem;font-weight:700;
+  background:rgba(6,8,14,.6);border:1px solid rgba(255,255,255,.14)}
+/* Editar emulador: sem imagem própria, a arte padrão ocupa o lugar da prévia vazia do seletor */
+.emu-cover-pick{display:flex;flex-direction:column;gap:var(--s3)}
+.emu-cover-pick .emu-cover.preview{width:100%}
+.emu-cover-pick .emu-cover.preview .emu-cover-name{font-size:.85rem}
+.emu-cover-pick .picker-preview:not([style]){display:none}
+@media (max-width:520px){.emu{flex-direction:column}.emu-cover{width:100%;max-width:12rem}}
+
+/* Desfoque do plano de fundo da Home (Configurações → Aparência). A arte é ampliada conforme o
+   desfoque para as bordas borradas não revelarem o fundo da janela. */
+.home-bg{overflow:hidden}
+/* Configurações → Plano de fundo da Home (imagem própria) */
+.home-bg-pick{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:12px}
+.home-bg-thumb{width:min(100%,240px);aspect-ratio:16/9;border-radius:10px;border:1px solid var(--line);
+  background:#02030a center/cover no-repeat;display:grid;place-items:center;color:var(--muted);font-size:13px}
+.cap-pick{max-height:62vh;overflow-y:auto;padding:4px;margin-bottom:14px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+.cap-pick .thumb small{padding-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.home-bg .bg-layer:not(.soft){filter:blur(var(--home-blur,0px));scale:calc(1 + var(--home-blur,0px) / 400px)}
+.home-bg .bg-layer.soft{filter:blur(max(36px,var(--home-blur,0px))) saturate(1.2)}
+
+/* Barra deslizante das configurações */
+.range{display:flex;align-items:center;gap:12px}
+.range input[type=range]{-webkit-appearance:none;appearance:none;width:220px;height:6px;border-radius:99px;cursor:pointer;
+  background:linear-gradient(90deg,var(--a) 0 var(--fill,0%),rgba(255,255,255,.14) var(--fill,0%) 100%);outline:none}
+.range input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--b);border:2px solid var(--a);box-shadow:0 0 0 0 rgba(var(--ar),.45);transition:box-shadow .15s ease}
+.range input[type=range]:hover::-webkit-slider-thumb,.range input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 6px rgba(var(--ar),.3)}
+.range input[type=range]:disabled{opacity:.45;cursor:default}
+.range output{min-width:48px;text-align:right;font-variant-numeric:tabular-nums}
+
+/* ---------- Página do jogo: nota do Metacritic (topo da coluna lateral) ----------
+   Faixas oficiais do Metascore: ≥ 75 favorável · 50–74 misto · < 50 desfavorável.
+   A faixa vem sempre escrita ao lado (a cor nunca é a única informação). */
+.mc{display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:var(--r-lg);
+  background:linear-gradient(180deg,var(--glass-hi),var(--glass));border:1px solid var(--glass-line);box-shadow:var(--elev-1),inset 0 1px 0 var(--glass-hi)}
+.mc.good{border-color:rgba(102,204,51,.45)}
+.mc.mid{border-color:rgba(255,204,51,.45)}
+.mc.bad{border-color:rgba(255,77,77,.5)}
+.mc-main{display:flex;align-items:center;gap:14px}
+.mc-score{flex:none;width:68px;height:68px;border-radius:14px;display:grid;place-items:center;font-size:2rem;font-weight:800;font-variant-numeric:tabular-nums;
+  letter-spacing:-.02em;color:#111;box-shadow:0 8px 20px -8px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.35)}
+.mc-score.good{background:#66cc33}
+.mc-score.mid{background:#ffcc33}
+.mc-score.bad{background:#ff4d4d;color:#fff}
+.mc-score.none{background:var(--glass);color:var(--text-dim);border:1px dashed var(--glass-line);box-shadow:none;font-weight:400}
+.mc-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.mc-text strong{font-size:.72rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--text-dim)}
+.mc-text span{font-size:1rem;font-weight:600}
+.mc-text small{font-size:.74rem;color:var(--text-dim)}
+.mc-bar{height:6px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
+.mc-bar i{display:block;height:100%;border-radius:99px;background:currentColor}
+.mc.good .mc-bar{color:#66cc33}
+.mc.mid .mc-bar{color:#ffcc33}
+.mc.bad .mc-bar{color:#ff4d4d}
+.mc-others{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.mc-others small{font-size:.72rem;color:var(--text-dim)}
+.mc-chip{font-size:.72rem;padding:2px 8px;border-radius:99px;border:1px solid var(--glass-line);color:var(--text-dim)}
+.mc-chip b{color:var(--text);margin-left:2px}
+.mc-chip.good{border-color:rgba(102,204,51,.5)}
+.mc-chip.mid{border-color:rgba(255,204,51,.5)}
+.mc-chip.bad{border-color:rgba(255,77,77,.55)}
+.mc-cands{display:flex;flex-direction:column;gap:8px;max-height:56vh;overflow-y:auto;padding-right:4px}
+.mc-cand{display:grid;grid-template-columns:88px minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 12px 8px 8px;border-radius:var(--r-md);cursor:pointer;text-align:left;color:inherit;
+  background:linear-gradient(180deg,var(--glass-hi),var(--glass));border:1px solid var(--glass-line)}
+.mc-cand.other{opacity:.7}
+.mc-cand-img{width:88px;aspect-ratio:16/9;border-radius:8px;background:rgba(0,0,0,.35) center/cover}
+.mc-cand-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.mc-cand-text b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mc-cand-text small{font-size:.74rem;color:var(--text-dim)}
+.mc-score.small{width:44px;height:44px;font-size:1.2rem;border-radius:10px}
+
+/* ---------- Página do jogo: layout harmônico em blocos ----------
+   Cada seção = título (ações à direita) + cartão de vidro, o mesmo desenho dos painéis
+   Metacritic/Steam/RetroAchievements. Espaçamento único entre seções e topo das colunas alinhado. */
+.dp-grid{grid-template-columns:minmax(0,1fr) 360px;gap:var(--s6);margin-top:var(--s5);align-items:start}
+.dp-main,.dp-side{display:flex;flex-direction:column;min-width:0}
+.dp-block-head{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);flex-wrap:wrap;margin:var(--s6) 0 var(--s3);min-height:38px}
+.dp-block-head .section{margin:0}
+.dp-block-actions{display:flex;gap:8px;flex-wrap:wrap}
+.dp-side>.section:first-child,.dp-main>.dp-block:first-child .dp-block-head{margin-top:0}
+.dp-side>.section{min-height:38px;display:flex;align-items:center}
+/* cartões: um só desenho para todos os blocos e painéis */
+.dp-card,.dp-side .ra-panel,.dp-side .mc{display:flex;flex-direction:column;gap:12px;padding:16px 18px;border-radius:var(--r-lg);
+  background:linear-gradient(180deg,var(--glass-hi),var(--glass));border:1px solid var(--glass-line);box-shadow:var(--elev-1),inset 0 1px 0 var(--glass-hi)}
+.dp-card>p{margin:0}
+.dp-card .row{gap:10px}
+/* dentro do cartão: sem caixa dentro de caixa */
+html .dp-card :is(.hltb,.rate-row){background:transparent;border:none;box-shadow:none;transform:none!important}
+html .dp-card :is(.hltb,.rate-row)::before{display:none}
+.dp-card .rate-row{padding:0}
+.dp-card .hltb td{padding:9px 2px}
+.dp-card .hltb tr.mine td{background:rgba(var(--ar),.14)}
+.dp-card .hltb tr.mine td:first-child{border-radius:8px 0 0 8px;padding-left:10px}
+.dp-card .hltb tr.mine td:last-child{border-radius:0 8px 8px 0;padding-right:10px}
+.dp-card .shot-big{border-radius:var(--r-md)}
+.dp-card .shots{padding:4px 2px 6px;margin:0}
+.dp-card .desc{max-width:none}
+.dp-card .web-shots{margin-top:var(--s2)}
+.dp-card .web-shots .section.sub{margin:0 0 var(--s2)}
+/* informações: rótulo | valor, alinhados */
+.dp-info{display:grid;grid-template-columns:minmax(96px,auto) 1fr;gap:9px 16px;margin:0;font-size:.9rem}
+.dp-info dt{color:var(--text-dim)}
+.dp-info dd{margin:0;min-width:0;overflow-wrap:anywhere}
+/* busca: campo + "Buscar na Steam" + "Pesquisar na internet" na mesma linha e mesma altura */
+.dp-search{align-items:stretch}
+.dp-search .search{flex:1 1 220px;max-width:360px;width:auto}
+.dp-search .btn{min-height:44px}
+@media (max-width:1100px){.dp-grid{grid-template-columns:1fr}.dp-side>.section:first-child{margin-top:var(--s6)}}
+/* mantém a borda na cor da faixa do Metascore depois da regra unificada dos cartões */
+.dp-side .mc.good{border-color:rgba(102,204,51,.45)}
+.dp-side .mc.mid{border-color:rgba(255,204,51,.45)}
+.dp-side .mc.bad{border-color:rgba(255,77,77,.5)}
+
+/* ---------- Página do jogo: abas (Visão geral · Mods) ---------- */
+.dp-tabs{display:flex;gap:6px;margin-top:var(--s5);padding:4px;border-radius:999px;width:max-content;background:var(--glass);border:1px solid var(--glass-line)}
+.dp-tabs button{display:inline-flex;align-items:center;gap:8px;background:none;border:none;color:var(--text-dim);padding:9px 22px;border-radius:999px;cursor:pointer;font-weight:600;font-size:.9rem}
+.dp-tabs .glyph{margin:0}
+.dp-tabs button.on{background:rgba(var(--ar),.35);color:#fff}
+.dp-mods{margin-top:var(--s2)}
+.dp-mods>.dp-block:first-child .dp-block-head{margin-top:var(--s4)}
+
+/* ---------- IGDB ---------- */
+.igdb-head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:start}
+.igdb-cover{display:flex;flex-direction:column;gap:8px;width:132px}
+.igdb-cover img{width:132px;aspect-ratio:3/4;object-fit:cover;border-radius:var(--r-md);box-shadow:var(--elev-2)}
+.igdb-text{display:flex;flex-direction:column;gap:8px;min-width:0}
+.igdb-text strong{font-size:1.1rem}
+.igdb-text .desc{margin:0}
+.igdb-more{align-self:flex-start;background:none;border:none;color:var(--b);cursor:pointer;padding:0;font-weight:600}
+.igdb-media{display:flex;flex-direction:column;gap:8px}
+.cand-ok{color:#7ddc8a!important}
+
+/* ---------- Mods (Nexus Mods) ---------- */
+.mods-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.mods-tools .search{flex:1 1 220px;max-width:320px;width:auto}
+.mods-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.mod-card{display:flex;flex-direction:column;padding:0;overflow:hidden;border-radius:var(--r-md);cursor:pointer;text-align:left;color:inherit;
+  background:linear-gradient(180deg,var(--glass-hi),var(--glass));border:1px solid var(--glass-line)}
+.mod-card:hover{transform:translateY(-2px);border-color:rgba(var(--br),.35)}
+.mod-img{position:relative;display:block;aspect-ratio:16/9;background:rgba(0,0,0,.35) center/cover}
+.mod-img .fav{top:8px;right:10px}
+.mod-vortex{position:absolute;left:8px;bottom:8px;font-style:normal;font-size:.62rem;font-weight:800;letter-spacing:.08em;padding:2px 7px;border-radius:6px;background:rgba(8,10,18,.8);border:1px solid rgba(var(--br),.4);color:var(--b)}
+.mod-body{display:flex;flex-direction:column;gap:5px;padding:10px 12px 12px;min-width:0}
+.mod-body strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mod-body>small{font-size:.76rem;color:var(--text-dim);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mod-meta{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:.74rem;color:var(--text)}
+.mod-meta span:last-child:not(:first-child){color:var(--lab)}
+.mod-gallery{margin-bottom:14px}
+.mod-reqs{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.mod-files td{font-size:.82rem}
+.mod-files td:not(:first-child){text-align:right;white-space:nowrap;color:var(--text-dim);font-weight:400}
+
+/* ---------- Configurações: fontes de dados ---------- */
+.ds-card{gap:10px}
+.ds-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;width:100%}
+.ds-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px;vertical-align:middle;background:var(--muted)}
+.ds-dot.ok{background:#4ade80;box-shadow:0 0 8px rgba(74,222,128,.7)}
+.ds-dot.err{background:var(--danger)}
+.ds-status{font-size:.72rem;font-weight:600;color:var(--text-dim);margin-left:4px}
+html[data-motion="reduced"] .mod-card:hover{transform:none}
+
+/* ---------- Banner do jogo: selo de classificação etária (canto inferior direito) ----------
+   Desenho próprio no estilo dos selos oficiais; cores das faixas sempre acompanhadas do texto. */
+.age-badge{position:absolute;right:20px;bottom:20px;z-index:2;width:46px;border-radius:9px;overflow:hidden;display:flex;flex-direction:column;align-items:center;
+  background:#f4f4f4;color:#111;box-shadow:0 6px 18px -6px rgba(0,0,0,.85),0 0 0 1px rgba(255,255,255,.18);pointer-events:auto;opacity:.92;transition:opacity var(--dur)}
+.age-badge:hover{opacity:1}
+.age-badge b{display:grid;place-items:center;width:100%;height:36px;font-size:1.15rem;font-weight:900;letter-spacing:-.02em;color:#fff;font-variant-numeric:tabular-nums}
+.age-badge small{display:block;width:100%;padding:2px 0 3px;text-align:center;font-size:.52rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#111;background:#f4f4f4}
+.age-badge.green b{background:#2f9e44}
+.age-badge.blue b{background:#1c7ed6}
+.age-badge.yellow b{background:#f2c200;color:#111}
+.age-badge.amber b{background:#f08c00}
+.age-badge.red b{background:#e03131}
+.age-badge.black b{background:#111}
+.age-badge.neutral b{background:#2b2f3a;font-size:.95rem}
+/* o conteúdo do banner (capa, título, botões) não passa por baixo do selo */
+.dp-hero:has(.age-badge) .dp-head{padding-right:86px}
+
+/* IGDB: ações no rodapé do bloco, separadas do conteúdo por uma linha sutil */
+.igdb-actions{padding-top:12px;border-top:1px solid var(--glass-line)}
+
+/* Capturas do NEXSTAGE: mesma imagem grande 16:9 das capturas da Steam/IGDB, clicável (abre o visualizador) */
+.shot-big-btn{display:block;width:100%;padding:0;border:none;background:none;cursor:zoom-in;border-radius:var(--r-md)}
+.shot-big-btn .shot-big{display:block}
+.shot-big.thumb-missing{display:grid;place-items:center;color:var(--text-dim)}
+
+/* Apresentação de mídias do IGDB (imagens a cada 5 s; vídeos do início ao fim, sem som) */
+.igdb-stage{position:relative;aspect-ratio:16/9;border-radius:var(--r-md);overflow:hidden;background:#000;border:1px solid var(--glass-line);isolation:isolate}
+.igdb-stage>iframe,.igdb-stage>.igdb-pic,.igdb-stage>.igdb-poster{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;object-fit:cover}
+/* o vídeo não recebe clique: sem a interface/sugestões do YouTube por cima; os controles são os do app */
+.igdb-stage>iframe{pointer-events:none;z-index:0}
+.igdb-poster{z-index:1;transition:opacity .5s ease}
+.igdb-poster.gone{opacity:0;pointer-events:none}
+.igdb-pic.fade{animation:igdb-fade .6s ease-out}
+@keyframes igdb-fade{from{opacity:0}to{opacity:1}}
+.igdb-stage::before{content:"";position:absolute;inset:auto 0 0 0;height:38%;z-index:2;pointer-events:none;
+  background:linear-gradient(to top,rgba(0,0,0,.55),transparent)}
+/* a mídia em foco (controle): anel de foco do app; o halo ::after seria recortado pelo overflow */
+.igdb-stage[data-focus]{cursor:zoom-in}
+.igdb-stage[data-focus]:focus::after{display:none}
+.igdb-tools{cursor:default;position:absolute;right:14px;bottom:14px;left:14px;z-index:3;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.igdb-tools .btn{padding:7px 14px;font-size:.8rem;backdrop-filter:blur(8px)}
+.igdb-stage-msg{position:absolute;inset:0;z-index:2;display:grid;place-items:center;background:rgba(0,0,0,.75);color:#fff;text-align:center;padding:20px}
+.igdb-timer{position:absolute;left:0;bottom:0;height:3px;width:100%;z-index:3;background:linear-gradient(90deg,var(--a),var(--b));
+  transform-origin:left;animation:igdb-timer 5s linear forwards;pointer-events:none}
+@keyframes igdb-timer{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+/* tela cheia: camada do próprio app cobrindo a janela inteira */
+.overlay.igdb-fs{padding:0;background:#000;backdrop-filter:none;display:block;z-index:80}
+.igdb-stage.full{position:absolute;inset:0;aspect-ratio:auto;border:none;border-radius:0}
+.igdb-stage.full>.igdb-pic,.igdb-stage.full>.igdb-poster{object-fit:contain}
+.igdb-stage.full .igdb-tools{right:24px;bottom:24px;left:24px}
+.shot.vid{position:relative}
+.shot.vid i{position:absolute;inset:0;display:grid;place-items:center;font-style:normal;color:#fff;font-size:.8rem;text-shadow:0 1px 4px #000;pointer-events:none}
+@media (prefers-reduced-motion: reduce){.igdb-pic.fade,.igdb-timer{animation:none}.igdb-poster{transition:none}}
+/* HUD da tela cheia do IGDB: pílula discreta com os comandos; some após 5 s sem uso */
+.overlay.igdb-fs{outline:none;cursor:none}
+.overlay.igdb-fs.awake{cursor:default}
+.igdb-hud{position:absolute;right:24px;bottom:22px;z-index:3;display:flex;align-items:center;gap:4px;padding:4px;border-radius:999px;
+  background:rgba(10,12,18,.62);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(10px);
+  opacity:0;transform:translateY(6px);transition:opacity .6s ease,transform .6s ease;pointer-events:none}
+.igdb-fs.awake .igdb-hud{opacity:1;transform:none;transition-duration:.15s;pointer-events:auto}
+.igdb-hud button{display:flex;align-items:center;gap:8px;height:34px;padding:0 12px;border:none;border-radius:999px;background:none;
+  color:#fff;font:inherit;font-size:.82rem;cursor:pointer}
+.igdb-hud button:hover:not(:disabled){background:rgba(255,255,255,.1)}
+.igdb-hud button:disabled{opacity:.4;cursor:default}
+.igdb-hud kbd{font:inherit;font-weight:700;font-size:.72rem;min-width:22px;text-align:center;padding:1px 6px;border-radius:6px;
+  border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.85)}
+.igdb-hud>i{width:1px;height:18px;background:rgba(255,255,255,.15);margin:0 2px}
+.igdb-stage.full::before{opacity:0;transition:opacity .6s ease}
+.igdb-fs.awake .igdb-stage.full::before{opacity:1;transition-duration:.15s}
+@media (prefers-reduced-motion: reduce){.igdb-hud,.igdb-stage.full::before{transition:none}}
+/* vídeo pausado em tela cheia */
+.igdb-paused{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;width:84px;height:84px;border-radius:50%;
+  display:grid;place-items:center;background:rgba(0,0,0,.55);color:#fff;font-size:1.6rem;pointer-events:none}
+/* teclas da pílula: caixa de tamanho fixo, conteúdo centralizado; símbolos do PlayStation em vetor */
+.igdb-hud kbd{display:inline-grid;place-items:center;height:22px;line-height:1;box-sizing:border-box}
+.igdb-hud kbd.ps{width:22px;min-width:22px;padding:0;border-radius:50%}
+.igdb-hud kbd.ps svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;display:block}
+/* pílula de comandos na página (controle): aparece quando a mídia está em foco */
+.igdb-hud.inline{right:14px;bottom:14px;opacity:0;transform:translateY(6px);pointer-events:none}
+.igdb-stage:focus .igdb-hud.inline,.igdb-stage:hover .igdb-hud.inline{opacity:1;transform:none;transition-duration:.15s;pointer-events:auto}
+/* glifos do PlayStation em vetor (barra de dicas, abas etc.) */
+.glyph.vec svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block}

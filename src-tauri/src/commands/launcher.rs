@@ -1,0 +1,300 @@
+//! Inicialização de jogos por executável.
+//!
+//! O processo é iniciado sem bloquear a UI. Uma thread aguarda o término,
+//! registra a sessão em `play_sessions`, soma o tempo em `profile_games` e
+//! emite o evento `game-session-ended` para o frontend atualizar a biblioteca.
+//!
+//! Limitação conhecida: jogos cujo executável é apenas um "stub" que abre outro
+//! processo e encerra (alguns launchers) terão tempo de jogo subestimado.
+//!
+//! Jogos da Steam (importados ou vinculados a um AppID e instalados) são SEMPRE iniciados pelo cliente
+//! oficial (`steam://run/<appid>`): a Steam autentica, atualiza e executa, e o overlay da Steam e os
+//! anti-cheats funcionam normalmente. O NEXSTAGE não abre, monitora, injeta nem encerra esses processos
+//! (por isso não há sessão local cronometrada para eles; o tempo vem da Steam como dado externo).
+
+use crate::db::Db;
+use crate::error::{AppError, AppResult};
+use crate::overlay::{self, Runtime};
+use rusqlite::params;
+use std::{path::Path, process::Command, time::Instant};
+use tauri::{AppHandle, Emitter, Manager, State};
+
+/// Divide argumentos no estilo Windows: separados por espaço, aspas duplas agrupam.
+/// Barras invertidas são mantidas literalmente (caminhos como `C:\Jogos\rom.iso`).
+fn split_args(s: &str) -> AppResult<Vec<String>> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut in_quotes = false;
+    let mut has_token = false;
+    for c in s.chars() {
+        match c {
+            '"' => {
+                in_quotes = !in_quotes;
+                has_token = true;
+            }
+            c if c.is_whitespace() && !in_quotes => {
+                if has_token || !cur.is_empty() {
+                    out.push(std::mem::take(&mut cur));
+                    has_token = false;
+                }
+            }
+            c => cur.push(c),
+        }
+    }
+    if in_quotes {
+        return Err(AppError::Validation(
+            "Argumentos inválidos: aspas não fechadas.".into(),
+        ));
+    }
+    if has_token || !cur.is_empty() {
+        out.push(cur);
+    }
+    Ok(out)
+}
+
+/// Substitui `{iso}` pelo caminho do ISO em cada argumento (depois de separar, então espaços no caminho são seguros).
+fn expand_args(args: Vec<String>, file: Option<&str>) -> Vec<String> {
+    match file {
+        Some(p) => args.into_iter().map(|a| a.replace("{iso}", p).replace("{rom}", p)).collect(),
+        None => args,
+    }
+}
+
+/// Tudo o que é preciso para iniciar o jogo, já validado (executável, argumentos, pasta).
+struct Prepared {
+    exe: std::path::PathBuf,
+    args: Vec<String>,
+}
+
+/// Valida o jogo (executável/emulador/arquivo existentes, argumentos) SEM iniciar nada.
+fn prepare(db: &Db, profile_id: i64, game_id: i64) -> AppResult<Prepared> {
+    let (mut exe, mut args, iso, emu_exe, emu_args) = {
+        let conn = db.conn()?;
+        let found = conn
+            .query_row(
+                "SELECT g.executable_path, g.launch_args, COALESCE(g.iso_path, g.rom_path), e.exe_path, e.args
+                 FROM profile_games pg JOIN games g ON g.id = pg.game_id
+                 LEFT JOIN emulators e ON e.id = g.emulator_id
+                 WHERE pg.profile_id=?1 AND pg.game_id=?2",
+                params![profile_id, game_id],
+                |r| Ok((
+                    r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, Option<String>>(2)?,
+                    r.get::<_, Option<String>>(3)?, r.get::<_, Option<String>>(4)?,
+                )),
+            )
+            .map_err(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => {
+                    AppError::NotFound("Jogo não encontrado na biblioteca.".into())
+                }
+                other => other.into(),
+            })?;
+        found
+    };
+
+    // Emulador associado (cadastrado em Emuladores): usa o executável dele; os argumentos do jogo, se
+    // existirem, têm prioridade sobre o modelo do emulador. Sem emulador, vale o sistema anterior.
+    if let Some(ee) = emu_exe {
+        if !Path::new(&ee).is_file() {
+            return Err(AppError::NotFound(format!("O emulador associado não foi encontrado: {ee}. Atualize o caminho na página Emuladores.")));
+        }
+        exe = ee;
+        if args.trim().is_empty() {
+            args = emu_args.unwrap_or_default();
+        }
+    }
+    // Pacotes PKG (PS3) e VPK (Vita) precisam ser INSTALADOS no emulador; não são iniciados por caminho.
+    if let Some(f) = &iso {
+        let ext = Path::new(f).extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+        if ext == "pkg" || ext == "vpk" {
+            return Err(AppError::Validation(format!(
+                "Arquivos .{ext} precisam ser instalados no emulador (menu de instalação de pacotes); depois adicione o jogo instalado."
+            )));
+        }
+    }
+    // Arquivo importado (ISO/ROM): nunca é montado nem executado automaticamente; precisa de emulador/comando.
+    if exe.trim().is_empty() {
+        return Err(if iso.is_some() {
+            AppError::Validation(
+                "Este jogo foi importado, mas ainda não tem emulador associado. Associe um emulador em \"Editar jogo\" (ou cadastre-o na página Emuladores) ou informe o executável e os argumentos (use {iso} ou {rom} para o caminho do arquivo).".into(),
+            )
+        } else {
+            AppError::NotFound("Executável não configurado para este jogo.".into())
+        });
+    }
+    if let Some(i) = &iso {
+        if !Path::new(i).is_file() {
+            return Err(AppError::NotFound(format!("O arquivo do jogo não foi encontrado: {i}.")));
+        }
+    }
+    let path = Path::new(&exe);
+    if !path.is_file() {
+        return Err(AppError::NotFound(format!(
+            "Executável não encontrado: {exe}. Edite o jogo e selecione o arquivo novamente."
+        )));
+    }
+    Ok(Prepared { exe: path.to_path_buf(), args: expand_args(split_args(&args)?, iso.as_deref()) })
+}
+
+/// Como o jogo será iniciado.
+enum Launch {
+    Exe(Prepared),
+    /// Pelo cliente Steam (AppID).
+    Steam(i64),
+}
+
+/// Decide entre o cliente Steam e o executável/emulador, validando SEM iniciar nada.
+fn plan(db: &Db, profile_id: i64, game_id: i64) -> AppResult<Launch> {
+    let (appid, steam_only) = {
+        let conn = db.conn()?;
+        super::games::ensure_owned(&conn, profile_id, game_id)?;
+        let only: bool = conn
+            .query_row("SELECT source='steam' AND trim(executable_path)='' FROM games WHERE id=?1", [game_id], |r| r.get(0))
+            .unwrap_or(false);
+        (crate::steam::store::appid_of(&conn, game_id)?, only)
+    };
+    if let Some(a) = appid {
+        match crate::steam::local::app(a) {
+            Some(x) if x.installed => {
+                if !crate::steam::local::protocol_available() {
+                    return Err(AppError::Validation("O protocolo steam:// não está registrado neste Windows. Abra ou reinstale o cliente Steam.".into()));
+                }
+                return Ok(Launch::Steam(a));
+            }
+            Some(_) if steam_only => {
+                return Err(AppError::Validation("Este jogo ainda está sendo instalado ou atualizado pela Steam. Acompanhe o download no cliente Steam.".into()))
+            }
+            None if steam_only => {
+                return Err(AppError::Validation("Este jogo da Steam não está instalado neste PC. Use o botão Instalar (o download é feito pelo cliente Steam).".into()))
+            }
+            _ => {} // vinculado, mas não instalado pela Steam: usa o executável cadastrado
+        }
+    }
+    prepare(db, profile_id, game_id).map(Launch::Exe)
+}
+
+/// Confere se o jogo pode ser iniciado (usado antes do Gameboot: um erro aparece na hora, sem
+/// tocar a animação inteira para depois falhar).
+#[tauri::command]
+pub fn check_launch(db: State<Db>, profile_id: i64, game_id: i64) -> AppResult<()> {
+    plan(&db, profile_id, game_id).map(|_| ())
+}
+
+/// Gameboot: `on` traz o NEXSTAGE para a frente, em tela cheia e acima das outras janelas, durante a
+/// animação; `off` desfaz (usado só se o jogo não chegar a iniciar — ao iniciar, `launch_game` já
+/// devolve a janela ao modo normal e a minimiza).
+#[tauri::command]
+pub fn gameboot_window(app: AppHandle, on: bool) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static WAS_FULLSCREEN: AtomicBool = AtomicBool::new(false);
+    let Some(w) = app.get_webview_window("main") else { return };
+    if on {
+        WAS_FULLSCREEN.store(w.is_fullscreen().unwrap_or(false), Ordering::SeqCst);
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_always_on_top(true);
+        let _ = w.set_fullscreen(true);
+        let _ = w.set_focus();
+    } else {
+        let _ = w.set_always_on_top(false);
+        let _ = w.set_fullscreen(WAS_FULLSCREEN.load(Ordering::SeqCst));
+        let _ = w.set_focus();
+    }
+}
+
+#[tauri::command]
+pub fn launch_game(app: AppHandle, db: State<Db>, profile_id: i64, game_id: i64) -> AppResult<()> {
+    let Prepared { exe, args } = match plan(&db, profile_id, game_id)? {
+        Launch::Exe(p) => p,
+        Launch::Steam(appid) => return launch_via_steam(&app, &db, profile_id, game_id, appid),
+    };
+    let path = exe.as_path();
+    let mut cmd = Command::new(path);
+    cmd.args(args);
+    if let Some(dir) = path.parent() {
+        cmd.current_dir(dir);
+    }
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| AppError::Other(format!("Falha ao iniciar o jogo: {e}")))?;
+    let started = Instant::now();
+    // Só marca como "iniciado" quando o processo realmente subiu (define a ordem da Home).
+    if let Ok(conn) = db.conn() {
+        let _ = conn.execute(
+            "UPDATE profile_games SET last_played_at=strftime('%Y-%m-%d %H:%M:%f','now') WHERE profile_id=?1 AND game_id=?2",
+            params![profile_id, game_id],
+        );
+    }
+
+    // Registra o processo (para o overlay poder encerrá-lo) e minimiza o launcher.
+    app.state::<Runtime>().add(game_id, child.id());
+    app.state::<Runtime>().last_game.store(game_id, std::sync::atomic::Ordering::SeqCst);
+    overlay::set_active(&app, false);
+
+    std::thread::spawn(move || {
+        let _ = child.wait();
+        let secs = started.elapsed().as_secs() as i64;
+        let db = app.state::<Db>();
+        if let Ok(conn) = db.conn() {
+            let offset = format!("-{secs} seconds");
+            let _ = conn.execute(
+                "INSERT INTO play_sessions(profile_id,game_id,started_at,ended_at,duration_seconds)
+                 VALUES(?1,?2,datetime('now',?3),datetime('now'),?4)",
+                params![profile_id, game_id, offset, secs],
+            );
+            let _ = conn.execute(
+                "UPDATE profile_games SET playtime_seconds=playtime_seconds+?1
+                 WHERE profile_id=?2 AND game_id=?3",
+                params![secs, profile_id, game_id],
+            );
+        }
+        // Se era o último jogo aberto, traz o NEXSTAGE de volta.
+        overlay::game_finished(&app, game_id);
+        let _ = app.emit("game-session-ended", game_id);
+    });
+
+    Ok(())
+}
+
+/// Entrega o jogo ao cliente Steam e só registra "jogado por último" (ordem da Home). Nenhum processo
+/// é acompanhado ou tocado pelo NEXSTAGE.
+fn launch_via_steam(app: &AppHandle, db: &Db, profile_id: i64, game_id: i64, appid: i64) -> AppResult<()> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(format!("steam://run/{appid}"), None::<&str>)
+        .map_err(|_| AppError::Other("Não foi possível pedir à Steam para iniciar o jogo.".into()))?;
+    if let Ok(conn) = db.conn() {
+        let _ = conn.execute(
+            "UPDATE profile_games SET last_played_at=strftime('%Y-%m-%d %H:%M:%f','now') WHERE profile_id=?1 AND game_id=?2",
+            params![profile_id, game_id],
+        );
+    }
+    app.state::<Runtime>().last_game.store(game_id, std::sync::atomic::Ordering::SeqCst);
+    overlay::set_active(app, false); // desfaz o modo do Gameboot
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.minimize();
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_args;
+
+    #[test]
+    fn splits_quoted_windows_paths() {
+        let v = split_args(r#"-fullscreen "D:\Roms\Meu Jogo.iso" --x"#).unwrap();
+        assert_eq!(v, vec!["-fullscreen", r"D:\Roms\Meu Jogo.iso", "--x"]);
+    }
+
+    #[test]
+    fn expands_iso_placeholder_keeping_spaces() {
+        let args = split_args(r#"-fullscreen "{iso}""#).unwrap();
+        let out = super::expand_args(args, Some(r"D:\Jogos\Meu Jogo.iso"));
+        assert_eq!(out, vec!["-fullscreen", r"D:\Jogos\Meu Jogo.iso"]);
+    }
+
+    #[test]
+    fn rejects_unclosed_quote() {
+        assert!(split_args(r#"-a "b"#).is_err());
+    }
+}

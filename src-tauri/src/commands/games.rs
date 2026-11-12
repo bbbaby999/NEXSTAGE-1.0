@@ -1,0 +1,482 @@
+//! Biblioteca de jogos por perfil (adição manual de executáveis).
+
+use crate::db::Db;
+use crate::error::{AppError, AppResult};
+use rusqlite::{params, Connection, Row};
+use serde::{Deserialize, Serialize};
+use std::path::Path;
+use tauri::State;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Game {
+    pub id: i64,
+    pub title: String,
+    pub platform: String,
+    pub executable_path: String,
+    pub launch_args: String,
+    pub cover: Option<String>,
+    pub favorite: bool,
+    pub playtime_seconds: i64,
+    pub last_played_at: Option<String>,
+    pub added_at: String,
+    pub background: Option<String>,
+    pub bg_x: i64,
+    pub bg_y: i64,
+    pub steam_id: Option<String>,
+    pub release_date: Option<String>,
+    pub release_iso: Option<String>,
+    pub genre: Option<String>,
+    pub genres: Vec<String>,
+    pub completed: bool,
+    pub completed_at: Option<String>,
+    pub iso_path: Option<String>,
+    pub rom_path: Option<String>,
+    pub emulator_id: Option<i64>,
+    pub emulator_name: Option<String>,
+    /// Jogo do RetroAchievements associado (por hash ou confirmado pelo usuário).
+    pub ra_game_id: Option<i64>,
+    /// Origem ("manual", "iso", "folder", "steam"...).
+    pub source: String,
+    /// AppID da Steam (jogo importado da Steam ou vinculado a ela).
+    pub steam_app_id: Option<i64>,
+    /// Pronto para jogar neste PC: jogo da Steam instalado pelo cliente Steam; demais, executável ou
+    /// arquivo do jogo (ISO/ROM) presente no disco. Calculado na listagem (só leitura).
+    pub installed: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameInput {
+    pub title: String,
+    pub platform: String,
+    pub executable_path: String,
+    #[serde(default)]
+    pub launch_args: String,
+    pub cover: Option<String>,
+    #[serde(default)]
+    pub background: Option<String>,
+    #[serde(default)]
+    pub bg_x: Option<i64>,
+    #[serde(default)]
+    pub bg_y: Option<i64>,
+    /// Caminho do .iso importado (nunca copiado, movido ou modificado).
+    #[serde(default)]
+    pub iso_path: Option<String>,
+}
+
+const SELECT: &str = "SELECT g.id,g.title,g.platform,g.executable_path,g.launch_args,g.cover,
+    pg.favorite,pg.playtime_seconds,pg.last_played_at,pg.added_at,
+    g.background,g.bg_x,g.bg_y,json_extract(gi.data,'$.externalId'),
+    json_extract(gi.data,'$.releaseDate'),json_extract(gi.data,'$.genres[0]'),json_extract(gi.data,'$.genres'),pg.completed,pg.completed_at,g.iso_path,g.rom_path,g.emulator_id,em.name,rl.ra_game_id,g.source,
+    COALESCE(sl.appid, CASE WHEN g.source='steam' THEN CAST(g.external_id AS INTEGER) END)
+    FROM profile_games pg JOIN games g ON g.id = pg.game_id
+    LEFT JOIN game_info gi ON gi.game_id = g.id
+    LEFT JOIN emulators em ON em.id = g.emulator_id
+    LEFT JOIN ra_links rl ON rl.game_id = g.id AND rl.status IN ('hash','manual')
+    LEFT JOIN steam_links sl ON sl.game_id = g.id";
+
+/// Converte datas da Steam ("21 de fev. de 2019", "Feb 21, 2019", "2019") em "AAAA-MM-DD" para ordenar.
+pub fn parse_release(s: &str) -> Option<String> {
+    let (mut year, mut month, mut day) = (None, None, None);
+    for tok in s.to_lowercase().split(|c: char| !c.is_alphanumeric()).filter(|t| !t.is_empty()) {
+        if tok.chars().all(|c| c.is_ascii_digit()) {
+            match tok.len() {
+                4 => year = tok.parse::<i32>().ok().filter(|y| (1970..=2100).contains(y)),
+                1 | 2 if day.is_none() => day = tok.parse::<u32>().ok().filter(|d| (1..=31).contains(d)),
+                _ => {}
+            }
+        } else if month.is_none() && tok.chars().count() >= 3 {
+            let p: String = tok.chars().take(3).collect();
+            month = match p.as_str() {
+                "jan" => Some(1), "fev" | "feb" => Some(2), "mar" => Some(3), "abr" | "apr" => Some(4),
+                "mai" | "may" => Some(5), "jun" => Some(6), "jul" => Some(7), "ago" | "aug" => Some(8),
+                "set" | "sep" => Some(9), "out" | "oct" => Some(10), "nov" => Some(11), "dez" | "dec" => Some(12),
+                _ => None,
+            };
+        }
+    }
+    year.map(|y| format!("{y:04}-{:02}-{:02}", month.unwrap_or(1), day.unwrap_or(1)))
+}
+
+fn map(r: &Row) -> rusqlite::Result<Game> {
+    let release_date: Option<String> = r.get(14)?;
+    Ok(Game {
+        release_iso: release_date.as_deref().and_then(parse_release),
+        release_date,
+        completed: r.get::<_, i64>(17)? != 0,
+        completed_at: r.get(18)?,
+        iso_path: r.get(19)?,
+        rom_path: r.get(20)?,
+        emulator_id: r.get(21)?,
+        emulator_name: r.get(22)?,
+        ra_game_id: r.get(23)?,
+        source: r.get(24)?,
+        steam_app_id: r.get(25)?,
+        installed: false,
+        genre: r.get(15)?,
+        genres: r
+            .get::<_, Option<String>>(16)?
+            .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
+            .unwrap_or_default(),
+        id: r.get(0)?,
+        title: r.get(1)?,
+        platform: r.get(2)?,
+        executable_path: r.get(3)?,
+        launch_args: r.get(4)?,
+        cover: crate::images::resolve(r.get(5)?),
+        favorite: r.get::<_, i64>(6)? != 0,
+        playtime_seconds: r.get(7)?,
+        last_played_at: r.get(8)?,
+        added_at: r.get(9)?,
+        background: crate::images::resolve(r.get(10)?),
+        bg_x: r.get(11)?,
+        bg_y: r.get(12)?,
+        steam_id: r.get(13)?,
+    })
+}
+
+/// Marca `installed` em cada jogo. Os manifestos da Steam são lidos uma vez por chamada.
+fn mark_installed(games: &mut [Game]) {
+    let steam = if games.iter().any(|g| g.steam_app_id.is_some()) { crate::steam::local::local_apps() } else { Default::default() };
+    for g in games.iter_mut() {
+        let steam_ok = g.steam_app_id.and_then(|a| steam.get(&a)).map(|a| a.installed).unwrap_or(false);
+        let steam_only = g.source == "steam" && g.executable_path.trim().is_empty();
+        let file_ok = || {
+            let exists = |p: &Option<String>| p.as_deref().map(|p| !p.trim().is_empty() && Path::new(p).exists()).unwrap_or(false);
+            exists(&Some(g.executable_path.clone())) || exists(&g.iso_path) || exists(&g.rom_path)
+        };
+        g.installed = steam_ok || (!steam_only && file_ok());
+    }
+}
+
+fn validate(i: &mut GameInput, allow_no_exe: bool) -> AppResult<()> {
+    i.title = i.title.trim().to_string();
+    i.platform = i.platform.trim().to_string();
+    i.executable_path = i.executable_path.trim().to_string();
+    i.launch_args = i.launch_args.trim().to_string();
+    let t = i.title.chars().count();
+    if t == 0 || t > 80 {
+        return Err(AppError::Validation("Título: 1 a 80 caracteres.".into()));
+    }
+    if i.platform.is_empty() {
+        i.platform = "PC".into();
+    }
+    // Padroniza o valor gravado (evita duplicatas por diferença de escrita). Valores antigos
+    // sem equivalente claro (ex.: "RetroArch") são preservados como estão.
+    if let Some(c) = canonical_platform(&i.platform) {
+        i.platform = c.into();
+    }
+    // Jogo importado por ISO pode ficar sem emulador por enquanto (configurado depois).
+    if i.executable_path.is_empty() && !allow_no_exe {
+        return Err(AppError::Validation("Selecione o executável do jogo.".into()));
+    }
+    if !i.executable_path.is_empty() && !Path::new(&i.executable_path).is_file() {
+        return Err(AppError::Validation(
+            "O executável selecionado não existe neste computador.".into(),
+        ));
+    }
+    if i.launch_args.len() > 1000 {
+        return Err(AppError::Validation("Argumentos muito longos (máx. 1000).".into()));
+    }
+    Ok(())
+}
+
+/// Valida o ISO sem tocar nele: extensão, existência, leitura e duplicidade na biblioteca do perfil.
+fn validate_iso(conn: &Connection, profile_id: i64, iso: &str) -> AppResult<()> {
+    let p = Path::new(iso);
+    let is_iso = p.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("iso")).unwrap_or(false);
+    if !is_iso {
+        return Err(AppError::Validation("Selecione um arquivo com extensão .iso.".into()));
+    }
+    if !p.is_file() {
+        return Err(AppError::Validation("O arquivo ISO não existe ou está inacessível.".into()));
+    }
+    std::fs::File::open(p).map_err(|_| {
+        AppError::Validation("Não foi possível ler o arquivo ISO (sem permissão ou em uso por outro programa).".into())
+    })?;
+    let dup: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM profile_games pg JOIN games g ON g.id=pg.game_id WHERE pg.profile_id=?1 AND g.iso_path=?2",
+        params![profile_id, iso],
+        |r| r.get(0),
+    )?;
+    if dup > 0 {
+        return Err(AppError::Validation("Este ISO já está na sua biblioteca.".into()));
+    }
+    Ok(())
+}
+
+/// Troca o local do arquivo (ISO/ROM) de um jogo importado — ex.: o arquivo foi movido de pasta.
+/// Só referencia o novo caminho (nada é copiado ou movido) e grava na mesma coluna que o jogo já usa.
+/// Jogos sem arquivo (executável/Steam) não são alterados.
+fn relocate_file(conn: &Connection, profile_id: i64, game_id: i64, new_file: &str) -> AppResult<()> {
+    let (iso, rom): (Option<String>, Option<String>) =
+        conn.query_row("SELECT iso_path,rom_path FROM games WHERE id=?1", [game_id], |r| Ok((r.get(0)?, r.get(1)?)))?;
+    let column = match (&iso, &rom) {
+        (_, Some(r)) => { if r == new_file { return Ok(()); } "rom_path" }
+        (Some(i), None) => { if i == new_file { return Ok(()); } "iso_path" }
+        (None, None) => return Ok(()),
+    };
+    let p = Path::new(new_file);
+    if !p.is_file() {
+        return Err(AppError::Validation("O arquivo do jogo não existe ou está inacessível.".into()));
+    }
+    std::fs::File::open(p).map_err(|_| {
+        AppError::Validation("Não foi possível ler o arquivo do jogo (sem permissão ou em uso por outro programa).".into())
+    })?;
+    let key = super::scan::norm_key(new_file);
+    let mut st = conn.prepare(
+        "SELECT g.iso_path,g.rom_path FROM profile_games pg JOIN games g ON g.id=pg.game_id WHERE pg.profile_id=?1 AND g.id<>?2",
+    )?;
+    let taken = st
+        .query_map(params![profile_id, game_id], |r| Ok((r.get::<_, Option<String>>(0)?, r.get::<_, Option<String>>(1)?)))?
+        .filter_map(Result::ok)
+        .any(|(a, b)| [a, b].iter().flatten().any(|s| super::scan::norm_key(s) == key));
+    if taken {
+        return Err(AppError::Validation("Este arquivo já pertence a outro jogo da sua biblioteca.".into()));
+    }
+    conn.execute(&format!("UPDATE games SET {column}=?1 WHERE id=?2"), params![new_file, game_id])?;
+    Ok(())
+}
+
+fn fetch(conn: &Connection, profile_id: i64, game_id: i64) -> AppResult<Game> {
+    let mut g = conn.query_row(
+        &format!("{SELECT} WHERE pg.profile_id=?1 AND pg.game_id=?2"),
+        params![profile_id, game_id],
+        map,
+    )
+    .map_err(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => {
+            AppError::NotFound("Jogo não encontrado na biblioteca.".into())
+        }
+        other => other.into(),
+    })?;
+    mark_installed(std::slice::from_mut(&mut g));
+    Ok(g)
+}
+
+#[tauri::command(async)] // fora da thread da interface (E/S de disco ou consulta grande)
+pub fn list_library(db: State<Db>, profile_id: i64) -> AppResult<Vec<Game>> {
+    let conn = db.conn()?;
+    let mut stmt = conn.prepare(&format!(
+        "{SELECT} WHERE pg.profile_id=?1 ORDER BY g.title COLLATE NOCASE"
+    ))?;
+    let mut rows = stmt
+        .query_map([profile_id], map)?
+        .collect::<Result<Vec<_>, _>>()?;
+    mark_installed(&mut rows);
+    Ok(rows)
+}
+
+#[tauri::command]
+pub fn add_game(db: State<Db>, profile_id: i64, mut input: GameInput) -> AppResult<Game> {
+    let iso = input.iso_path.clone().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    validate(&mut input, iso.is_some())?;
+    input.cover = crate::images::store(input.cover.take())?;
+    input.background = crate::images::store(input.background.take())?;
+    let mut conn = db.conn()?;
+    if let Some(p) = &iso {
+        validate_iso(&conn, profile_id, p)?;
+    }
+    let tx = conn.transaction()?;
+    tx.execute(
+        "INSERT INTO games(title,platform,executable_path,launch_args,cover,background,bg_x,bg_y,iso_path,source)
+         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+        params![
+            input.title,
+            input.platform,
+            input.executable_path,
+            input.launch_args,
+            input.cover,
+            input.background,
+            input.bg_x.unwrap_or(50).clamp(0, 100),
+            input.bg_y.unwrap_or(50).clamp(0, 100),
+            iso,
+            if iso.is_some() { "iso" } else { "manual" }
+        ],
+    )?;
+    let game_id = tx.last_insert_rowid();
+    tx.execute(
+        "INSERT INTO profile_games(profile_id,game_id) VALUES(?1,?2)",
+        params![profile_id, game_id],
+    )?;
+    tx.commit()?;
+    fetch(&conn, profile_id, game_id)
+}
+
+#[tauri::command]
+pub fn update_game(
+    db: State<Db>,
+    profile_id: i64,
+    game_id: i64,
+    mut input: GameInput,
+) -> AppResult<Game> {
+    let conn = db.conn()?;
+    ensure_owned(&conn, profile_id, game_id)?;
+    // `input.iso_path`: novo local do arquivo do jogo (ISO/ROM), se o usuário trocou (ver `relocate_file`).
+    // ISO/ROM ou jogo da Steam (abre pelo cliente Steam) podem ficar sem executável
+    let no_exe_ok: bool = conn
+        .query_row("SELECT COALESCE(iso_path, rom_path) IS NOT NULL OR source='steam' OR EXISTS(SELECT 1 FROM steam_links WHERE game_id=?1) FROM games WHERE id=?1", [game_id], |r| r.get(0))
+        .unwrap_or(false);
+    validate(&mut input, no_exe_ok)?;
+    let old_platform: Option<String> = conn.query_row("SELECT platform FROM games WHERE id=?1", [game_id], |r| r.get(0)).ok();
+    input.cover = crate::images::store(input.cover.take())?;
+    input.background = crate::images::store(input.background.take())?;
+    let n = conn.execute(
+        "UPDATE games SET title=?1,platform=?2,executable_path=?3,launch_args=?4,cover=?5,
+         background=?6,bg_x=?7,bg_y=?8
+         WHERE id=?9 AND id IN (SELECT game_id FROM profile_games WHERE profile_id=?10)",
+        params![
+            input.title,
+            input.platform,
+            input.executable_path,
+            input.launch_args,
+            input.cover,
+            input.background,
+            input.bg_x.unwrap_or(50).clamp(0, 100),
+            input.bg_y.unwrap_or(50).clamp(0, 100),
+            game_id,
+            profile_id
+        ],
+    )?;
+    if n == 0 {
+        return Err(AppError::NotFound("Jogo não encontrado na biblioteca.".into()));
+    }
+    if let Some(new_file) = input.iso_path.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        relocate_file(&conn, profile_id, game_id, new_file)?;
+    }
+    // plataforma trocada: a nota do Metacritic passa a ser a da versão escolhida (cache, sem rede)
+    if old_platform.as_deref() != Some(input.platform.as_str()) {
+        super::metacritic::on_platform_changed(&conn, game_id, &input.platform)?;
+    }
+    fetch(&conn, profile_id, game_id)
+}
+
+#[tauri::command]
+pub fn remove_game(db: State<Db>, profile_id: i64, game_id: i64) -> AppResult<()> {
+    let mut conn = db.conn()?;
+    let tx = conn.transaction()?;
+    tx.execute(
+        "DELETE FROM play_sessions WHERE profile_id=?1 AND game_id=?2",
+        params![profile_id, game_id],
+    )?;
+    tx.execute(
+        "DELETE FROM profile_games WHERE profile_id=?1 AND game_id=?2",
+        params![profile_id, game_id],
+    )?;
+    tx.execute(
+        "DELETE FROM games WHERE id=?1 AND id NOT IN (SELECT game_id FROM profile_games)",
+        [game_id],
+    )?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Marca/desmarca o jogo como concluído neste perfil (grava a data da conclusão).
+#[tauri::command]
+pub fn set_completed(db: State<Db>, profile_id: i64, game_id: i64, completed: bool) -> AppResult<()> {
+    let conn = db.conn()?;
+    ensure_owned(&conn, profile_id, game_id)?;
+    conn.execute(
+        "UPDATE profile_games SET completed=?1,
+         completed_at=CASE WHEN ?1=1 THEN datetime('now') ELSE NULL END
+         WHERE profile_id=?2 AND game_id=?3",
+        params![completed as i64, profile_id, game_id],
+    )?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_favorite(db: State<Db>, profile_id: i64, game_id: i64, favorite: bool) -> AppResult<()> {
+    let conn = db.conn()?;
+    conn.execute(
+        "UPDATE profile_games SET favorite=?1 WHERE profile_id=?2 AND game_id=?3",
+        params![favorite as i64, profile_id, game_id],
+    )?;
+    Ok(())
+}
+
+/// Garante que o jogo pertence à biblioteca do perfil.
+pub fn ensure_owned(conn: &Connection, profile_id: i64, game_id: i64) -> AppResult<()> {
+    let n: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM profile_games WHERE profile_id=?1 AND game_id=?2",
+        params![profile_id, game_id],
+        |r| r.get(0),
+    )?;
+    if n == 0 {
+        Err(AppError::NotFound("Jogo não encontrado na biblioteca.".into()))
+    } else {
+        Ok(())
+    }
+}
+
+/// Plataformas oficiais do NEXSTAGE, na ordem exibida na interface.
+pub const PLATFORMS: [&str; 15] = [
+    "PC", "XBOX", "Xbox 360", "Xbox Series", "Playstation 1", "Playstation 2", "Playstation 3", "Playstation 4",
+    "Playstation 5", "PSP", "Ps Vita", "Nintendo Switch", "Nintendo Switch 2", "Super Nintendo", "Nintendinho",
+];
+
+/// Converte nomes antigos/variações para o valor oficial. `None` = sem equivalente seguro.
+/// (Emuladores com sistema único mapeiam para o sistema: PCSX2→PS2, RPCS3→PS3, PPSSPP→PSP;
+/// Steam / Epic / Game Pass já eram jogos de PC.)
+pub fn canonical_platform(s: &str) -> Option<&'static str> {
+    let k = s.trim().to_lowercase();
+    Some(match k.as_str() {
+        "pc" | "steam" | "epic games" | "epic" | "xbox / game pass" | "xbox/game pass" | "game pass" | "pc game pass" | "windows" => "PC",
+        "xbox" | "xbox one" | "xbox original" => "XBOX",
+        "xbox series" | "xbox series x" | "xbox series s" | "xbox series x|s" | "xbox series x/s" | "xsx" => "Xbox Series",
+        "xbox 360" | "x360" => "Xbox 360",
+        "playstation 1" | "playstation" | "ps1" | "psx" | "psone" | "ps one" | "playstation one" => "Playstation 1",
+        "playstation 2" | "ps2" | "pcsx2" => "Playstation 2",
+        "playstation 3" | "ps3" | "rpcs3" => "Playstation 3",
+        "playstation 4" | "ps4" => "Playstation 4",
+        "playstation 5" | "ps5" => "Playstation 5",
+        "psp" | "ppsspp" | "playstation portable" => "PSP",
+        "ps vita" | "psvita" | "playstation vita" | "vita" => "Ps Vita",
+        "nintendo switch" | "switch" => "Nintendo Switch",
+        "nintendo switch 2" | "switch 2" | "switch2" | "ns2" | "lichii" => "Nintendo Switch 2",
+        "super nintendo" | "snes" | "super nes" | "super famicom" => "Super Nintendo",
+        "nintendinho" | "nes" | "famicom" | "nintendo 8 bits" => "Nintendinho",
+        _ => return None,
+    })
+}
+
+#[cfg(test)]
+mod platform_tests {
+    use super::*;
+
+    fn game(source: &str, exe: &str, iso: Option<String>, appid: Option<i64>) -> Game {
+        Game {
+            id: 1, title: "x".into(), platform: "PC".into(), executable_path: exe.into(), launch_args: String::new(), cover: None, favorite: false,
+            playtime_seconds: 0, last_played_at: None, added_at: String::new(), background: None, bg_x: 50, bg_y: 50, steam_id: None,
+            release_date: None, release_iso: None, genre: None, genres: vec![], completed: false, completed_at: None, iso_path: iso, rom_path: None,
+            emulator_id: None, emulator_name: None, ra_game_id: None, source: source.into(), steam_app_id: appid, installed: false,
+        }
+    }
+
+    #[test]
+    fn installed_status() {
+        let exe = std::env::current_exe().unwrap().to_string_lossy().into_owned();
+        let mut v = vec![
+            game("manual", &exe, None, None),                           // executável existe
+            game("manual", r"Z:\nao\existe.exe", None, None),         // executável sumiu
+            game("iso", "", Some(exe.clone()), None),                   // arquivo do jogo existe
+            game("steam", "", None, Some(999_999_999)),                 // Steam, sem manifesto
+        ];
+        mark_installed(&mut v);
+        assert_eq!(v.iter().map(|g| g.installed).collect::<Vec<_>>(), vec![true, false, true, false]);
+    }
+
+    #[test]
+    fn maps_old_values_and_keeps_unknown() {
+        assert_eq!(canonical_platform("Steam"), Some("PC"));
+        assert_eq!(canonical_platform("Xbox Series X"), Some("Xbox Series"));
+        assert_eq!(canonical_platform("xbox one"), Some("XBOX"));
+        assert_eq!(canonical_platform("  pcsx2 "), Some("Playstation 2"));
+        assert_eq!(canonical_platform("PPSSPP"), Some("PSP"));
+        assert_eq!(canonical_platform("Ps Vita"), Some("Ps Vita"));
+        assert_eq!(canonical_platform("Switch 2"), Some("Nintendo Switch 2"));
+        assert_eq!(canonical_platform("RetroArch"), None);
+        assert!(PLATFORMS.iter().all(|p| canonical_platform(p) == Some(*p)));
+    }
+}

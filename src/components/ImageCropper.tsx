@@ -1,0 +1,100 @@
+import { useEffect, useRef, useState } from "react";
+import Modal from "./Modal";
+import Button from "./Button";
+import { Crop, centerCrop, clampCrop, sourceRect, zoomCrop } from "../lib/crop";
+import { t } from "../lib/i18n";
+
+/**
+ * Editor de enquadramento: zoom, reposicionamento (arrastar, rolar, botões ou controle) e prévia em
+ * tempo real. O resultado salvo é exatamente o que aparece no quadro (já recortado), então o
+ * enquadramento é o mesmo ao reabrir o aplicativo.
+ */
+export default function ImageCropper({ src, aspectW, aspectH, outW, outH, round, title, onApply, onClose }: {
+  src: string; aspectW: number; aspectH: number; outW: number; outH: number; round?: boolean;
+  title: string; onApply: (dataUrl: string) => void; onClose: () => void;
+}) {
+  const vw = aspectW >= aspectH ? 560 : 320;
+  const vh = Math.round((vw * aspectH) / aspectW);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const [img, setImg] = useState<HTMLImageElement | null>(null);
+  const [crop, setCrop] = useState<Crop>({ zoom: 1, ox: 0, oy: 0 });
+  const [error, setError] = useState(false);
+  const drag = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const i = new Image();
+    i.onload = () => { setImg(i); setCrop(centerCrop(i.naturalWidth, i.naturalHeight, vw, vh)); };
+    i.onerror = () => setError(true);
+    i.src = src;
+  }, [src, vw, vh]);
+
+  // Prévia ao vivo (2x para ficar nítida)
+  useEffect(() => {
+    if (!img || !canvas.current) return;
+    const ctx = canvas.current.getContext("2d")!;
+    const r = sourceRect(img.naturalWidth, img.naturalHeight, vw, vh, crop);
+    ctx.clearRect(0, 0, vw * 2, vh * 2);
+    ctx.drawImage(img, r.sx, r.sy, r.sw, r.sh, 0, 0, vw * 2, vh * 2);
+  }, [img, crop, vw, vh]);
+
+  const iw = img?.naturalWidth ?? 1, ih = img?.naturalHeight ?? 1;
+  const set = (c: Crop) => setCrop(clampCrop(iw, ih, vw, vh, c));
+  const nudge = (dx: number, dy: number) => set({ ...crop, ox: crop.ox + dx, oy: crop.oy + dy });
+  const zoom = (z: number) => img && setCrop(zoomCrop(iw, ih, vw, vh, crop, z));
+
+  // Rolagem do mouse = zoom (precisa de listener não passivo para impedir a rolagem da página).
+  useEffect(() => {
+    const el = canvas.current;
+    if (!el || !img) return;
+    const onWheel = (e: WheelEvent) => { e.preventDefault(); zoom(crop.zoom + (e.deltaY < 0 ? 0.1 : -0.1)); };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  });
+
+  function apply() {
+    if (!img) return;
+    const out = document.createElement("canvas");
+    out.width = outW; out.height = outH;
+    const r = sourceRect(iw, ih, vw, vh, crop);
+    out.getContext("2d")!.drawImage(img, r.sx, r.sy, r.sw, r.sh, 0, 0, outW, outH);
+    onApply(out.toDataURL("image/jpeg", 0.92));
+  }
+
+  return (
+    <Modal title={title} onClose={onClose} wide>
+      {error ? <div className="empty"><p>{t("Não foi possível abrir essa imagem.")}</p></div> : (
+        <div className="crop">
+          <div className={`crop-view ${round ? "round" : ""}`} style={{ width: vw, height: vh }}>
+            <canvas ref={canvas} width={vw * 2} height={vh * 2} style={{ width: vw, height: vh }}
+              onPointerDown={(e) => { drag.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId); }}
+              onPointerMove={(e) => { if (!drag.current) return; nudge(e.clientX - drag.current.x, e.clientY - drag.current.y); drag.current = { x: e.clientX, y: e.clientY }; }}
+              onPointerUp={() => { drag.current = null; }} />
+          </div>
+          <div className="crop-tools">
+            <p className="muted">{t("Arraste a imagem, role o mouse ou use os botões. A prévia mostra o resultado final.")}</p>
+            <div className="row">
+              <span>{t("Zoom")}</span>
+              <Button onClick={() => zoom(crop.zoom - 0.2)} disabled={crop.zoom <= 1}>−</Button>
+              <input type="range" min={1} max={4} step={0.05} value={crop.zoom} onChange={(e) => zoom(Number(e.target.value))} style={{ width: 180 }} />
+              <Button onClick={() => zoom(crop.zoom + 0.2)} disabled={crop.zoom >= 4}>+</Button>
+              <span className="muted">{Math.round(crop.zoom * 100)}%</span>
+            </div>
+            <div className="row">
+              <span>{t("Posição")}</span>
+              <Button onClick={() => nudge(24, 0)} aria-label={t("Mover para a esquerda")}>←</Button>
+              <Button onClick={() => nudge(-24, 0)} aria-label={t("Mover para a direita")}>→</Button>
+              <Button onClick={() => nudge(0, 24)} aria-label={t("Mover para cima")}>↑</Button>
+              <Button onClick={() => nudge(0, -24)} aria-label={t("Mover para baixo")}>↓</Button>
+              <Button variant="ghost" onClick={() => img && setCrop(centerCrop(iw, ih, vw, vh, crop.zoom))}>{t("Centralizar")}</Button>
+              <Button variant="ghost" onClick={() => img && setCrop(centerCrop(iw, ih, vw, vh))}>{t("Redefinir")}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="row end">
+        <Button variant="ghost" onClick={onClose}>{t("Cancelar")}</Button>
+        <Button variant="primary" onClick={apply} disabled={!img}>{t("Aplicar")}</Button>
+      </div>
+    </Modal>
+  );
+}

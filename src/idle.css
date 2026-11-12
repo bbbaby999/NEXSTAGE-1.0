@@ -1,0 +1,54 @@
+/* ---------- Modo Ocioso (protetor de tela) ---------- */
+/* Acima da interface, dos avisos e das dicas de comandos; abaixo do Gameboot (250). */
+.idle-root{position:fixed;inset:0;z-index:240;background:#000;cursor:none;animation:idle-in .9s ease both}
+.idle-root.leaving{animation:idle-out .38s ease both}
+@keyframes idle-in{from{opacity:0}to{opacity:1}}
+@keyframes idle-out{from{opacity:1}to{opacity:0}}
+
+/* A apresentação ocupa o contêiner (tela cheia ou o quadro da pré-visualização): medidas em cqh/cqw. */
+.idle-show{position:absolute;inset:0;overflow:hidden;background:#02030a;container-type:size;contain:strict;user-select:none}
+.idle-layer{position:absolute;inset:0;animation:idle-fade ease both;will-change:opacity}
+@keyframes idle-fade{from{opacity:0}to{opacity:1}}
+
+.idle-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  animation:idle-kb linear both;transform-origin:center;will-change:transform}
+@keyframes idle-kb{
+  from{transform:translate(var(--kb-x0,0),var(--kb-y0,0)) scale(var(--kb-s0,1.015))}
+  to{transform:translate(var(--kb-x1,0),var(--kb-y1,0)) scale(var(--kb-s1,1.05))}
+}
+
+/* Capa (jogo sem plano de fundo) e capturas: imagem inteira sobre um fundo desfocado dela mesma. */
+.idle-backdrop{position:absolute;inset:-8%;width:116%;height:116%;object-fit:cover;filter:blur(48px) saturate(1.2) brightness(.42)}
+/* Classes com prefixo próprio: ".shot"/".cover" genéricas colidem com a Galeria/Biblioteca (styles.css). */
+.idle-layer.idle-shot .idle-img{object-fit:contain}
+.idle-layer.idle-cover .idle-img{inset:auto;left:50%;top:50%;width:auto;height:72cqh;max-width:80cqw;margin:0;
+  translate:-50% -54%;object-fit:contain;border-radius:1.4cqh;box-shadow:0 3cqh 9cqh rgba(0,0,0,.6)}
+
+.idle-vignette{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(to top,rgba(0,0,0,.62) 0%,rgba(0,0,0,0) 34%),radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.45) 100%)}
+
+.idle-caption{position:absolute;left:5cqw;bottom:6.5cqh;z-index:2;max-width:60cqw;display:flex;flex-direction:column;gap:.6cqh;
+  color:#fff;text-shadow:0 .3cqh 2cqh rgba(0,0,0,.7);animation:idle-caption 1.2s ease .9s both}
+.idle-caption strong{font-size:clamp(11px,4.4cqh,52px);font-weight:300;letter-spacing:.01em;line-height:1.1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.idle-caption small{font-size:clamp(9px,2cqh,22px);opacity:.72;letter-spacing:.04em}
+@keyframes idle-caption{from{opacity:0;transform:translateY(1.5cqh)}to{opacity:1;transform:none}}
+
+.idle-empty{position:absolute;inset:0;display:grid;place-items:center;padding:0 8cqw;text-align:center;
+  color:rgba(255,255,255,.55);font-size:clamp(11px,2.6cqh,26px);font-weight:300;
+  background:radial-gradient(ellipse at 50% 45%,#0b1226 0%,#02030a 70%)}
+
+.idle-hint{position:absolute;right:4cqw;top:4cqh;z-index:3;font-size:clamp(10px,1.8cqh,18px);color:rgba(255,255,255,.8);
+  padding:.8cqh 1.6cqh;border-radius:999px;background:rgba(0,0,0,.35);backdrop-filter:blur(8px);
+  animation:idle-hint 5s ease 1s both}
+@keyframes idle-hint{0%{opacity:0}12%{opacity:1}75%{opacity:1}100%{opacity:0}}
+
+/* Animações reduzidas: só o crossfade, sem movimento de câmera. */
+html[data-motion="reduced"] .idle-img{animation:none!important;transform:none}
+@media (prefers-reduced-motion:reduce){html:not([data-motion="full"]) .idle-img{animation:none!important;transform:none}}
+
+/* Pré-visualização nas Configurações */
+.idle-preview-row{display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-top:14px}
+.idle-preview{position:relative;width:min(100%,440px);aspect-ratio:16/9;border-radius:12px;overflow:hidden;
+  border:1px solid var(--line);background:#02030a}
+.idle-preview-off{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px}

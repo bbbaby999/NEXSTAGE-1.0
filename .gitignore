@@ -1,0 +1,43 @@
+# Dependências e compilações
+node_modules
+dist
+src-tauri/target
+src-tauri/gen
+
+# Arquivos de publicação gerados por scripts/release.mjs (instalador, .sig e latest.json vão para o
+# GitHub Releases, não para o código)
+release/
+
+# Chaves e credenciais — NUNCA versionar. A chave de assinatura das atualizações fica fora do projeto
+# (%USERPROFILE%\.tauri\nexstage.key).
+*.key
+*.key.pub
+*.pem
+*.pfx
+*.p12
+.env
+.env.*
+
+# Dados locais (o banco do app fica em %APPDATA%, mas cópias manuais não devem subir)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Logs, temporários e lixo do sistema
+*.log
+*.tmp
+*.bak
+npm-debug.log*
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Editores
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Instaladores (vão para o GitHub Releases)
+*.exe
+*.msi

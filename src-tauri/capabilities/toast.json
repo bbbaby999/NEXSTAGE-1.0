@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "toast",
+  "description": "Janela de avisos por cima do jogo (capturas, conquistas, controles): só recebe eventos e lê configurações",
+  "windows": ["shot-toast"],
+  "permissions": ["core:default"]
+}

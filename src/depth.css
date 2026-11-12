@@ -1,0 +1,312 @@
+/* =====================================================================
+   NEXSTAGE · profundidade 3D (carrega por último)
+   Luz vinda de cima: chanfro claro no topo, sombra no pé, sombras em
+   camadas (contato + ambiente) e superfícies que se erguem e inclinam
+   seguindo o mouse (lib/depth.ts grava --dx/--dy/--gx/--gy).
+   O fundo de ondas (.waves) não é tocado.
+   ===================================================================== */
+
+:root{
+  /* sombras em camadas: contato curto + penumbra + sombra ambiente longa */
+  --elev-1:0 1px 1px rgba(0,0,0,.35),0 4px 10px -3px rgba(0,0,0,.5),0 16px 28px -14px rgba(0,0,0,.75);
+  --elev-2:0 2px 3px rgba(0,0,0,.4),0 12px 22px -8px rgba(0,0,0,.6),0 32px 56px -20px rgba(0,0,0,.9);
+  --elev-3:0 3px 6px rgba(0,0,0,.45),0 24px 48px -16px rgba(0,0,0,.85),0 60px 110px -30px rgba(0,0,0,.95),0 0 60px rgba(var(--ar),.12);
+  /* chanfro: luz no topo, sombra na base */
+  --bevel:inset 0 1px 0 rgba(255,255,255,.09),inset 0 -1px 0 rgba(0,0,0,.4);
+  --bevel-hi:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -1px 0 rgba(0,0,0,.45);
+  --depth-persp:900px;
+}
+
+/* ---------- Superfícies: transform 3D unificado ---------- */
+/* position:relative (para o reflexo ::before) com especificidade zero: quem já se posiciona
+   (ex.: o botão Voltar da página do jogo, absoluto sobre a arte) mantém a própria posição. */
+:where(.setting:not(.col-set),.stat,.thumb,.theme,.emu,.folder-list li,.radio,.note,.pf-list li,.opt,.stage-shot,.mini-shot,
+  .sm-user,.kb-key,.chip,.btn,.stage-more,.select-btn,.coll-row,.rate-row,.hltb,.legend,.seg){position:relative}
+html :is(.setting:not(.col-set),.stat,.thumb,.theme,.emu,.folder-list li,.radio,.note,.pf-list li,.opt,.stage-shot,.mini-shot,
+  .sm-user,.kb-key,.chip,.btn,.stage-more,.select-btn,.coll-row,.rate-row,.hltb,.legend,.seg){
+  --lift:0px;--ds:1;
+  transform:perspective(var(--depth-persp)) translate3d(0,var(--lift),0) rotateX(var(--dx,0deg)) rotateY(var(--dy,0deg)) scale(var(--ds));
+  transition:transform .2s var(--ease),box-shadow .25s var(--ease),background .15s,border-color .2s,color .15s,opacity .15s;
+}
+/* o mesmo transform nos estados (vence as regras antigas de :hover/:focus que trocavam o transform) */
+html :is(.setting:not(.col-set),.stat,.thumb,.theme,.emu,.folder-list li,.radio,.note,.pf-list li,.opt,.stage-shot,.mini-shot,
+  .sm-user,.kb-key,.chip,.btn,.stage-more,.select-btn,.coll-row,.rate-row,.hltb,.legend,.seg):is(:hover,:focus,:active,.depth-on){
+  transform:perspective(var(--depth-persp)) translate3d(0,var(--lift),0) rotateX(var(--dx,0deg)) rotateY(var(--dy,0deg)) scale(var(--ds));
+}
+
+/* reflexo de luz que acompanha o mouse */
+html :is(.setting:not(.col-set),.stat,.thumb,.theme,.emu,.folder-list li,.radio,.note,.pf-list li,.opt,.sm-user,.kb-key,.btn,.stage-more,.select-btn,.coll-row)::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .25s;
+  background:radial-gradient(circle at var(--gx,50%) var(--gy,0%),rgba(255,255,255,.09),transparent 60%);
+}
+html .depth-on::before{opacity:1}
+html .btn.primary.depth-on::before{background:radial-gradient(circle at var(--gx,50%) var(--gy,0%),rgba(255,255,255,.28),transparent 60%)}
+
+/* ---------- Painéis e linhas: erguidos da página ---------- */
+html :is(.setting,.stat,.thumb,.theme,.emu,.folder-list li,.radio,.note,.pf-list li,.opt,.stage-shot,.mini-shot,.sm-user,.kb-key,
+  .chip,.select-btn,.coll-row,.rate-row,.hltb,.legend,.scan-row,.pf-custom,.selbar){
+  box-shadow:var(--elev-1),var(--bevel);
+}
+html :is(.setting:not(.col-set),.stat,.thumb,.theme,.emu,.folder-list li,.note,.pf-list li,.coll-row,.rate-row,.hltb,.legend):is(:hover,.depth-on){
+  --lift:-3px;box-shadow:var(--elev-2),var(--bevel-hi),0 0 0 1px rgba(var(--br),.07);
+}
+html :is(.radio,.opt,.sm-user,.select-btn,.chip,.stage-shot,.mini-shot,.theme):is(:hover,.depth-on){
+  --lift:-2px;box-shadow:var(--elev-2),var(--bevel-hi);
+}
+html :is(.radio.on,.opt.on,.chip.on,.theme.on,.kb-key.on){box-shadow:var(--elev-1),var(--bevel-hi),0 0 22px -6px rgba(var(--br),.55)}
+html :is(.stage-shot,.mini-shot,.theme):focus{--ds:1.06}
+html :is(.thumb,.stat,.emu,.note,.opt,.radio,.sm-user,.select-btn,.chip):focus{--ds:1.02}
+html .setting:not(.col-set):focus-within{--lift:-2px}
+/* o anel de foco continua por cima das sombras */
+html :is(.setting,.stat,.thumb,.theme,.emu,.folder-list li,.radio,.note,.pf-list li,.opt,.stage-shot,.mini-shot,.sm-user,.kb-key,
+  .chip,.select-btn,.coll-row,.rate-row,.hltb,.legend,.btn,.stage-more):focus{
+  box-shadow:0 0 0 2px var(--b),var(--elev-2),var(--bevel-hi);
+}
+/* conteúdo dentro do painel um pouco "à frente" do fundo dele */
+html .thumb img,html .theme i{box-shadow:0 6px 14px -6px rgba(0,0,0,.7)}
+html .theme i{box-shadow:0 6px 14px -6px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.25),inset 0 -6px 12px -6px rgba(0,0,0,.35)}
+
+/* ---------- Botões: teclas físicas (erguem no hover, afundam ao clicar) ---------- */
+html :is(.btn,.stage-more,.kb-key):not(:disabled){box-shadow:0 1px 0 rgba(0,0,0,.45),0 6px 14px -6px rgba(0,0,0,.7),var(--bevel-hi)}
+html :is(.btn,.stage-more,.kb-key):not(:disabled):is(:hover,.depth-on){--lift:-2px;box-shadow:0 2px 0 rgba(0,0,0,.45),0 12px 22px -8px rgba(0,0,0,.8),var(--bevel-hi)}
+html .btn.primary:not(:disabled){box-shadow:0 1px 0 rgba(0,0,0,.35),0 10px 24px -8px rgba(var(--ar),.85),inset 0 1px 0 rgba(255,255,255,.42),inset 0 -2px 0 rgba(0,0,0,.2)}
+html .btn.primary:not(:disabled):is(:hover,.depth-on){box-shadow:0 2px 0 rgba(0,0,0,.35),0 16px 32px -10px rgba(var(--ar),.95),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 0 rgba(0,0,0,.2)}
+html .btn.ghost:not(:disabled):not(:hover):not(.depth-on){box-shadow:none}
+html :is(.btn,.stage-more,.kb-key,.chip,.opt,.radio,.theme,.select-btn,.stage-shot,.mini-shot):not(:disabled):active{
+  --lift:1px;--ds:.97;transition-duration:.06s;
+  box-shadow:0 0 0 rgba(0,0,0,0),inset 0 2px 6px rgba(0,0,0,.45),inset 0 -1px 0 rgba(255,255,255,.05);
+}
+html .btn:disabled{box-shadow:none}
+
+/* controle segmentado: trilho afundado, opção ativa em relevo */
+html .seg{box-shadow:inset 0 2px 5px rgba(0,0,0,.5),inset 0 -1px 0 rgba(255,255,255,.05)}
+html .seg button.on{box-shadow:0 2px 6px -1px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.18)}
+
+/* campos de texto e barras: rebaixados na superfície */
+html :is(input.search,input[type=text],input[type=password],textarea,.kb-preview,.scan-bar){
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.5),inset 0 -1px 0 rgba(255,255,255,.05);
+}
+html :is(input.search,input[type=text],input[type=password],textarea):focus{box-shadow:inset 0 2px 6px rgba(0,0,0,.5),0 0 0 2px rgba(var(--br),.45)}
+html .range input[type=range]{box-shadow:inset 0 1px 3px rgba(0,0,0,.6)}
+html .range input[type=range]::-webkit-slider-thumb{box-shadow:0 3px 6px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.6)}
+
+/* ---------- Camadas flutuantes: barra superior, menus e janelas ---------- */
+html .topbar{box-shadow:var(--elev-2),var(--bevel-hi),0 0 0 1px rgba(0,0,0,.25)}
+html .tab.active{box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 -1px 0 rgba(0,0,0,.35),0 4px 12px -4px rgba(0,0,0,.6)}
+html :is(.modal,.pick-panel,.ctx-panel,.kb-panel,.sm-panel){box-shadow:var(--elev-3),inset 0 1px 0 rgba(255,255,255,.1),inset 0 -1px 0 rgba(0,0,0,.5)}
+html .toast{box-shadow:var(--elev-2),var(--bevel-hi)}
+html .modal{animation:pop3d .34s var(--ease) both}
+html .pick-panel{animation:pop3d .28s var(--ease) both}
+@keyframes pop3d{from{opacity:0;transform:perspective(1200px) translate3d(0,18px,-60px) rotateX(9deg)}to{opacity:1;transform:none}}
+
+/* troca de tela: a página chega "de trás" com leve inclinação */
+@keyframes page-in{from{opacity:0;transform:perspective(1400px) translate3d(0,16px,-50px) rotateX(3deg)}to{opacity:1;transform:none}}
+
+/* ---------- Tipografia em relevo ---------- */
+html :is(h1,.page-head h1,.pf-text h1,.home-title){text-shadow:0 1px 0 rgba(0,0,0,.4),0 6px 22px rgba(0,0,0,.45)}
+html .section{text-shadow:0 1px 0 rgba(0,0,0,.5),0 0 18px rgba(var(--ar),.25)}
+html .stage-title{text-shadow:0 2px 0 rgba(0,0,0,.35),0 8px 30px rgba(0,0,0,.7)}
+
+/* ---------- Home: primeiro plano em parallax contra a arte do fundo ---------- */
+/* `translate` (não `transform`): convive com as animações de entrada que usam transform */
+.stage-hero[data-parallax]{translate:calc(var(--px,0) * 7px) calc(var(--py,0) * 4px);transition:translate .7s var(--ease)}
+.replay[data-parallax]{translate:calc(var(--px,0) * 3px) calc(var(--py,0) * 2px);transition:translate .7s var(--ease)}
+html .stage-tags span{box-shadow:0 4px 10px -4px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.08)}
+
+/* ---------- Movimento reduzido: só a luz e as sombras (sem inclinação, erguer ou parallax) ---------- */
+html[data-motion="reduced"] :is(.setting,.stat,.thumb,.theme,.emu,.folder-list li,.radio,.note,.pf-list li,.opt,.stage-shot,.mini-shot,
+  .sm-user,.kb-key,.chip,.btn,.stage-more,.select-btn,.coll-row,.rate-row,.hltb,.legend,.seg){transform:none!important}
+html[data-motion="reduced"] :is(.stage-hero,.replay)[data-parallax]{translate:none}
+@media (prefers-reduced-motion:reduce){
+  html:not([data-motion="full"]) :is(.setting,.stat,.thumb,.theme,.emu,.folder-list li,.radio,.note,.pf-list li,.opt,.stage-shot,.mini-shot,
+    .sm-user,.kb-key,.chip,.btn,.stage-more,.select-btn,.coll-row,.rate-row,.hltb,.legend,.seg){transform:none!important}
+  html:not([data-motion="full"]) :is(.stage-hero,.replay)[data-parallax]{translate:none}
+}
+
+/* ---------- Configurações: caixas mais sólidas e seletor de tema compacto ---------- */
+/* fundo quase opaco (segue as cores de painel do tema) para o texto não disputar com as ondas */
+html .settings .setting{
+  background:linear-gradient(180deg,color-mix(in srgb,var(--panel2) 88%,transparent),color-mix(in srgb,var(--panel) 90%,transparent));
+}
+html .settings .radio:not(.on):not(:hover){background:color-mix(in srgb,var(--panel2) 70%,transparent)}
+html .settings .setting.disabled{opacity:.7}
+
+.theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:8px}
+html .theme-grid .theme{width:auto;flex-direction:row;align-items:center;gap:10px;padding:8px 12px 8px 8px;border-radius:999px;
+  background:color-mix(in srgb,var(--panel) 80%,transparent);font:inherit;font-size:.86rem;color:var(--text)}
+html .theme-grid .theme i{flex:none;width:26px;height:26px;border-radius:50%}
+html .theme-grid .theme span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html .theme-grid .theme.on{border-color:var(--b);background:rgba(var(--ar),.22)}
+html .theme-grid .theme.on i{outline:2px solid var(--b);outline-offset:2px}
+html .theme-grid .theme:focus{--ds:1.04}
+
+/* ---------- Configurações: menu lateral de seções ---------- */
+
+/* ---------- Configurações: armazenamento (gráfico de rosca) ---------- */
+/* cores fixas (validadas para daltonismo e contraste sobre o painel escuro): não dependem do tema,
+   para "NEXSTAGE" e "Capturas" nunca coincidirem com a cor de destaque. "Outros" é neutro e "Livre" é o trilho. */
+.storage-box{--st-nx:#3987e5;--st-shot:#d95926;--st-other:#8a93ad;--st-free:rgba(255,255,255,.09);gap:var(--s4)}
+.st-head{display:flex;justify-content:space-between;align-items:center;gap:var(--s3);flex-wrap:wrap}
+.st-drives{display:flex;gap:var(--s2);flex-wrap:wrap}
+.st-drives .chip small{color:inherit;opacity:.7;margin-left:4px}
+.st-body{display:flex;align-items:center;gap:clamp(20px,4vw,48px);flex-wrap:wrap}
+.st-donut{position:relative;width:min(220px,60vw);aspect-ratio:1;flex:none;filter:drop-shadow(0 10px 18px rgba(0,0,0,.55))}
+.st-donut svg{display:block;width:100%;height:100%;overflow:visible}
+/* contorno na cor do painel = 2px de espaço entre as fatias */
+.st-arc{stroke:var(--panel2);stroke-width:2;stroke-linejoin:round;cursor:pointer;transform-origin:100px 100px;
+  transition:opacity var(--dur-fast),transform var(--dur) var(--ease)}
+.st-arc.dim{opacity:.4}
+.st-arc.hot{transform:scale(1.04)}
+.st-nx{fill:var(--st-nx);background:var(--st-nx)}
+.st-shot{fill:var(--st-shot);background:var(--st-shot)}
+.st-other{fill:var(--st-other);background:var(--st-other)}
+.st-free{fill:var(--st-free);background:var(--st-free);outline:1px solid rgba(255,255,255,.18);outline-offset:-1px}
+.st-arc.st-free{outline:none}
+.st-center{position:absolute;inset:28%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none}
+.st-center b{font-size:1.7rem;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
+.st-center span{font-size:.85rem;color:var(--text)}
+.st-center small{font-size:.7rem;color:var(--text-dim);margin-top:2px;line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.st-legend{list-style:none;margin:0;padding:0;flex:1;min-width:min(100%,280px);display:flex;flex-direction:column;gap:4px}
+.st-legend li{display:grid;grid-template-columns:14px minmax(0,1fr) auto 3.6rem;gap:12px;align-items:center;padding:9px 12px;border-radius:var(--r-md);
+  transition:background var(--dur-fast)}
+.st-legend li.hot{background:rgba(255,255,255,.06)}
+.st-legend i{width:14px;height:14px;border-radius:4px}
+.st-legend span{color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-legend b{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.st-legend em{font-style:normal;color:var(--text-dim);text-align:right;font-variant-numeric:tabular-nums}
+html[data-motion="reduced"] .st-arc.hot{transform:none}
+
+/* ---------- Configurações: menu lateral (painel de altura total) ---------- */
+.set-layout{display:grid;grid-template-columns:clamp(260px,22vw,320px) minmax(0,1fr);gap:clamp(24px,3vw,48px);align-items:start}
+.set-content{min-width:0}
+.set-content .settings{max-width:960px}
+.set-content>.section:first-child{margin-top:var(--s2)}
+.set-content .section{scroll-margin-top:var(--s4)}
+/* --set-nav-h / --set-nav-top vêm do SectionNav (área visível de .main): o painel vai do topo ao rodapé */
+.set-nav{position:sticky;top:var(--set-nav-top,24px);height:var(--set-nav-h,calc(100vh - 160px));
+  display:flex;flex-direction:column;gap:4px;padding:var(--s5) var(--s3) var(--s4);border-radius:var(--r-xl);overflow-y:auto;scrollbar-width:none;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--panel2) 92%,transparent),color-mix(in srgb,var(--panel) 94%,transparent));
+  border:1px solid var(--glass-line);box-shadow:var(--elev-2),var(--bevel-hi)}
+.set-nav-title{font-size:1.6rem;font-weight:300;letter-spacing:-.01em;padding:0 var(--s3) var(--s4);margin:0 0 var(--s2);
+  border-bottom:1px solid var(--glass-line)}
+.set-nav button{position:relative;display:flex;align-items:center;gap:14px;text-align:left;min-height:52px;padding:12px 16px 12px 20px;
+  border:none;border-radius:var(--r-md);background:none;color:var(--text-dim);font:inherit;font-size:1rem;font-weight:600;cursor:pointer;
+  transition:color var(--dur-fast),background var(--dur-fast)}
+.set-nav button svg{flex:none;opacity:.8;transition:opacity var(--dur-fast),color var(--dur-fast)}
+.set-nav button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.set-nav button:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.set-nav button.on{color:#fff;background:rgba(var(--ar),.22);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 6px 16px -8px rgba(0,0,0,.6)}
+.set-nav button.on svg{opacity:1;color:var(--b)}
+/* LED da seção ativa (mesma linguagem da aba ativa da barra superior) */
+.set-nav button::before{content:"";position:absolute;left:6px;top:26%;bottom:26%;width:3px;border-radius:3px;background:var(--b);
+  opacity:0;transform:scaleY(.4);transition:opacity var(--dur),transform var(--dur) var(--ease)}
+.set-nav button.on::before{opacity:1;transform:none;box-shadow:0 0 10px 1px rgba(var(--br),.8)}
+.set-nav-foot{margin-top:auto;padding:var(--s4) var(--s3) 0;color:var(--text-dim);font-size:.75rem;letter-spacing:.08em}
+/* telas estreitas: o menu vira uma faixa horizontal fixa no topo */
+@media (max-width:960px){
+  .set-layout{grid-template-columns:minmax(0,1fr);gap:var(--s3)}
+  .set-nav{flex-direction:row;align-items:center;height:auto;top:0;z-index:2;overflow-x:auto;padding:var(--s2);border-radius:var(--r-lg)}
+  .set-nav-title,.set-nav-foot{display:none}
+  .set-nav button{white-space:nowrap;min-height:44px;padding:8px 14px;flex:none}
+  .set-nav button::before{left:22%;right:22%;top:auto;bottom:3px;width:auto;height:3px;transform:scaleX(.4)}
+  .set-nav button.on::before{transform:none}
+}
+
+/* ---------- Busca nas configurações ---------- */
+[data-search-hide]{display:none!important}
+.set-search{position:relative;display:flex;align-items:center;margin:0 0 var(--s2)}
+.set-search>svg{position:absolute;left:12px;color:var(--text-dim);pointer-events:none}
+html .set-search input.search{width:100%;min-width:0;padding:11px 38px 11px 38px;border-radius:var(--r-md)}
+.set-search-clear{position:absolute;right:6px;width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,255,255,.08);
+  color:var(--text-dim);cursor:pointer;font-size:.8rem;display:grid;place-items:center}
+.set-search-clear:hover{color:var(--text);background:rgba(255,255,255,.14)}
+.set-search-info{padding:0 var(--s3) var(--s2);color:var(--text-dim);font-size:.8rem}
+.set-nav button.empty{opacity:.35;cursor:default}
+.set-count{margin-left:auto;font-style:normal;font-size:.75rem;font-weight:700;min-width:24px;padding:2px 8px;border-radius:999px;text-align:center;
+  background:rgba(var(--ar),.3);color:var(--text)}
+@media (max-width:960px){.set-search{min-width:220px;margin:0}.set-search-info{display:none}}
+
+/* ---------- Armazenamento: unidades exibidas ---------- */
+.st-manage{flex-wrap:wrap}
+.st-manage .chip small{color:inherit;opacity:.7;margin-left:4px}
+
+/* ---------- Dicas de comando do controle (canto inferior) ---------- */
+.ctl-hints{position:fixed;right:var(--s5);bottom:var(--s4);z-index:125;display:flex;align-items:center;gap:var(--s4);flex-wrap:wrap;justify-content:flex-end;
+  max-width:calc(100vw - 2 * var(--s5));padding:8px 16px;border-radius:999px;pointer-events:none;
+  background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--glass-line);box-shadow:var(--elev-2),var(--bevel-hi);
+  font-size:.82rem;color:var(--text-dim);animation:fade .25s ease both}
+.ctl-hints>span{display:inline-flex;align-items:center;gap:2px;white-space:nowrap}
+.ctl-hints .glyph{margin-right:6px}
+.ctl-hints .glyph+.glyph{margin-left:-2px}
+/* glifos de botões de ombro, menu e direcional são retangulares mesmo nos estilos redondos */
+.glyph.g-l1,.glyph.g-r1,.glyph.g-l2,.glyph.g-r2,.glyph.g-menu,.glyph.g-dpad{border-radius:7px!important;min-width:26px!important;padding:0 7px!important}
+.glyph.playstation.g-l1,.glyph.playstation.g-r1,.glyph.playstation.g-l2,.glyph.playstation.g-r2,.glyph.playstation.g-menu,.glyph.g-dpad{
+  background:rgba(255,255,255,.08);color:var(--text);border-color:var(--glass-line)}
+/* espaço no fim das páginas para as dicas não cobrirem o último item */
+html.has-hints .main{padding-bottom:84px}
+
+/* ---------- Visualizador: tela cheia ---------- */
+.viewer-rail .v-kbd{margin-left:auto;padding:1px 7px;border-radius:6px;border:1px solid var(--glass-line);background:rgba(255,255,255,.06);
+  font:inherit;font-size:.7rem;font-weight:700;color:var(--text-dim)}
+.viewer-full{position:fixed;inset:0;z-index:60;background:#000;display:grid;place-items:center;cursor:none;animation:fade .2s ease both}
+.viewer-full.awake{cursor:default}
+.viewer-full>img{max-width:100vw;max-height:100vh;width:100%;height:100%;object-fit:contain;display:block;user-select:none;-webkit-user-drag:none}
+/* pílula discreta: quase invisível parada, acende ao mexer o mouse ou usar um comando */
+.vf-hints{position:fixed;right:20px;bottom:18px;display:flex;align-items:center;gap:4px;padding:4px;border-radius:999px;
+  background:rgba(10,12,18,.42);border:1px solid rgba(255,255,255,.1);opacity:.22;transition:opacity .5s ease;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.viewer-full.awake .vf-hints,.vf-hints:hover{opacity:.85;transition-duration:.15s}
+.vf-hints button{display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:none;border-radius:999px;background:none;
+  color:rgba(255,255,255,.85);font:inherit;font-size:.75rem;cursor:pointer}
+.vf-hints button:hover:not(:disabled){background:rgba(255,255,255,.1)}
+.vf-hints button:disabled{opacity:.3;cursor:default}
+.vf-hints button svg{width:16px;height:16px}
+.vf-hints kbd{font:inherit;font-weight:700;font-size:.68rem;padding:1px 6px;border-radius:5px;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.75)}
+.vf-hints>i{width:1px;height:18px;background:rgba(255,255,255,.15);margin:0 2px}
+
+/* ---------- Cursor oculto enquanto o controle está em uso (lib/cursor.ts) ---------- */
+html.cursor-hidden,html.cursor-hidden *{cursor:none!important}
+/* sem hover com o cursor invisível parado: o conteúdo que rola por baixo dele não reage */
+html.cursor-hidden body{pointer-events:none}
+
+/* ---------- Seletor de cor do tema personalizado ---------- */
+.cp{display:flex;flex-direction:column;gap:var(--s4);min-width:min(720px,86vw)}
+.cp-auto{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap}
+.cp-auto small{color:var(--text-dim);flex:1;min-width:220px}
+.cp-body{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:var(--s5);align-items:start}
+.cp-pick{display:flex;flex-direction:column;gap:var(--s3)}
+/* quadro: branco → matiz (horizontal) sob transparente → preto (vertical) */
+.cp-sv{position:relative;aspect-ratio:4/3;border-radius:var(--r-md);cursor:crosshair;touch-action:none;outline:none;
+  background:linear-gradient(to top,#000,transparent),linear-gradient(to right,#fff,var(--hue));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),var(--elev-1)}
+.cp-sv:focus{box-shadow:0 0 0 2px var(--b),var(--elev-2)}
+.cp-thumb{position:absolute;width:20px;height:20px;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;
+  border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.6),0 3px 8px rgba(0,0,0,.6)}
+/* barra de matiz: arco-íris no trilho */
+html .cp-hue input[type=range]{width:100%;height:14px;background:linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)}
+html .cp-hue input[type=range]::-webkit-slider-thumb{width:22px;height:22px;background:#fff;border:3px solid rgba(0,0,0,.5)}
+.cp-side{display:flex;flex-direction:column;gap:var(--s3)}
+.cp-preview{display:grid;grid-template-columns:1fr 1fr;gap:var(--s2)}
+.cp-sw{display:flex;flex-direction:column;justify-content:flex-end;gap:2px;min-height:84px;padding:10px 12px;border-radius:var(--r-md);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),inset 0 0 0 1px rgba(255,255,255,.1),var(--elev-1)}
+.cp-sw span,.cp-sw b{padding:1px 6px;border-radius:5px;background:rgba(0,0,0,.45);color:#fff;width:fit-content;font-size:.72rem}
+.cp-sw b{font-size:.85rem;font-variant-numeric:tabular-nums;letter-spacing:.04em}
+.cp-field{display:flex;align-items:center;gap:var(--s2)}
+.cp-field span{min-width:2.4rem;color:var(--text-dim);font-size:.8rem;font-weight:700;letter-spacing:.08em}
+html .cp-field input.search{flex:1;min-width:0;width:100%;font-variant-numeric:tabular-nums;text-transform:uppercase}
+.cp-rgb{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s2)}
+.cp-rgb .cp-field span{min-width:auto}
+.cp-presets{display:grid;grid-template-columns:repeat(10,1fr);gap:6px}
+.cp-preset{aspect-ratio:1;border-radius:50%;border:2px solid rgba(255,255,255,.2);cursor:pointer;padding:0;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 3px 8px -2px rgba(0,0,0,.6);transition:transform var(--dur-fast)}
+.cp-preset:hover,.cp-preset:focus{transform:scale(1.15)}
+.cp-warn{color:#ffb454}
+.cp-actions{justify-content:flex-end}
+@media (max-width:900px){.cp-body{grid-template-columns:1fr}}
+
+/* ---------- Página do jogo: botão Voltar no canto superior esquerdo da arte ---------- */
+html .dp-back{position:absolute;top:18px;left:18px;z-index:3;display:inline-flex;align-items:center;gap:8px;padding:9px 16px 9px 12px;
+  background:rgba(8,11,20,.62);border:1px solid rgba(255,255,255,.16);color:#eef2ff;
+  -webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3);text-shadow:0 1px 2px rgba(0,0,0,.5)}
+html .dp-back:hover,html .dp-back.depth-on{background:rgba(20,26,44,.8)}
+html .dp-back .glyph{margin:0 0 0 4px}
