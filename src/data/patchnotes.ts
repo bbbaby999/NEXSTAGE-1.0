@@ -21,14 +21,11 @@ export const PATCH_NOTES: PatchNote[] = [
   {
     version: "1.0.1",
     date: "2026-11-12",
-    summary: "Traduções completas nos 10 idiomas, configurações mais organizadas e um app mais seguro e leve.",
+    summary: "Traduções completas em todos os idiomas e configurações de notificações mais organizadas.",
     sections: [
       { type: "improve", items: [
         "Traduções completas em inglês, espanhol, francês, alemão, italiano, russo, japonês, coreano e chinês: Central de Controles, Backup e restauração, notas de atualização da Steam e os demais textos que ainda apareciam em português.",
         "Datas, horário do relógio e números seguem o idioma escolhido.",
-        "O NEXSTAGE abre uma cópia só: abrir de novo (atalho ou início com o Windows) traz a janela que já está aberta para a frente.",
-        "As chaves do SteamGridDB e do RAWG passam a ser guardadas cifradas pelo Windows, como as demais credenciais (as já salvas são convertidas automaticamente).",
-        "Abertura mais leve: as telas menos usadas são carregadas em segundo plano.",
       ] },
       { type: "ui", items: [
         "A notificação de captura (e a duração dela) foi para Configurações → Sons e notificações, junto das demais notificações.",
