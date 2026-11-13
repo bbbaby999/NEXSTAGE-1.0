@@ -4,6 +4,7 @@
  */
 import { createContext, ReactNode, useCallback, useContext, useRef, useState } from "react";
 import type { Profile, StatsTab, View } from "../types";
+import { api } from "../lib/api";
 
 interface Toast { id: number; msg: string; kind: "ok" | "err" }
 interface Ctx {
@@ -47,6 +48,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const nextId = useRef(1);
 
   const toast = useCallback((msg: string, kind: "ok" | "err" = "ok") => {
+    // erros exibidos vão para o registro local (anexado ao feedback só com autorização)
+    if (kind === "err") api.logClientError("aviso", msg).catch(() => {});
     const id = nextId.current++;
     setToasts((t) => [...t, { id, msg, kind }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === "err" ? 6000 : 3000);

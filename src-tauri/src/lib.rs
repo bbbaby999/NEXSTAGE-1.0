@@ -28,6 +28,8 @@ mod backup;
 mod net;
 mod vault;
 mod apikeys;
+mod diaglog;
+mod feedback;
 mod pad_notify;
 #[cfg(debug_assertions)]
 mod dev;
@@ -52,6 +54,8 @@ pub fn run() {
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
+            // Registro local de erros (anexado ao feedback só com autorização do usuário).
+            diaglog::init(&dir);
             let db = db::Db::open(&dir.join("nexstage.db"))?;
             // Capas e fundos em arquivos (ver `images`): migra as que ainda estão no banco e limpa as sem uso.
             images::init(&dir)?;
@@ -130,6 +134,10 @@ pub fn run() {
         .invoke_handler({
             let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
             profiles::list_profiles,
+            diaglog::log_client_error,
+            feedback::feedback_info,
+            feedback::feedback_attachments,
+            feedback::feedback_send,
             profiles::create_profile,
             profiles::update_profile,
             profiles::delete_profile,

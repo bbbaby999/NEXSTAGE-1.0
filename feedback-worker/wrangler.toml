@@ -1,0 +1,10 @@
+name = "nexstage-feedback"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+
+[vars]
+# Repositório que recebe as Issues de feedback (recomendado: privado, separado do código).
+GITHUB_REPO = "bbbaby999/nexstage-feedback"
+
+# O token NÃO vai aqui. Defina como segredo:
+#   npx wrangler secret put GITHUB_TOKEN

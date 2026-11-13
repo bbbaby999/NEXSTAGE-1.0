@@ -62,6 +62,12 @@ Os arquivos de idioma são listas na mesma ordem de `keys.ts`; entradas novas v�
 
 > **Nunca** coloque a chave privada (`nexstage.key`), senhas ou chaves de API no repositório. O `.gitignore` já bloqueia os formatos mais comuns.
 
+## Feedback e relatórios
+
+Em **Configurações → Atualizações → Feedback e relatórios** o usuário envia sugestões ou relata problemas, sem conta no GitHub. O app envia para um Cloudflare Worker (pasta `feedback-worker/`), que cria a Issue no repositório de feedback; o token do GitHub fica só no Worker. Para ativar: siga `feedback-worker/README.md` e rode `node scripts/setup-feedback.mjs <endereço do Worker>` antes de compilar.
+
+O app mantém um registro local de erros em `%APPDATA%\app.nexstage.launcher\logs\nexstage.log` (até 256 KB). Ele só é enviado se o usuário marcar a opção de anexos e revisar o conteúdo; nome de usuário, e-mails, chaves e endereços são removidos antes.
+
 ## Segurança e privacidade
 
 - As credenciais (Steam, RetroAchievements, IGDB, Nexus Mods, SteamGridDB, RAWG) ficam cifradas pela DPAPI do Windows e só abrem no mesmo usuário do mesmo computador. As de Steam, RetroAchievements, IGDB e Nexus Mods nunca voltam para a interface.

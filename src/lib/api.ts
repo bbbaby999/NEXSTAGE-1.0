@@ -16,6 +16,14 @@ export const imgUrl = (v: string | null): string | null =>
 const withGameImages = (g: Game): Game => ({ ...g, cover: imgUrl(g.cover), background: imgUrl(g.background) });
 const withEmuImage = (e: Emulator): Emulator => ({ ...e, cover: imgUrl(e.cover) });
 
+export type FeedbackCategory = "improvement" | "feature" | "bug" | "general";
+export interface FeedbackInfo { configured: boolean; version: string; logDir: string }
+export interface FeedbackAttachment { name: string; description: string; content: string; bytes: number }
+export interface FeedbackInput {
+  category: FeedbackCategory; title: string; comments: string; problem: string; sentAt: string; language: string;
+  attachments: { name: string; content: string }[];
+}
+
 export const api = {
   listProfiles: () => invoke<Profile[]>("list_profiles"),
   createProfile: (input: ProfileInput) => invoke<Profile>("create_profile", { input }),
@@ -222,6 +230,11 @@ export const api = {
     invoke<[SteamGameData, string | null]>("steam_game", { profileId, appid, refresh, lang: currentLang() }),
   steamClientStatus: () => invoke<SteamClientStatus>("steam_client_status"),
   previewPadToast: (event: "connected" | "disconnected" | "battery", name: string) => invoke<void>("preview_pad_toast", { event, name }),
+  // Feedback e relatórios (Configurações → Atualizações)
+  logClientError: (source: string, message: string) => invoke<void>("log_client_error", { source, message }),
+  feedbackInfo: () => invoke<FeedbackInfo>("feedback_info"),
+  feedbackAttachments: () => invoke<FeedbackAttachment[]>("feedback_attachments"),
+  feedbackSend: (input: FeedbackInput) => invoke<{ id: number | null }>("feedback_send", { input }),
   previewAchievementToast: (rare: boolean, title: string, game: string) => invoke<void>("preview_achievement_toast", { rare, title, game }),
   // Últimas atualizações (notas oficiais da Steam; leitura só do cache, verificação em segundo plano)
   steamNewsOverview: (profileId: number) =>

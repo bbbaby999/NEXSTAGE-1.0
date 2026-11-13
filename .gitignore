@@ -41,3 +41,7 @@ desktop.ini
 # Instaladores (vão para o GitHub Releases)
 *.exe
 *.msi
+
+# Cloudflare Wrangler (serviço de feedback)
+.wrangler/
+.dev.vars

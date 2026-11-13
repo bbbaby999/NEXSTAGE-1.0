@@ -21,6 +21,7 @@ import type { GalleryItem, PadCombos, ShortcutInfo, StartupInfo } from "../types
 import { comboLabel, combosConflict, popcount, validateCombo } from "../lib/padCombo";
 import PatchNotes from "../components/PatchNotes";
 import { VERSION_LABEL } from "../lib/version";
+import FeedbackPanel from "../components/FeedbackPanel";
 import { setGamebootEnabled } from "../lib/gameboot";
 import { IdleMode, setIdleConfig, startIdlePreview, useIdleActive, useIdleConfig } from "../lib/idle";
 import { IdleShow } from "../components/IdleScreen";
@@ -506,6 +507,7 @@ export default function Settings() {
   const [homeBlur, setHomeBlur] = useState(0);
   const blurSave = useRef<ReturnType<typeof setTimeout>>();
   const [notes, setNotes] = useState(false);
+  const [feedback, setFeedback] = useState(false);
   const [notesAuto, setNotesAuto] = useState(true);
   const [folder, setFolder] = useState("");
   const [motion, setMotionState] = useState<MotionMode>("auto");
@@ -872,11 +874,16 @@ export default function Settings() {
               <div><strong>{t("Abrir Patch Notes após atualizar")}</strong><small>{t("Mostra as novidades na primeira abertura depois de uma atualização.")}</small></div>
               <Button variant={notesAuto ? "primary" : "default"} onClick={() => { const n = !notesAuto; setNotesAuto(n); saveApp("patchnotes_auto", n ? "1" : "0"); }}>{notesAuto ? t("Ligado") : t("Desligado")}</Button>
             </div>
+            <div className="setting">
+              <div><strong>{t("Feedback e relatórios")}</strong><small>{t("Envie sugestões, ideias ou relate problemas ao desenvolvedor, com a opção de anexar arquivos de diagnóstico.")}</small></div>
+              <Button onClick={() => setFeedback(true)}>{t("Enviar feedback")}</Button>
+            </div>
           </div>
           <p className="muted note">{t("NEXSTAGE")}{" "}{VERSION_LABEL} {t("· ALL GAMES. ONE STAGE.")}</p>
           </div>
         </div>
       {notes && <PatchNotes onClose={() => setNotes(false)} />}
+      {feedback && <FeedbackPanel onClose={() => setFeedback(false)} />}
       {editing && <ProfileForm profile={p} onClose={() => setEditing(false)} onDone={afterProfile} />}
       {picking && <ColorPicker initial={custom} onChange={previewCustom} onCancel={cancelCustom} onApply={applyCustom} />}
     </>

@@ -19,6 +19,18 @@ export const NOTE_LABEL: Record<NoteType, string> = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "1.0.2",
+    date: "2026-11-12",
+    summary: "Nova central de Feedback e relatórios: envie sugestões e relate problemas direto do app.",
+    sections: [
+      { type: "new", items: [
+        "Feedback e relatórios (Configurações → Atualizações): envie sugestões, ideias de novas funcionalidades, comentários ou relate problemas ao desenvolvedor, sem precisar de conta.",
+        "Anexos opcionais de diagnóstico: você vê o conteúdo exato antes de enviar, e nome de usuário, e-mails, chaves e endereços de rede são removidos automaticamente.",
+        "Registro local de erros, guardado só no seu computador e anexado a um relato apenas com a sua autorização.",
+      ] },
+    ],
+  },
+  {
     version: "1.0.1",
     date: "2026-11-12",
     summary: "Traduções completas em todos os idiomas e configurações de notificações mais organizadas.",
