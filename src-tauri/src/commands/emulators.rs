@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tauri::State;
 
-pub const FORMATS: [&str; 7] = ["iso", "bin", "cue", "nsp", "nup", "pkg", "vpk"];
+pub const FORMATS: [&str; 8] = ["iso", "bin", "cue", "nsp", "xci", "nup", "pkg", "vpk"];
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +22,10 @@ pub struct Emulator {
     pub args: String,
     pub cover: Option<String>,
     pub exe_exists: bool,
+    /// Iniciar os jogos em tela cheia (aplicado no lançamento, no método de cada emulador).
+    pub fullscreen: bool,
+    /// O NEXSTAGE reconhece o emulador e sabe aplicar a opção de tela cheia.
+    pub fullscreen_supported: bool,
     pub games: i64,
 }
 
@@ -37,12 +41,14 @@ pub struct EmulatorInput {
     pub args: String,
     #[serde(default)]
     pub cover: Option<String>,
+    #[serde(default)]
+    pub fullscreen: bool,
 }
 
 pub fn load_all(conn: &Connection) -> AppResult<Vec<Emulator>> {
     let mut st = conn.prepare(
         "SELECT e.id,e.name,e.exe_path,e.platforms,e.formats,e.args,e.cover,
-                (SELECT COUNT(*) FROM games g WHERE g.emulator_id=e.id)
+                (SELECT COUNT(*) FROM games g WHERE g.emulator_id=e.id), e.fullscreen
          FROM emulators e ORDER BY e.name COLLATE NOCASE",
     )?;
     let rows = st
@@ -50,9 +56,12 @@ pub fn load_all(conn: &Connection) -> AppResult<Vec<Emulator>> {
             let exe: String = r.get(2)?;
             let pl: String = r.get(3)?;
             let fm: String = r.get(4)?;
+            let name: String = r.get(1)?;
             Ok(Emulator {
                 id: r.get(0)?,
-                name: r.get(1)?,
+                fullscreen: r.get(8)?,
+                fullscreen_supported: crate::emu_fullscreen::supported(&name, &exe),
+                name,
                 exe_exists: Path::new(&exe).is_file(),
                 exe_path: exe,
                 platforms: serde_json::from_str(&pl).unwrap_or_default(),
@@ -98,13 +107,17 @@ pub fn save_emulator(db: State<Db>, mut input: EmulatorInput) -> AppResult<Emula
     }
     // Capa personalizada: gravada como arquivo (como as capas dos jogos); vazia = arte padrão do console.
     let cover = crate::images::store(input.cover.take())?;
+    // Com a opção de tela cheia, os argumentos de tela cheia/janela escritos à mão saem do texto: a caixa manda.
+    if let Some(kind) = crate::emu_fullscreen::detect(&input.name, &input.exe_path) {
+        input.args = crate::emu_fullscreen::strip_text(kind, &input.args);
+    }
     let conn = db.conn()?;
     let (pl, fm) = (serde_json::to_string(&platforms).unwrap_or_default(), serde_json::to_string(&formats).unwrap_or_default());
     let id = match input.id {
         Some(id) => {
             let n = conn.execute(
-                "UPDATE emulators SET name=?1,exe_path=?2,platforms=?3,formats=?4,args=?5,cover=?6 WHERE id=?7",
-                params![input.name, input.exe_path, pl, fm, input.args.trim(), cover, id],
+                "UPDATE emulators SET name=?1,exe_path=?2,platforms=?3,formats=?4,args=?5,cover=?6,fullscreen=?7 WHERE id=?8",
+                params![input.name, input.exe_path, pl, fm, input.args.trim(), cover, input.fullscreen, id],
             )?;
             if n == 0 {
                 return Err(AppError::NotFound("Emulador não encontrado.".into()));
@@ -113,8 +126,8 @@ pub fn save_emulator(db: State<Db>, mut input: EmulatorInput) -> AppResult<Emula
         }
         None => {
             conn.execute(
-                "INSERT INTO emulators(name,exe_path,platforms,formats,args,cover) VALUES(?1,?2,?3,?4,?5,?6)",
-                params![input.name, input.exe_path, pl, fm, input.args.trim(), cover],
+                "INSERT INTO emulators(name,exe_path,platforms,formats,args,cover,fullscreen) VALUES(?1,?2,?3,?4,?5,?6,?7)",
+                params![input.name, input.exe_path, pl, fm, input.args.trim(), cover, input.fullscreen],
             )?;
             conn.last_insert_rowid()
         }
@@ -129,6 +142,12 @@ pub fn delete_emulator(db: State<Db>, id: i64) -> AppResult<()> {
     conn.execute("UPDATE games SET emulator_id=NULL WHERE emulator_id=?1", [id])?;
     conn.execute("DELETE FROM emulators WHERE id=?1", [id])?;
     Ok(())
+}
+
+/// O NEXSTAGE sabe aplicar "Iniciar jogos em tela cheia" a este emulador? (usado no formulário, antes de salvar)
+#[tauri::command]
+pub fn emulator_fullscreen_supported(name: String, exe_path: String) -> bool {
+    crate::emu_fullscreen::supported(&name, &exe_path)
 }
 
 /// Associa (ou desassocia, com `None`) o jogo a um emulador cadastrado.

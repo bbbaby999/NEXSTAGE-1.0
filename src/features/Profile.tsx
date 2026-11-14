@@ -2,23 +2,23 @@ import { CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
 import { listen } from "@tauri-apps/api/event";
 import { useSession } from "../state/session";
 import { useLibrary } from "../state/useLibrary";
-import { api, errMsg } from "../lib/api";
-import { formatDate, formatDateTime, formatDuration } from "../lib/format";
+import { api, errMsg, imgUrl } from "../lib/api";
+import { formatDate } from "../lib/format";
 import { DEFAULT_CFG, Layout, PageCfg, SectionId, normalizeCfg, normalizeShowcase, showcaseValid } from "../lib/profileStats";
 import GamerStatsPanel from "../components/stats/GamerStatsPanel";
-import StatsPrivacy from "../components/stats/StatsPrivacy";
 import Avatar from "../components/Avatar";
 import Button from "../components/Button";
-import GameCard from "../components/GameCard";
 import Modal from "../components/Modal";
 import ProfileForm from "../components/ProfileForm";
 import AccountSettings from "../components/AccountSettings";
 import Seg from "../components/Seg";
 import Skeleton from "../components/Skeleton";
-import type { Activity, Game } from "../types";
+import { useProfileScore } from "../components/AchievementScore";
+import { LevelRing, ProfileSidebar, RecentActivity, Showcase, tierOf } from "../components/profile/ProfileParts";
+import type { Activity, Game, GamerStats } from "../types";
 import { t, tk } from "../lib/i18n";
 
-const LABEL: Record<SectionId, string> = { stats: tk("Estatísticas"), favorites: tk("Jogos favoritos"), activity: tk("Atividade recente") };
+const LABEL: Record<SectionId, string> = { stats: tk("Estatísticas"), score: tk("Pontuação de conquistas"), favorites: tk("Jogos favoritos"), activity: tk("Atividade recente") };
 const ACCENTS = ["#2f6bff", "#8a3dff", "#ff3b5c", "#12b886", "#ffb020", "#18c5ff", "#ff6fb5"];
 
 const hexRgb = (h: string): [number, number, number] => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
@@ -33,7 +33,8 @@ function accentVars(hex: string | null): CSSProperties | undefined {
   } as CSSProperties;
 }
 
-/** Página "Meu perfil": identidade, estatísticas reais, favoritos, atividade e personalização (salva por perfil). */
+/** Página "Meu perfil": cabeçalho com arte, avatar e nível; coluna principal (vitrine, atividade, estatísticas) e
+ *  coluna lateral (pontuação, números, conquistas recentes e raras). Personalização salva por perfil. */
 export default function Profile() {
   const { profile, setProfile, replaceProfile, setView, setOpenGameId, setStartManage, statsIntent, setStatsIntent, toast } = useSession();
   const p = profile!;
@@ -46,6 +47,9 @@ export default function Profile() {
   const [pickFav, setPickFav] = useState(false);
   const [account, setAccount] = useState(false);
   const [ready, setReady] = useState(false);
+  const score = useProfileScore(p.id);
+  const [stats, setStats] = useState<GamerStats | null>(null);
+  useEffect(() => { api.gamerStats(p.id).then(setStats).catch(() => {}); }, [p.id]);
 
   const gameIds = useMemo(() => games.map((g) => g.id), [games]);
   useEffect(() => {
@@ -86,6 +90,9 @@ export default function Profile() {
   const favGames = showcase.map((id) => games.find((g) => g.id === id)).filter((g): g is Game => !!g);
 
   if (loading || !ready) return <Skeleton count={4} />;
+  const tier = tierOf(score?.level ?? 1);
+  // arte do cabeçalho: banner do perfil; sem banner, a arte do 1º favorito
+  const heroArt = p.banner ?? (favGames[0] ? imgUrl(favGames[0].background ?? favGames[0].cover) : null);
 
   const move = (id: SectionId, d: number) => {
     const o = [...cfg.order]; const i = o.indexOf(id); const j = i + d;
@@ -100,16 +107,15 @@ export default function Profile() {
     if (id === "stats") return (
       <section key={id} className="pf-section">
         <h2 className="section">{t("Estatísticas")}</h2>
-        <GamerStatsPanel initialTab={intent} />
-        <StatsPrivacy />
+        <GamerStatsPanel initialTab={intent} inProfile />
       </section>
     );
+    // "score" fica na coluna lateral (ProfileSidebar)
     if (id === "favorites") return (
       <section key={id} className="pf-section">
         <div className="pf-head"><h2 className="section">{t("Jogos favoritos")}</h2><Button onClick={() => setPickFav(true)}>{favGames.length ? t("Editar favoritos") : t("Escolher favoritos")}</Button></div>
-        {favGames.length ? (
-          <div className="pf-fav">{favGames.map((g, i) => <GameCard key={g.id} game={g} index={i} meta={`#${i + 1}`} onOpen={openGame} />)}</div>
-        ) : <div className="empty"><p>{t("Escolha de 3 a 5 jogos da sua Biblioteca para destacar aqui.")}</p></div>}
+        {favGames.length ? <Showcase games={favGames} onOpen={openGame} />
+          : <div className="empty"><p>{t("Escolha de 3 a 5 jogos da sua Biblioteca para destacar aqui.")}</p></div>}
       </section>
     );
     return (
@@ -118,43 +124,42 @@ export default function Profile() {
         {!activity || (!activity.sessions.length && !activity.completed.length) ? (
           <div className="empty"><p>{t("Ainda não há atividade registrada. Inicie um jogo pelo NEXSTAGE para ver o histórico.")}</p></div>
         ) : (
-          <div className="pf-activity">
-            <div className="stat"><strong>{formatDuration(activity.month.seconds)}</strong>
-              <span>{t("Este mês · {sessions} sessão(ões) em {games} jogo(s)", { sessions: activity.month.sessions, games: activity.month.games })}</span></div>
-            <ul className="pf-list">
-              {activity.sessions.map((s, i) => (
-                <li key={`${s.gameId}-${s.startedAt}-${i}`}><b>{s.title}</b><span>{formatDateTime(s.startedAt)}</span><em>{formatDuration(s.durationSeconds)}</em></li>
-              ))}
-            </ul>
-            {activity.completed.length > 0 && (
-              <ul className="pf-list done">
-                {activity.completed.map((c) => <li key={c.gameId}><b>✓ {c.title}</b><span>{t("Concluído em")}{" "}{formatDate(c.completedAt)}</span></li>)}
-              </ul>
-            )}
-          </div>
+          <RecentActivity activity={activity} games={games} onOpen={openGame} />
         )}
       </section>
     );
   };
 
   return (
-    <div className={`profile-page pf-${cfg.layout}`} style={accentVars(cfg.accent)}>
-      <header className="pf-hero" style={p.banner ? { backgroundImage: `url(${p.banner})` } : undefined}>
+    <div className={`profile-page pf2 pf-${cfg.layout}`} style={{ ...accentVars(cfg.accent), "--tier": tier.rgb } as CSSProperties}>
+      <header className={`pf2-hero tier-${tier.name}`}>
+        <div className="pf2-hero-art" style={heroArt ? { backgroundImage: `url(${heroArt})` } : undefined} />
         <div className="pf-shade" />
-        <div className="pf-id">
-          <Avatar name={p.displayName} src={p.avatar} size={cfg.layout === "compact" ? 84 : 120} />
+        <div className="pf2-id">
+          <div className="pf2-frame"><Avatar name={p.displayName} src={p.avatar} size={cfg.layout === "compact" ? 96 : 136} /></div>
           <div className="pf-text">
             <h1>{p.displayName}</h1>
             <p className="muted">@{p.username} {t("· Perfil criado em")}{" "}{formatDate(p.createdAt)}</p>
             {p.bio && <p className="pf-bio">{p.bio}</p>}
-            {(p.favoriteGame || p.favoritePlatform) && <p className="muted">{p.favoriteGame && t("Jogo favorito: {favoriteGame}", { favoriteGame: p.favoriteGame })}{p.favoriteGame && p.favoritePlatform && " · "}{p.favoritePlatform && t("Plataforma favorita: {favoritePlatform}", { favoritePlatform: p.favoritePlatform })}</p>}
+            {(p.favoriteGame || p.favoritePlatform) && (
+              <div className="pf2-tags">
+                {p.favoriteGame && <span>★ {p.favoriteGame}</span>}
+                {p.favoritePlatform && <span>{p.favoritePlatform}</span>}
+              </div>
+            )}
           </div>
-          <div className="pf-buttons">
-            <Button variant="primary" onClick={() => setEditing(true)}>{t("Editar perfil")}</Button>
-            <Button onClick={() => setAccount(true)}>{t("Configurações da conta")}</Button>
-            <Button onClick={() => setCustomizing((c) => !c)}>{customizing ? t("Fechar personalização") : t("Personalizar")}</Button>
-            <Button variant="ghost" onClick={() => { setStartManage(true); setProfile(null); }}>{t("Gerenciar perfis")}</Button>
-          </div>
+          {score && (
+            <div className="pf2-level">
+              <LevelRing score={score} size={cfg.layout === "compact" ? 92 : 116} />
+              <strong>{t("{n} pts", { n: score.total.toLocaleString(undefined) })}</strong>
+            </div>
+          )}
+        </div>
+        <div className="pf2-actions">
+          <Button variant="primary" onClick={() => setEditing(true)}>{t("Editar perfil")}</Button>
+          <Button onClick={() => setAccount(true)}>{t("Configurações da conta")}</Button>
+          <Button onClick={() => setCustomizing((c) => !c)}>{customizing ? t("Fechar personalização") : t("Personalizar")}</Button>
+          <Button variant="ghost" onClick={() => { setStartManage(true); setProfile(null); }}>{t("Gerenciar perfis")}</Button>
         </div>
       </header>
 
@@ -186,9 +191,12 @@ export default function Profile() {
         </div>
       )}
 
-      <div className="pf-body">
-        {cfg.order.filter((id) => !cfg.hidden.includes(id) || (id === "stats" && intent)).map(section)}
-        {cfg.hidden.length === cfg.order.length && <div className="empty"><p>{t("Todas as seções estão ocultas. Use “Personalizar” para exibi-las.")}</p></div>}
+      <div className="pf2-grid">
+        <div className="pf-body">
+          {cfg.order.filter((id) => id !== "score" && (!cfg.hidden.includes(id) || (id === "stats" && intent))).map(section)}
+          {cfg.hidden.length === cfg.order.length && <div className="empty"><p>{t("Todas as seções estão ocultas. Use “Personalizar” para exibi-las.")}</p></div>}
+        </div>
+        <ProfileSidebar profileId={p.id} score={score} showScore={!cfg.hidden.includes("score")} stats={stats} games={games} />
       </div>
 
       {editing && (

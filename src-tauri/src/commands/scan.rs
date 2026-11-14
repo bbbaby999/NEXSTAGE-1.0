@@ -25,7 +25,7 @@ pub struct ScanState {
     pub cancel: AtomicBool,
 }
 
-const EXTS: [&str; 8] = ["iso", "bin", "cue", "exe", "nsp", "nup", "pkg", "vpk"];
+const EXTS: [&str; 9] = ["iso", "bin", "cue", "exe", "nsp", "xci", "nup", "pkg", "vpk"];
 const SKIP_DIRS: [&str; 10] = [
     "$recycle.bin", "system volume information", "windows", "node_modules", ".git", "_commonredist",
     "redist", "redistributables", "directx", "vcredist",
@@ -169,6 +169,104 @@ fn item(c: &Cand, kind: &str, platform: Option<&str>, status: &str, note: String
     }
 }
 
+/// Identifica UM arquivo pelo conteúdo (somente leitura). Usado pela varredura de pastas e pelo
+/// "Adicionar jogo". `cue_bin`: primeiro .bin referenciado, quando o arquivo é um .cue.
+fn classify(c: &Cand, cue_bin: Option<&str>) -> Option<ScanItem> {
+    let disc = |f: &mut File, suffix: &str, unknown_suffix: bool| {
+        let d = detect::detect_disc(f);
+        match d.platform {
+            Some(p) => item(c, "disc", Some(p), "new", format!("{}{suffix}", d.note)),
+            None => item(c, "disc", None, "unrecognized", if unknown_suffix { format!("{}{suffix}", d.note) } else { d.note }),
+        }
+    };
+    let inaccessible = |kind: &str, e: std::io::Error| item(c, kind, None, "invalid", format!("Arquivo inacessível: {e}."));
+    Some(match c.ext.as_str() {
+        "exe" => match File::open(&c.path).map_err(|_| "inacessível").and_then(|mut f| detect::detect_pe(&mut f)) {
+            Ok(info) => {
+                let mut it = item(c, "windows", Some("PC"), "new", format!("Executável de jogo do Windows ({}{})", info.arch, if info.gui { "" } else { ", modo console" }));
+                if !info.gui { it.status = "secondary".into(); }
+                it
+            }
+            Err(e) => item(c, "windows", None, "invalid", format!("Executável inválido: {e}.")),
+        },
+        // scripts de inicialização (aceitos no "Adicionar jogo", como antes; a varredura não os procura)
+        "bat" | "cmd" => item(c, "windows", Some("PC"), "new", "Script de inicialização do Windows".into()),
+        "iso" => match File::open(&c.path) {
+            Ok(mut f) => disc(&mut f, "", false),
+            Err(e) => inaccessible("disc", e),
+        },
+        "cue" => match cue_bin.map(File::open) {
+            Some(Ok(mut f)) => disc(&mut f, " (.cue + .bin)", false),
+            _ => item(c, "disc", None, "invalid", "O .cue aponta para um .bin que não foi encontrado.".into()),
+        },
+        "bin" => match File::open(&c.path) {
+            Ok(mut f) => disc(&mut f, " (.bin sem .cue)", true),
+            Err(e) => inaccessible("disc", e),
+        },
+        "xci" => match File::open(&c.path) {
+            Ok(mut f) => {
+                let d = detect::detect_xci(&mut f);
+                item(c, "switch", d.platform, if d.platform.is_some() { "new" } else { "invalid" }, d.note)
+            }
+            Err(e) => inaccessible("switch", e),
+        },
+        "nup" => match detect::detect_nup(&c.path) {
+            Ok(d) => item(c, "switch", d.platform, if d.platform.is_some() { "new" } else { "invalid" }, d.note),
+            Err(e) => inaccessible("switch", e),
+        },
+        "nsp" | "pkg" | "vpk" => match File::open(&c.path) {
+            Ok(mut f) => {
+                let d = match c.ext.as_str() { "nsp" => detect::detect_nsp(&mut f), "pkg" => detect::detect_pkg(&mut f), _ => detect::detect_vpk(&mut f) };
+                let kind = match c.ext.as_str() { "nsp" => "switch", "pkg" => "pkg", _ => "vpk" };
+                match d.platform {
+                    Some(p) => {
+                        let extra = if c.ext == "nsp" { "" } else { " — precisa ser instalado no emulador" };
+                        item(c, kind, Some(p), "new", format!("{}{extra}", d.note))
+                    }
+                    None => item(c, kind, None, "invalid", d.note),
+                }
+            }
+            Err(e) => inaccessible("pkg", e),
+        },
+        _ => return None,
+    })
+}
+
+/// "Adicionar jogo": identifica um arquivo escolhido no seletor (plataforma, emuladores compatíveis e se
+/// já está na biblioteca), com a MESMA detecção da varredura de pastas. Nada é importado aqui.
+#[tauri::command(async)]
+pub fn inspect_game_file(db: State<Db>, profile_id: i64, path: String) -> AppResult<ScanItem> {
+    inspect(&db, profile_id, &path)
+}
+
+pub(crate) fn inspect(db: &Db, profile_id: i64, path: &str) -> AppResult<ScanItem> {
+    let path = PathBuf::from(path.trim());
+    let meta = std::fs::metadata(&path).map_err(|_| AppError::Validation("O arquivo não existe ou está inacessível.".into()))?;
+    if !meta.is_file() {
+        return Err(AppError::Validation("O arquivo não existe ou está inacessível.".into()));
+    }
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    let cue_bin = (ext == "cue").then(|| {
+        let mut txt = String::new();
+        let _ = File::open(&path).and_then(|f| f.take(256 * 1024).read_to_string(&mut txt));
+        let dir = path.parent().unwrap_or(Path::new("")).to_path_buf();
+        detect::cue_files(&txt).first().map(|n| dir.join(n).to_string_lossy().to_string())
+    }).flatten();
+    let c = Cand { path, ext, size: meta.len() };
+    let mut it = classify(&c, cue_bin.as_deref())
+        .ok_or_else(|| AppError::Validation("Formato não suportado. Escolha um arquivo .exe, .iso, .bin, .cue, .nsp, .xci, .nup, .pkg ou .vpk.".into()))?;
+    let conn = db.conn()?;
+    if library_keys(&conn, profile_id)?.contains(&norm_key(&it.path)) {
+        it.status = "duplicate".into();
+        it.note = "Já está na biblioteca.".into();
+    }
+    if let (Some(p), true) = (&it.platform, it.kind != "windows") {
+        it.compatible = compatible(&load_all(&conn)?, p, &it.ext);
+        if it.compatible.len() == 1 { it.assigned = it.compatible.first().copied(); }
+    }
+    Ok(it)
+}
+
 /// Analisa os candidatos (lê só os cabeçalhos necessários) e monta a lista de resultados.
 fn analyze(cands: Vec<Cand>, library: &HashSet<String>, emus: &[Emulator], cancel: &AtomicBool, app: &AppHandle) -> (Vec<ScanItem>, u64) {
     let mut items: Vec<ScanItem> = Vec::new();
@@ -202,84 +300,15 @@ fn analyze(cands: Vec<Cand>, library: &HashSet<String>, emus: &[Emulator], cance
         }
         let key = norm_key(&c.path.to_string_lossy());
         match c.ext.as_str() {
-            "exe" => {
-                let low = stem(&c.path).to_lowercase();
-                if BAD_EXE.iter().any(|b| low.contains(b)) {
-                    ignored += 1;
-                    continue;
-                }
-                let pe = File::open(&c.path).map_err(|_| "inacessível").and_then(|mut f| detect::detect_pe(&mut f));
-                match pe {
-                    Ok(info) => {
-                        let mut it = item(c, "windows", Some("PC"), "new", format!("Executável de jogo do Windows ({}{})", info.arch, if info.gui { "" } else { ", modo console" }));
-                        if !info.gui { it.status = "secondary".into(); }
-                        items.push(it);
-                        exes_by_dir.entry(c.path.parent().unwrap_or(Path::new("")).to_path_buf()).or_default().push(items.len() - 1);
-                    }
-                    Err(e) => items.push(item(c, "windows", None, "invalid", format!("Executável inválido: {e}."))),
-                }
-            }
-            "iso" => match File::open(&c.path) {
-                Ok(mut f) => {
-                    let d = detect::detect_disc(&mut f);
-                    match d.platform {
-                        Some(p) => items.push(item(c, "disc", Some(p), "new", d.note)),
-                        None => items.push(item(c, "disc", None, "unrecognized", d.note)),
-                    }
-                }
-                Err(e) => items.push(item(c, "disc", None, "invalid", format!("Arquivo inacessível: {e}."))),
-            },
-            "cue" => {
-                let bin = bin_of_cue.get(&key).cloned();
-                match bin.as_deref().map(|b| File::open(b)) {
-                    Some(Ok(mut f)) => {
-                        let d = detect::detect_disc(&mut f);
-                        match d.platform {
-                            Some(p) => items.push(item(c, "disc", Some(p), "new", format!("{} (.cue + .bin)", d.note))),
-                            None => items.push(item(c, "disc", None, "unrecognized", d.note)),
-                        }
-                    }
-                    Some(Err(_)) | None => items.push(item(c, "disc", None, "invalid", "O .cue aponta para um .bin que não foi encontrado.".into())),
-                }
-            }
-            "bin" => {
-                if covered.contains(&key) {
-                    ignored += 1; // faz parte de um .cue: não duplica
-                    continue;
-                }
-                match File::open(&c.path) {
-                    Ok(mut f) => {
-                        let d = detect::detect_disc(&mut f);
-                        match d.platform {
-                            Some(p) => items.push(item(c, "disc", Some(p), "new", format!("{} (.bin sem .cue)", d.note))),
-                            None => items.push(item(c, "disc", None, "unrecognized", format!("{} (.bin sem .cue)", d.note))),
-                        }
-                    }
-                    Err(e) => items.push(item(c, "disc", None, "invalid", format!("Arquivo inacessível: {e}."))),
-                }
-            }
-            "nup" => match detect::detect_nup(&c.path) {
-                Ok(d) => match d.platform {
-                    Some(p) => items.push(item(c, "switch", Some(p), "new", d.note)),
-                    None => items.push(item(c, "switch", None, "invalid", d.note)),
-                },
-                Err(e) => items.push(item(c, "switch", None, "invalid", format!("Arquivo inacessível: {e}."))),
-            },
-            "nsp" | "pkg" | "vpk" => match File::open(&c.path) {
-                Ok(mut f) => {
-                    let d = match c.ext.as_str() { "nsp" => detect::detect_nsp(&mut f), "pkg" => detect::detect_pkg(&mut f), _ => detect::detect_vpk(&mut f) };
-                    let kind = match c.ext.as_str() { "nsp" => "switch", "pkg" => "pkg", _ => "vpk" };
-                    match d.platform {
-                        Some(p) => {
-                            let extra = if c.ext == "nsp" { "" } else { " — precisa ser instalado no emulador" };
-                            items.push(item(c, kind, Some(p), "new", format!("{}{extra}", d.note)));
-                        }
-                        None => items.push(item(c, kind, None, "invalid", d.note)),
-                    }
-                }
-                Err(e) => items.push(item(c, "pkg", None, "invalid", format!("Arquivo inacessível: {e}."))),
-            },
+            "exe" if BAD_EXE.iter().any(|b| stem(&c.path).to_lowercase().contains(b)) => { ignored += 1; continue; }
+            "bin" if covered.contains(&key) => { ignored += 1; continue; } // faz parte de um .cue: não duplica
             _ => {}
+        }
+        let Some(it) = classify(c, bin_of_cue.get(&key).map(String::as_str)) else { continue };
+        let is_exe = it.kind == "windows" && it.status != "invalid";
+        items.push(it);
+        if is_exe {
+            exes_by_dir.entry(c.path.parent().unwrap_or(Path::new("")).to_path_buf()).or_default().push(items.len() - 1);
         }
     }
 
@@ -507,6 +536,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn classifies_single_files_like_the_folder_scan() {
+        let dir = std::env::temp_dir().join(format!("nexstage-classify-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let mk = |name: &str, data: &[u8]| { let p = dir.join(name); std::fs::write(&p, data).unwrap(); p };
+        let cand = |p: PathBuf| { let ext = p.extension().unwrap().to_string_lossy().to_lowercase(); Cand { size: 1, path: p, ext } };
+
+        let mut xci = vec![0u8; 0x200]; xci[0x100..0x104].copy_from_slice(b"HEAD");
+        let it = classify(&cand(mk("Jogo Ação [01].xci", &xci)), None).unwrap();
+        assert_eq!((it.kind.as_str(), it.platform.as_deref(), it.status.as_str()), ("switch", Some("Nintendo Switch"), "new"));
+        let it = classify(&cand(mk("ruim.nsp", b"XXXX")), None).unwrap();
+        assert_eq!(it.status, "invalid");
+        let it = classify(&cand(mk("jogo.pkg", &[0x7F, b'P', b'K', b'G', 0, 0, 0, 1])), None).unwrap();
+        assert_eq!((it.platform.as_deref(), it.kind.as_str()), (Some("Playstation 3"), "pkg"));
+        let it = classify(&cand(mk("iniciar.bat", b"@echo off")), None).unwrap();
+        assert_eq!((it.kind.as_str(), it.platform.as_deref()), ("windows", Some("PC")));
+        let it = classify(&cand(mk("falso.exe", b"nao sou exe")), None).unwrap();
+        assert_eq!(it.status, "invalid");
+        let it = classify(&cand(mk("disco.cue", b"FILE \"x.bin\" BINARY")), None).unwrap();
+        assert_eq!(it.status, "invalid"); // .bin referenciado não existe
+        assert!(classify(&cand(mk("leia.txt", b"oi")), None).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn normalizes_paths_for_duplicate_detection() {
         assert_eq!(norm_key(r"D:\Jogos\GOD OF WAR.ISO"), norm_key("d:/jogos/god of war.iso/"));
         assert_eq!(norm_key(r"\\?\D:\A\b.iso"), "d:/a/b.iso");
@@ -518,7 +571,7 @@ mod tests {
         let emu = |id, pl: &[&str], fm: &[&str]| Emulator {
             id, name: format!("e{id}"), exe_path: String::new(),
             platforms: pl.iter().map(|s| s.to_string()).collect(), formats: fm.iter().map(|s| s.to_string()).collect(),
-            args: String::new(), cover: None, exe_exists: true, games: 0,
+            args: String::new(), cover: None, exe_exists: true, games: 0, fullscreen: false, fullscreen_supported: false,
         };
         let list = vec![emu(1, &["Playstation 2"], &["iso", "cue"]), emu(2, &["Playstation 2"], &["iso"]), emu(3, &["PSP"], &["iso"])];
         assert_eq!(compatible(&list, "Playstation 2", "iso"), vec![1, 2]);
@@ -527,5 +580,8 @@ mod tests {
         assert!(compatible(&list, "PSP", "nsp").is_empty());
         let sw2 = vec![emu(4, &["Nintendo Switch 2"], &["nsp", "nup"])];
         assert_eq!(compatible(&sw2, "Nintendo Switch 2", "nup"), vec![4]);
+        let sw = vec![emu(5, &["Nintendo Switch"], &["nsp", "xci"])];
+        assert_eq!(compatible(&sw, "Nintendo Switch", "xci"), vec![5]);
+        assert!(compatible(&sw2, "Nintendo Switch", "xci").is_empty());
     }
 }

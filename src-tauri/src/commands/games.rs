@@ -182,28 +182,46 @@ fn validate(i: &mut GameInput, allow_no_exe: bool) -> AppResult<()> {
     Ok(())
 }
 
-/// Valida o ISO sem tocar nele: extensão, existência, leitura e duplicidade na biblioteca do perfil.
-fn validate_iso(conn: &Connection, profile_id: i64, iso: &str) -> AppResult<()> {
-    let p = Path::new(iso);
-    let is_iso = p.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("iso")).unwrap_or(false);
-    if !is_iso {
-        return Err(AppError::Validation("Selecione um arquivo com extensão .iso.".into()));
+/// Formatos de arquivo de jogo aceitos no "Adicionar jogo" (iniciados por um emulador). O .iso vai para
+/// `iso_path`; os demais para `rom_path`, como na importação por pasta.
+const GAME_FILE_EXTS: [&str; 8] = ["iso", "bin", "cue", "nsp", "xci", "nup", "pkg", "vpk"];
+
+/// O caminho já pertence a um jogo do perfil? Compara caminhos normalizados (maiúsculas, barras).
+/// `file`: compara com arquivos de jogo (ISO/ROM); senão, com executáveis de jogos sem arquivo.
+fn in_library(conn: &Connection, profile_id: i64, path: &str, file: bool) -> AppResult<bool> {
+    let key = super::scan::norm_key(path);
+    let sql = if file {
+        "SELECT g.iso_path,g.rom_path FROM profile_games pg JOIN games g ON g.id=pg.game_id WHERE pg.profile_id=?1"
+    } else {
+        "SELECT g.executable_path,NULL FROM profile_games pg JOIN games g ON g.id=pg.game_id
+         WHERE pg.profile_id=?1 AND g.iso_path IS NULL AND g.rom_path IS NULL"
+    };
+    let mut st = conn.prepare(sql)?;
+    let hit = st
+        .query_map([profile_id], |r| Ok((r.get::<_, Option<String>>(0)?, r.get::<_, Option<String>>(1)?)))?
+        .filter_map(Result::ok)
+        .any(|(a, b)| [a, b].iter().flatten().any(|s| super::scan::norm_key(s) == key));
+    Ok(hit)
+}
+
+/// Valida o arquivo do jogo sem tocar nele: formato, existência, leitura e duplicidade na biblioteca do perfil.
+/// Devolve se é um .iso.
+fn validate_game_file(conn: &Connection, profile_id: i64, file: &str) -> AppResult<bool> {
+    let p = Path::new(file);
+    let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    if !GAME_FILE_EXTS.contains(&ext.as_str()) {
+        return Err(AppError::Validation("Formato não suportado. Escolha um arquivo .exe, .iso, .bin, .cue, .nsp, .xci, .nup, .pkg ou .vpk.".into()));
     }
     if !p.is_file() {
-        return Err(AppError::Validation("O arquivo ISO não existe ou está inacessível.".into()));
+        return Err(AppError::Validation("O arquivo do jogo não existe ou está inacessível.".into()));
     }
     std::fs::File::open(p).map_err(|_| {
-        AppError::Validation("Não foi possível ler o arquivo ISO (sem permissão ou em uso por outro programa).".into())
+        AppError::Validation("Não foi possível ler o arquivo do jogo (sem permissão ou em uso por outro programa).".into())
     })?;
-    let dup: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM profile_games pg JOIN games g ON g.id=pg.game_id WHERE pg.profile_id=?1 AND g.iso_path=?2",
-        params![profile_id, iso],
-        |r| r.get(0),
-    )?;
-    if dup > 0 {
-        return Err(AppError::Validation("Este ISO já está na sua biblioteca.".into()));
+    if in_library(conn, profile_id, file, true)? {
+        return Err(AppError::Validation("Este jogo já está na sua biblioteca.".into()));
     }
-    Ok(())
+    Ok(ext == "iso")
 }
 
 /// Troca o local do arquivo (ISO/ROM) de um jogo importado — ex.: o arquivo foi movido de pasta.
@@ -269,19 +287,30 @@ pub fn list_library(db: State<Db>, profile_id: i64) -> AppResult<Vec<Game>> {
 }
 
 #[tauri::command]
-pub fn add_game(db: State<Db>, profile_id: i64, mut input: GameInput) -> AppResult<Game> {
+pub fn add_game(db: State<Db>, profile_id: i64, input: GameInput) -> AppResult<Game> {
+    add(&db, profile_id, input)
+}
+
+fn add(db: &Db, profile_id: i64, mut input: GameInput) -> AppResult<Game> {
     let iso = input.iso_path.clone().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
     validate(&mut input, iso.is_some())?;
     input.cover = crate::images::store(input.cover.take())?;
     input.background = crate::images::store(input.background.take())?;
     let mut conn = db.conn()?;
-    if let Some(p) = &iso {
-        validate_iso(&conn, profile_id, p)?;
-    }
+    let is_iso = match &iso {
+        Some(p) => validate_game_file(&conn, profile_id, p)?,
+        None => {
+            if in_library(&conn, profile_id, &input.executable_path, false)? {
+                return Err(AppError::Validation("Este jogo já está na sua biblioteca.".into()));
+            }
+            false
+        }
+    };
+    let (iso_col, rom_col) = if is_iso { (iso.clone(), None) } else { (None, iso.clone()) };
     let tx = conn.transaction()?;
     tx.execute(
-        "INSERT INTO games(title,platform,executable_path,launch_args,cover,background,bg_x,bg_y,iso_path,source)
-         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+        "INSERT INTO games(title,platform,executable_path,launch_args,cover,background,bg_x,bg_y,iso_path,rom_path,source)
+         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
         params![
             input.title,
             input.platform,
@@ -291,8 +320,9 @@ pub fn add_game(db: State<Db>, profile_id: i64, mut input: GameInput) -> AppResu
             input.background,
             input.bg_x.unwrap_or(50).clamp(0, 100),
             input.bg_y.unwrap_or(50).clamp(0, 100),
-            iso,
-            if iso.is_some() { "iso" } else { "manual" }
+            iso_col,
+            rom_col,
+            match (&iso, is_iso) { (Some(_), true) => "iso", (Some(_), false) => "rom", _ => "manual" }
         ],
     )?;
     let game_id = tx.last_insert_rowid();
@@ -478,5 +508,72 @@ mod platform_tests {
         assert_eq!(canonical_platform("Switch 2"), Some("Nintendo Switch 2"));
         assert_eq!(canonical_platform("RetroArch"), None);
         assert!(PLATFORMS.iter().all(|p| canonical_platform(p) == Some(*p)));
+    }
+}
+
+#[cfg(test)]
+mod add_tests {
+    //! "Adicionar jogo" de ponta a ponta num banco temporário: formatos, coluna gravada, emulador e duplicidade.
+    use super::*;
+    use crate::commands::scan;
+    use std::path::PathBuf;
+
+    fn input(title: &str, platform: &str, exe: &str, file: Option<&Path>) -> GameInput {
+        GameInput {
+            title: title.into(), platform: platform.into(), executable_path: exe.into(), launch_args: String::new(),
+            cover: None, background: None, bg_x: None, bg_y: None, iso_path: file.map(|p| p.to_string_lossy().to_string()),
+        }
+    }
+
+    #[test]
+    fn adds_every_supported_format_once() {
+        let dir = std::env::temp_dir().join(format!("nexstage-add-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("Pasta Ação")).unwrap();
+        let db = Db::open(&dir.join("t.db")).unwrap();
+        db.conn().unwrap().execute_batch(
+            "INSERT INTO profiles(id, username, display_name) VALUES(1,'a','A');
+             INSERT INTO emulators(id,name,exe_path,platforms,formats,args) VALUES
+               (7,'Switch','C:/e.exe','[\"Nintendo Switch\"]','[\"nsp\",\"xci\"]','-f -g \"{rom}\"');",
+        ).unwrap();
+        let mk = |n: &str, d: &[u8]| { let p = dir.join("Pasta Ação").join(n); std::fs::write(&p, d).unwrap(); p };
+
+        // EXE (jogo de PC): detectado como PC; adicionado; o mesmo caminho de novo é recusado
+        let exe = std::env::current_exe().unwrap();
+        let it = scan::inspect(&db, 1, &exe.to_string_lossy()).unwrap();
+        assert_eq!((it.kind.as_str(), it.platform.as_deref()), ("windows", Some("PC")));
+        let g = add(&db, 1, input("Meu Jogo", "PC", &exe.to_string_lossy(), None)).unwrap();
+        assert_eq!((g.source.as_str(), g.iso_path.as_deref(), g.rom_path.as_deref()), ("manual", None, None));
+        assert!(add(&db, 1, input("De novo", "PC", &exe.to_string_lossy().to_uppercase(), None)).is_err());
+
+        // ISO → iso_path; duplicado (mesmo caminho em maiúsculas) é recusado
+        let iso = mk("Jogo [EUA].iso", &vec![0u8; 40 * 2048]);
+        let g = add(&db, 1, input("Jogo", "Playstation 2", "", Some(&iso))).unwrap();
+        assert_eq!((g.source.as_str(), g.iso_path.is_some(), g.rom_path.is_none()), ("iso", true, true));
+        let up = PathBuf::from(iso.to_string_lossy().to_uppercase());
+        assert!(add(&db, 1, input("Jogo", "Playstation 2", "", Some(&up))).is_err());
+        assert_eq!(scan::inspect(&db, 1, &iso.to_string_lossy()).unwrap().status, "duplicate");
+
+        // XCI → rom_path; o emulador compatível (plataforma + formato) é sugerido antes de importar
+        let mut x = vec![0u8; 0x200]; x[0x100..0x104].copy_from_slice(b"HEAD");
+        let xci = mk("Zelda (v1.0).xci", &x);
+        let it = scan::inspect(&db, 1, &xci.to_string_lossy()).unwrap();
+        assert_eq!((it.platform.as_deref(), it.status.as_str(), it.assigned), (Some("Nintendo Switch"), "new", Some(7)));
+        let g = add(&db, 1, input("Zelda", "Nintendo Switch", "", Some(&xci))).unwrap();
+        assert_eq!((g.source.as_str(), g.rom_path.is_some(), g.iso_path.is_none()), ("rom", true, true));
+        assert_eq!(scan::inspect(&db, 1, &xci.to_string_lossy()).unwrap().status, "duplicate");
+
+        // BIN, CUE, NSP, NUP, PKG, VPK também são aceitos
+        for (n, d) in [("a.bin", &b"x"[..]), ("b.cue", b"FILE \"a.bin\" BINARY"), ("c.nsp", b"PFS0...."), ("d.nup", b"x"),
+                       ("e.pkg", &[0x7F, b'P', b'K', b'G', 0, 0, 0, 1]), ("f.vpk", b"PK\x03\x04 sce_sys")] {
+            let p = mk(n, d);
+            add(&db, 1, input(n, "PC", "", Some(&p))).unwrap_or_else(|e| panic!("{n}: {e:?}"));
+        }
+        // formato fora da lista: recusado nos dois caminhos
+        let txt = mk("leia.txt", b"oi");
+        assert!(add(&db, 1, input("x", "PC", "", Some(&txt))).is_err());
+        assert!(scan::inspect(&db, 1, &txt.to_string_lossy()).is_err());
+        drop(db);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

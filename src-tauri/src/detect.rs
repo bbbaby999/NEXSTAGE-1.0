@@ -115,6 +115,14 @@ pub fn detect_nsp<R: Read + Seek>(r: &mut R) -> Found {
     }
 }
 
+/// .xci (imagem de cartucho): 0x100 bytes de assinatura RSA seguidos da marca "HEAD" no offset 0x100.
+pub fn detect_xci<R: Read + Seek>(r: &mut R) -> Found {
+    match read_at(r, 0x100, 4) {
+        Some(h) if &h[..] == b"HEAD" => found("Nintendo Switch", "Imagem de cartucho XCI do Nintendo Switch (HEAD)"),
+        _ => unk("Cabeçalho XCI inválido (arquivo corrompido ou não é um XCI)."),
+    }
+}
+
 /// .nup (Nintendo Switch 2): sem cabeçalho documentado para conferir, então a plataforma vem da
 /// extensão; só se descarta arquivo vazio.
 pub fn detect_nup(path: &std::path::Path) -> std::io::Result<Found> {
@@ -226,6 +234,11 @@ mod tests {
 
         assert_eq!(detect_nsp(&mut Cursor::new(b"PFS0....".to_vec())).platform, Some("Nintendo Switch"));
         assert_eq!(detect_nsp(&mut Cursor::new(b"XXXX".to_vec())).platform, None);
+
+        let mut xci = vec![0u8; 0x200]; xci[0x100..0x104].copy_from_slice(b"HEAD");
+        assert_eq!(detect_xci(&mut Cursor::new(xci)).platform, Some("Nintendo Switch"));
+        assert_eq!(detect_xci(&mut Cursor::new(vec![0u8; 0x200])).platform, None);
+        assert_eq!(detect_xci(&mut Cursor::new(b"curto".to_vec())).platform, None);
 
         let mut p3 = vec![0u8; 16]; p3[..4].copy_from_slice(&[0x7F, b'P', b'K', b'G']); p3[7] = 1;
         assert_eq!(detect_pkg(&mut Cursor::new(p3.clone())).platform, Some("Playstation 3"));

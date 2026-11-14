@@ -1,0 +1,138 @@
+/* Página de perfil (pf2): cabeçalho com arte, moldura e anel na cor da faixa de nível (--tier),
+   coluna principal + coluna lateral. A cor de destaque do perfil continua em --a/--b/--ar/--br. */
+
+.pf2{--tier:197,138,90;display:flex;flex-direction:column;gap:var(--s5)}
+
+/* ---------- Cabeçalho ---------- */
+.pf2-hero{position:relative;border-radius:var(--r-xl);overflow:hidden;min-height:clamp(420px,34vw,600px);display:flex;flex-direction:column;justify-content:flex-end;
+  background:linear-gradient(120deg,#101a38,#0a0d17);border:1px solid var(--glass-line);box-shadow:var(--elev-3)}
+.pf2-hero-art{position:absolute;inset:-24px;background:center/cover no-repeat;filter:saturate(1.15);transform:scale(1.04);
+  mask-image:linear-gradient(180deg,#000 55%,rgba(0,0,0,.45) 100%)}
+.pf2-hero .pf-shade{background:
+  linear-gradient(0deg,rgba(5,6,10,.97) 8%,rgba(5,6,10,.55) 55%,rgba(5,6,10,.15)),
+  radial-gradient(120% 90% at 0% 100%,rgba(var(--tier),.28),transparent 60%),
+  linear-gradient(90deg,rgba(5,6,10,.82) 0%,rgba(5,6,10,.55) 38%,transparent 70%),
+  linear-gradient(90deg,rgba(var(--ar),.22),transparent 55%)}
+.pf2-id{position:relative;display:flex;gap:var(--s5);align-items:flex-end;padding:var(--s5) var(--s5) var(--s3);flex-wrap:wrap}
+.pf2-frame{position:relative;padding:5px;border-radius:26px;flex:none;
+  background:conic-gradient(from 210deg,rgba(var(--tier),1),rgba(var(--tier),.35),rgba(var(--br),.9),rgba(var(--tier),1));
+  box-shadow:0 0 0 1px rgba(0,0,0,.5),0 0 36px rgba(var(--tier),.45),0 18px 40px -12px rgba(0,0,0,.9)}
+.pf2-frame > *{border-radius:21px !important;display:block}
+.pf2-frame::after{content:"";position:absolute;inset:5px;border-radius:21px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);pointer-events:none}
+.pf2 .pf-text h1{font-size:2.6rem;font-weight:700;line-height:1.05;letter-spacing:-.01em;color:#fff;
+  text-shadow:0 2px 0 rgba(0,0,0,.5),0 4px 24px rgba(0,0,0,.85)}
+.pf2 .pf-text .muted{color:#c9d0e4;text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.pf2 .pf-bio{max-width:44rem;color:#d2d8ec}
+.pf2-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:var(--s2)}
+.pf2-tags span{padding:4px 12px;border-radius:999px;font-size:.8rem;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(6px)}
+.pf2-level{display:flex;flex-direction:column;align-items:center;gap:6px;margin-left:auto}
+.pf2-level strong{font-size:.85rem;font-weight:500;color:var(--text-dim);font-variant-numeric:tabular-nums}
+.pf2-actions{position:relative;display:flex;gap:var(--s2);flex-wrap:wrap;padding:var(--s3) var(--s5) var(--s5);border-top:1px solid rgba(255,255,255,.06)}
+
+/* Anel do nível: progresso em conic-gradient na cor da faixa */
+.pf2-ring{position:relative;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:conic-gradient(rgba(var(--tier),1) var(--p),rgba(255,255,255,.08) 0);
+  box-shadow:0 0 30px rgba(var(--tier),.35),0 10px 26px -10px rgba(0,0,0,.9)}
+.pf2-ring-in{width:calc(100% - 12px);height:calc(100% - 12px);border-radius:50%;display:grid;place-content:center;text-align:center;
+  background:radial-gradient(circle at 35% 25%,rgba(var(--tier),.35),#0b0e18 62%);border:1px solid rgba(255,255,255,.08)}
+.pf2-ring-in b{font-size:2.1rem;font-weight:700;line-height:1;color:#fff;text-shadow:0 0 18px rgba(var(--tier),.6)}
+.pf2-ring-in span{font-size:.62rem;text-transform:uppercase;letter-spacing:.16em;color:rgba(var(--tier),1);margin-top:2px}
+
+/* ---------- Corpo em duas colunas ---------- */
+.pf2-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:var(--s5);align-items:start}
+.pf2 .pf-body{min-width:0}
+.pf2-side{display:flex;flex-direction:column;gap:var(--s4);position:sticky;top:var(--s4)}
+.pf2-card{padding:var(--s4);border-radius:var(--r-lg);background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));
+  border:1px solid var(--glass-line);box-shadow:var(--elev-1)}
+.pf2-card h3{margin:0 0 var(--s3);font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--text-dim)}
+
+.pf2-levelcard{display:flex;gap:var(--s4);align-items:center;border-color:rgba(var(--tier),.35);
+  background:radial-gradient(120% 120% at 0% 0%,rgba(var(--tier),.16),transparent 60%),linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015))}
+.pf2-levelcard > div:last-child{display:flex;flex-direction:column;gap:4px;min-width:0}
+.pf2-levelcard strong{font-size:1.35rem;font-weight:300;font-variant-numeric:tabular-nums}
+.pf2-levelcard small{font-size:.76rem;color:var(--text-dim)}
+.pf2-split{display:flex;gap:12px;margin-top:6px;flex-wrap:wrap}
+.pf2-split span{display:flex;flex-direction:column;font-size:.66rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim)}
+.pf2-split b{font-size:.9rem;font-weight:600;letter-spacing:0;color:var(--text);font-variant-numeric:tabular-nums}
+
+.pf2-nums{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3) var(--s4)}
+.pf2-nums div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pf2-nums b{font-size:1.3rem;font-weight:300;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf2-nums b.pf2-small{font-size:.95rem;font-weight:500}
+.pf2-nums span{font-size:.72rem;color:var(--text-dim)}
+
+.pf2-badges{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.pf2-badge{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:rgba(0,0,0,.3);border:1px solid var(--glass-line);display:grid;place-items:center;
+  transition:transform var(--dur-fast),box-shadow var(--dur-fast)}
+.pf2-badge:hover{transform:translateY(-2px) scale(1.06);box-shadow:0 0 0 1px rgba(var(--br),.5),0 8px 18px -8px rgba(0,0,0,.8);z-index:1}
+.pf2-badge img{width:100%;height:100%;object-fit:cover}
+.pf2-badge svg,.pf2-rare li > svg{color:var(--muted)}
+.pf2-rare li > svg{justify-self:center}
+.pf2-badge i{position:absolute;right:2px;bottom:2px;padding:0 4px;border-radius:6px;font-style:normal;font-size:.6rem;font-weight:700;
+  background:rgba(5,6,10,.82);color:var(--b)}
+
+.pf2-rare{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.pf2-rare li{display:grid;grid-template-columns:40px 1fr auto;gap:10px;align-items:center}
+.pf2-rare img{width:40px;height:40px;border-radius:8px;object-fit:cover}
+.pf2-rare span{display:flex;flex-direction:column;min-width:0}
+.pf2-rare b{font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf2-rare small{font-size:.72rem;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf2-rare em{font-style:normal;font-size:.8rem;font-weight:700;color:var(--ra-gold,#f2c14e)}
+
+/* ---------- Vitrine de favoritos ---------- */
+.pf2-show{display:flex;flex-direction:column;gap:var(--s3)}
+.pf2-feature{position:relative;display:block;width:100%;height:clamp(200px,22vw,330px);border-radius:var(--r-lg);overflow:hidden;padding:0;border:1px solid var(--glass-line);
+  background:#0b0e18;cursor:pointer;text-align:left;box-shadow:var(--elev-2)}
+.pf2-feature-art{position:absolute;inset:0;background:center/cover no-repeat;transition:transform var(--dur-slow)}
+.pf2-feature:hover .pf2-feature-art,.pf2-feature:focus-visible .pf2-feature-art{transform:scale(1.04)}
+.pf2-feature-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(5,6,10,.92),rgba(5,6,10,.35) 55%,transparent),linear-gradient(0deg,rgba(5,6,10,.7),transparent 50%)}
+.pf2-feature-text{position:absolute;left:var(--s5);bottom:var(--s4);right:var(--s5);display:flex;flex-direction:column;gap:4px}
+.pf2-feature-text small{font-size:.7rem;text-transform:uppercase;letter-spacing:.16em;color:var(--b)}
+.pf2-feature-text strong{font-size:1.8rem;font-weight:600;line-height:1.1;color:#fff;text-shadow:0 2px 16px rgba(0,0,0,.6)}
+.pf2-feature-text em{font-style:normal;font-size:.85rem;color:#cfd6ea}
+.pf2-show-rest{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:var(--s3)}
+.pf2-cover{position:relative;aspect-ratio:3/4;border-radius:var(--r-md);overflow:hidden;padding:0;border:1px solid var(--glass-line);background:#0b0e18;cursor:pointer;
+  box-shadow:var(--elev-1);transition:transform var(--dur-fast),box-shadow var(--dur-fast)}
+.pf2-cover:hover,.pf2-cover:focus-visible{transform:translateY(-3px);box-shadow:0 0 0 1px rgba(var(--br),.5),var(--elev-2)}
+.pf2-cover img{width:100%;height:100%;object-fit:cover}
+.pf2-cover > b{display:grid;place-items:center;height:100%;font-size:2rem;color:var(--muted)}
+.pf2-cover-rank{position:absolute;top:6px;left:6px;padding:1px 7px;border-radius:999px;font-size:.7rem;font-weight:700;background:rgba(5,6,10,.8);color:var(--b)}
+.pf2-cover-name{position:absolute;left:0;right:0;bottom:0;padding:18px 8px 6px;font-size:.75rem;text-align:left;color:#fff;
+  background:linear-gradient(0deg,rgba(5,6,10,.9),transparent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- Atividade recente ---------- */
+.pf2-act{display:flex;flex-direction:column;gap:var(--s3)}
+.pf2-act-head{display:flex;align-items:baseline;gap:var(--s3);flex-wrap:wrap}
+.pf2-act-head strong{font-size:1.5rem;font-weight:300;color:var(--b);font-variant-numeric:tabular-nums}
+.pf2-act-head span{font-size:.82rem;color:var(--text-dim)}
+.pf2-act-row{position:relative;display:grid;grid-template-columns:auto 1fr auto;gap:var(--s4);align-items:center;width:100%;padding:12px var(--s4) 12px 12px;
+  border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--glass-line);background:#0b0e18;cursor:pointer;text-align:left;color:inherit;
+  transition:border-color var(--dur-fast),transform var(--dur-fast)}
+.pf2-act-row:hover:not(:disabled),.pf2-act-row:focus-visible{border-color:rgba(var(--br),.45);transform:translateX(2px)}
+.pf2-act-row:disabled{cursor:default}
+.pf2-act-art{position:absolute;inset:0;background:center/cover no-repeat;opacity:.38;filter:blur(1px) saturate(1.1);
+  mask-image:linear-gradient(90deg,transparent 0%,#000 35%,#000 70%,transparent)}
+.pf2-act-row::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(11,14,24,.95) 20%,rgba(11,14,24,.55) 60%,rgba(11,14,24,.9))}
+.pf2-act-row > *:not(.pf2-act-art){position:relative}
+.pf2-act-cover{width:52px;height:70px;border-radius:8px;overflow:hidden;background:rgba(255,255,255,.05);display:grid;place-items:center;box-shadow:0 6px 14px -6px rgba(0,0,0,.9)}
+.pf2-act-cover img{width:100%;height:100%;object-fit:cover}
+.pf2-act-text{display:flex;flex-direction:column;gap:3px;min-width:0}
+.pf2-act-text strong{font-size:1.05rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf2-act-text small{font-size:.78rem;color:var(--text-dim)}
+.pf2-act-time{display:flex;flex-direction:column;align-items:flex-end;gap:1px;text-align:right}
+.pf2-act-time b{font-size:1.1rem;font-weight:500;color:var(--b);font-variant-numeric:tabular-nums}
+.pf2-act-time small{font-size:.72rem;color:var(--text-dim)}
+.pf2-done{display:flex;flex-wrap:wrap;gap:8px}
+.pf2-done-chip{padding:5px 12px;border-radius:999px;font-size:.78rem;background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.3);color:#9ff0c9}
+
+/* ---------- Variações de layout ---------- */
+.pf2.pf-compact .pf2-hero{min-height:clamp(280px,22vw,380px)}
+.pf2.pf-compact .pf-text h1{font-size:2rem}
+.pf2.pf-compact .pf2-feature{height:clamp(160px,15vw,230px)}
+.pf2.pf-stats .pf2-grid{grid-template-columns:minmax(0,1fr) 380px}
+
+@media (max-width:1100px){
+  .pf2-grid{grid-template-columns:1fr}
+  .pf2-side{position:static;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+}
+html[data-motion="reduced"] :is(.pf2-feature-art,.pf2-cover,.pf2-badge,.pf2-act-row){transition:none}

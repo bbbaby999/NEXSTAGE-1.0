@@ -27,6 +27,7 @@ import TimeToBeatBlock from "../components/TimeToBeatBlock";
 import AgeRatingBadge from "../components/AgeRatingBadge";
 import MetacriticPanel from "../components/MetacriticPanel";
 import SteamGamePanel from "../components/SteamGamePanel";
+import TrophyGamePanel from "../components/TrophyGamePanel";
 import { isInstalled } from "../lib/steam";
 import { TrophyIcon } from "../components/RaUnlockToasts";
 import type { GalleryItem, GameInfo, SteamAppStatus, StoreHit, WebShot } from "../types";
@@ -320,6 +321,7 @@ export default function GameDetail({ gameId }: { gameId: number }) {
 
           {game.steamAppId !== null && <SteamGamePanel game={game} status={steamSt} onInstall={install} onChanged={reload} />}
           <RaGamePanel game={game} onChanged={reload} />
+          <TrophyGamePanel game={game} />
 
           <TimeToBeatBlock game={game} info={info} onEdit={() => {
             const h = info?.hltb?.source === "manual" ? info.hltb : null;
@@ -337,7 +339,7 @@ export default function GameDetail({ gameId }: { gameId: number }) {
               <dt>{t("Último acesso")}</dt><dd>{formatDate(game.lastPlayedAt)}</dd>
               {game.isoPath && (<><dt>{t("Arquivo ISO")}</dt><dd className="path">{game.isoPath}</dd></>)}
               {game.romPath && (<><dt>{t("Arquivo")}</dt><dd className="path">{game.romPath}</dd></>)}
-              {(game.isoPath || game.romPath) && (<><dt>{t("Emulador")}</dt><dd>{game.emulatorName ?? t("Nenhum associado (use Editar jogo)")}</dd></>)}
+              {(game.isoPath || game.romPath || game.emulatorName) && (<><dt>{t("Emulador")}</dt><dd>{game.emulatorName ?? t("Nenhum associado (use Editar jogo)")}</dd></>)}
               <dt>{t("Fonte")}</dt><dd>{info ? (info.source === "steam" ? t("Steam · {matchedName}", { matchedName: info.matchedName }) : t("Manual")) : t("Sem dados")}</dd>
             </dl>
           </Block>

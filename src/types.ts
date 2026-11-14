@@ -182,7 +182,20 @@ export interface StartupInfo { mode: "none" | "minimized" | "window" | "fullscre
 export interface PadCombos { overlay: number; screenshot: number; overlayDefault: number; screenshotDefault: number }
 export interface FandomLink { url: string; direct: boolean }
 
-export interface Emulator { id: number; name: string; exePath: string; platforms: string[]; formats: string[]; args: string; cover: string | null; exeExists: boolean; games: number }
+export interface Emulator { id: number; name: string; exePath: string; platforms: string[]; formats: string[]; args: string; cover: string | null; exeExists: boolean; games: number; fullscreen: boolean; fullscreenSupported: boolean }
+/** Troféus (Vita3K/RPCS3): "P" platina, "G" ouro, "S" prata, "B" bronze. */
+export type TrophyGrade = "P" | "G" | "S" | "B";
+export interface Trophy { id: number; name: string; detail: string; grade: TrophyGrade; hidden: boolean; unlocked: boolean; unlockedAt: number | null; icon: string | null }
+export interface GameTrophies {
+  emulator: "Vita3K" | "RPCS3"; status: "ok" | "notInstalled" | "notFound"; commId: string | null; title: string | null;
+  icon: string | null; total: number; unlocked: number; trophies: Trophy[];
+}
+export interface TrophySetSummary {
+  emulator: "Vita3K" | "RPCS3"; commId: string; title: string; icon: string | null; total: number; unlocked: number;
+  lastUnlockAt: number | null; libraryGameId: number | null; trophies: Trophy[];
+}
+export interface ScoreSource { points: number; achievements: number; completed: number }
+export interface ProfileScore { total: number; level: number; levelFloor: number; nextLevelAt: number; ra: ScoreSource; steam: ScoreSource; trophies: ScoreSource }
 export interface ScanItem {
   path: string; name: string; ext: string; kind: "windows" | "disc" | "switch" | "pkg" | "vpk";
   platform: string | null; status: "new" | "secondary" | "duplicate" | "invalid" | "unrecognized";

@@ -67,6 +67,7 @@ pub fn handle(app: &AppHandle, sc: &Shortcut) -> bool {
         rare,
         global_pct: Some(if rare { 2.5 } else { 55.0 }),
         more: 0,
+        grade: None,
     });
     shot_toast::notify_achievements(app, vec![item], 0);
     true
@@ -97,6 +98,7 @@ fn sample(app: &AppHandle, rare: bool) -> Option<AchievementToast> {
                 rare: shot_toast::steam_is_rare(pct),
                 global_pct: pct,
                 more: 0,
+                grade: None,
             })
         },
     )

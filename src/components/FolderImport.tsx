@@ -105,7 +105,7 @@ export default function FolderImport({ profileId, folder, folderId, onClose, onI
           </p>
         )}
         {c.total === 0 ? (
-          <div className="empty"><p>{t("Nenhum arquivo .iso, .bin, .exe, .nsp, .nup, .pkg ou .vpk foi encontrado nessa pasta.")}</p></div>
+          <div className="empty"><p>{t("Nenhum arquivo .iso, .bin, .exe, .nsp, .xci, .nup, .pkg ou .vpk foi encontrado nessa pasta.")}</p></div>
         ) : (
           <div className="scan-table" role="table">
             <div className="scan-row head" role="row"><span /><span>{t("Nome")}</span><span>{t("Formato")}</span><span>{t("Plataforma")}</span><span>{t("Emulador")}</span><span>{t("Status")}</span></div>

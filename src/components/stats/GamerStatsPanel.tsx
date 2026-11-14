@@ -26,7 +26,8 @@ export function SourceTag({ s }: { s: StatSource }) {
  * Estatísticas gamer completas. `data` (versão pública já filtrada) desliga atualização e links.
  * Tudo vem do cache local consolidado (`gamer_stats`); "Atualizar" sincroniza as contas conectadas.
  */
-export default function GamerStatsPanel({ initialTab, data }: { initialTab?: StatsTab | null; data?: GamerStats | null }) {
+/** `inProfile`: versão do perfil, sem a lista "Jogos recentes" (o perfil já mostra a Atividade recente) e sem a nota de rodapé. */
+export default function GamerStatsPanel({ initialTab, data, inProfile }: { initialTab?: StatsTab | null; data?: GamerStats | null; inProfile?: boolean }) {
   const { profile, toast, setView, setOpenGameId } = useSession();
   const own = useGamerStats(profile!.id);
   const s = data !== undefined ? data : own.stats;
@@ -79,15 +80,15 @@ export default function GamerStatsPanel({ initialTab, data }: { initialTab?: Sta
         {device !== "keyboard" && <Glyph k="r2" />}
       </div>
       <div className="gs-body" key={tab}>
-        {tab === "summary" && <Summary s={s} open={open} />}
+        {tab === "summary" && <Summary s={s} open={open} hideRecent={inProfile} />}
         {tab === "top" && <Top s={s} open={open} />}
         {tab === "achievements" && <Achs s={s} open={open} />}
         {tab === "history" && <History s={s} />}
         {tab === "steam" && <SteamTab s={s} open={open} />}
       </div>
-      <p className="muted note">
+      {!inProfile && <p className="muted note">
         {t("Tempo de jogo: quando um jogo está vinculado a mais de uma origem (NEXSTAGE e Steam), vale o maior valor, sem somar. Conquistas ficam separadas por plataforma; o total soma apenas conjuntos distintos (Steam + RetroAchievements). Nada é estimado.")}
-      </p>
+      </p>}
     </div>
   );
 }
@@ -110,7 +111,7 @@ function breakdown(g: StatGame): string {
   return parts.length > 1 ? parts.join(" · ") : "";
 }
 
-function Summary({ s, open }: { s: GamerStats; open: (id: number | null) => void }) {
+function Summary({ s, open, hideRecent }: { s: GamerStats; open: (id: number | null) => void; hideRecent?: boolean }) {
   const a = s.achievements;
   const steamTime = s.steamSeconds;
   return (
@@ -132,7 +133,7 @@ function Summary({ s, open }: { s: GamerStats; open: (id: number | null) => void
           empty={t("Nenhuma atividade recente")} />
         <Tile label={t("Último jogo")} value={s.lastGame?.title} sub={s.lastGame?.lastActivity ? raAgo(s.lastGame.lastActivity) : null} />
       </div>
-      {s.recentGames.length > 0 && (
+      {!hideRecent && s.recentGames.length > 0 && (
         <>
           <h3 className="gs-h3">{t("Jogos recentes")}</h3>
           <div className="gs-recent">

@@ -3,7 +3,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { currentLang, t } from "./i18n";
 import { idleBusy } from "./idle";
-import type { GameHit, ImageSet, SourceRef, WebShot, Emulator, FolderRow, ImportSummary, Activity, FandomLink, PadCombos, StartupInfo, ClassifyResult, Controller, Drive, GalleryItem, ImportResult, ShortcutInfo, Game, GameCollection, GameInfo, GameInput, Profile, ProfileInput, RaAccount, RaOverview, RaAchievement, RaGameDetail, RaSyncReport, RaLinkInfo, RaGame, RaScanReport, RaEmuSupport, SteamAccount, SteamOwnedList, SteamPreviewItem, SteamImportReport, SteamSyncReport, SteamAppStatus, SteamGameData, SteamClientStatus, SteamAchOverview, SteamAchEntry, SteamNewsOverview, BackupInfo, BackupTarget, BackupReport, BackupInspect, BackupVerify, BackupRestoreReport, BackupAuto, BackupAutoMode, GamerStats, StatsVisibility, MetacriticResult, StoreHit, SourceView, SourceId, IgdbResult, NexusLinkStatus, NexusGame, NexusModsPage, NexusModDetail, NexusMod, ModSort } from "../types";
+import type { ScanItem, GameHit, ImageSet, SourceRef, WebShot, Emulator, FolderRow, ImportSummary, Activity, FandomLink, PadCombos, StartupInfo, ClassifyResult, Controller, Drive, GalleryItem, ImportResult, ShortcutInfo, Game, GameCollection, GameInfo, GameInput, Profile, ProfileInput, RaAccount, RaOverview, RaAchievement, RaGameDetail, RaSyncReport, RaLinkInfo, RaGame, RaScanReport, RaEmuSupport, SteamAccount, SteamOwnedList, SteamPreviewItem, SteamImportReport, SteamSyncReport, SteamAppStatus, SteamGameData, SteamClientStatus, SteamAchOverview, SteamAchEntry, SteamNewsOverview, BackupInfo, BackupTarget, BackupReport, BackupInspect, BackupVerify, BackupRestoreReport, BackupAuto, BackupAutoMode, GamerStats, StatsVisibility, MetacriticResult, StoreHit, SourceView, SourceId, IgdbResult, NexusLinkStatus, NexusGame, NexusModsPage, NexusModDetail, NexusMod, ModSort } from "../types";
 
 /**
  * Capas e fundos ficam em arquivos na pasta de dados do app (ver src-tauri/src/images.rs): o backend
@@ -154,11 +154,20 @@ export const api = {
   saveEmulator: (input: { id?: number; name: string; exePath: string; platforms: string[]; formats: string[]; args: string; cover: string | null }) =>
     invoke<Emulator>("save_emulator", { input }).then(withEmuImage),
   deleteEmulator: (id: number) => invoke<void>("delete_emulator", { id }),
+  emulatorFullscreenSupported: (name: string, exePath: string) =>
+    invoke<boolean>("emulator_fullscreen_supported", { name, exePath }),
+  gameTrophies: (profileId: number, gameId: number) =>
+    invoke<import("../types").GameTrophies | null>("game_trophies", { profileId, gameId }),
+  trophyOverview: (profileId: number) =>
+    invoke<import("../types").TrophySetSummary[]>("trophy_overview", { profileId }),
+  profileScore: (profileId: number) => invoke<import("../types").ProfileScore>("profile_score", { profileId }),
   setGameEmulator: (profileId: number, gameId: number, emulatorId: number | null) =>
     invoke<void>("set_game_emulator", { profileId, gameId, emulatorId }),
   scanFolder: (profileId: number, path: string, folderId: number | null) =>
     invoke<void>("scan_folder", { profileId, path, folderId }),
   cancelScan: () => invoke<void>("cancel_scan"),
+  /** Identifica um arquivo escolhido em "Adicionar jogo" (mesma detecção da varredura; não importa nada). */
+  inspectGameFile: (profileId: number, path: string) => invoke<ScanItem>("inspect_game_file", { profileId, path }),
   importScanItems: (profileId: number, folderPath: string, items: { path: string; ext: string; platform: string; title: string; emulatorId: number | null }[]) =>
     idleBusy(invoke<ImportSummary>("import_scan_items", { profileId, folderPath, items })),
   listLibraryFolders: (profileId: number) => invoke<FolderRow[]>("list_library_folders", { profileId }),

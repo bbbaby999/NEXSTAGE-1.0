@@ -1,11 +1,13 @@
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api } from "../lib/api";
+import { api, imgUrl } from "../lib/api";
 import { t } from "../lib/i18n";
+import { raValue, steamValue, trophyValue } from "../lib/score";
 
 interface ToastEvent { thumb: string; title: string | null; secs: number; sound: boolean; show: boolean }
-/** Conquista desbloqueada (RetroAchievements ou Steam), confirmada pela API como nova. */
-interface AchItem { source: "ra" | "steam"; icon: string | null; title: string; game: string; points: number; hardcore: boolean; rare: boolean; globalPct: number | null; more: number }
+/** Conquista desbloqueada (RetroAchievements ou Steam, confirmada pela API como nova) ou troféu do
+ *  Vita3K/RPCS3 (lido do arquivo do emulador; `grade`: P/G/S/B). */
+interface AchItem { grade: string | null; source: "ra" | "steam" | "vita3k" | "rpcs3"; icon: string | null; title: string; game: string; points: number; hardcore: boolean; rare: boolean; globalPct: number | null; more: number }
 interface AchToastEvent { item: AchItem; secs: number; sound: boolean }
 /** Controle conectado / desconectado / bateria baixa. */
 interface PadItem { event: "connected" | "disconnected" | "battery"; device: "xbox" | "playstation" | "generic"; name: string; percent: number | null; label: string | null }
@@ -101,7 +103,9 @@ export default function ShotToast() {
     const detail = [
       a.game,
       a.source === "ra" && a.points > 0 ? t("+{n} pontos", { n: a.points }) : null,
+      a.grade ? (a.grade === "P" ? t("Platina") : a.grade === "G" ? t("Ouro") : a.grade === "S" ? t("Prata") : t("Bronze")) : null,
       a.globalPct !== null ? t("{p}% dos jogadores", { p: a.globalPct < 10 ? a.globalPct.toFixed(1) : Math.round(a.globalPct) }) : null,
+      t("+{n} na pontuação", { n: a.grade ? trophyValue(a.grade) : a.source === "ra" ? raValue(a.points, a.hardcore) : steamValue(a.globalPct) }),
       a.more > 0 ? t("e mais {n} conquista(s)", { n: a.more }) : null,
     ].filter(Boolean).join(" · ");
     return (
@@ -109,19 +113,19 @@ export default function ShotToast() {
         <div className="ach-badge">
           {a.rare && <><i className="ach-spark s1" /><i className="ach-spark s2" /><i className="ach-spark s3" /><i className="ach-spark s4" /></>}
           <div className="ach-icon">
-            {a.icon ? <img src={a.icon} alt="" onError={(e) => (e.currentTarget.style.visibility = "hidden")} /> : <TrophyGlyph />}
+            {a.icon ? <img src={imgUrl(a.icon) ?? undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = "hidden")} /> : <TrophyGlyph />}
           </div>
         </div>
         <div className="ach-body">
           <span className="ach-kicker">
             <TrophyGlyph size={13} />
-            {a.rare ? t("Conquista rara desbloqueada") : t("Conquista desbloqueada")}
+            {a.grade ? (a.grade === "P" ? t("Troféu de platina desbloqueado") : t("Troféu desbloqueado")) : a.rare ? t("Conquista rara desbloqueada") : t("Conquista desbloqueada")}
             {a.hardcore && <b>HC</b>}
           </span>
           <strong>{a.title}</strong>
           <small>{detail}</small>
         </div>
-        <span className="ach-src">{a.source === "steam" ? "Steam" : "RA"}</span>
+        <span className="ach-src">{a.source === "steam" ? "Steam" : a.source === "vita3k" ? "Vita3K" : a.source === "rpcs3" ? "RPCS3" : "RA"}</span>
       </div>
     );
   }

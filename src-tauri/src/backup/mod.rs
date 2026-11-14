@@ -1177,6 +1177,10 @@ mod tests {
             c.execute("INSERT INTO profiles(id,username,display_name) VALUES(1,?1,?1)", [profile]).unwrap();
             c.execute("INSERT INTO games(id,title,executable_path,cover) VALUES(1,'Jogo','C:/jogo.exe',?1)", [format!("nximg:{img}")]).unwrap();
             c.execute_batch("INSERT INTO profile_games(profile_id,game_id,playtime_seconds) VALUES(1,1,3600);").unwrap();
+            // 1.1.0: emulador com tela cheia, vínculo de troféus e seção de pontuação no perfil (tudo no banco)
+            c.execute("INSERT INTO emulators(id,name,exe_path,fullscreen) VALUES(1,?1,'C:/Vita3K/Vita3K.exe',1)", [format!("Vita3K {profile}")]).unwrap();
+            c.execute("INSERT INTO trophy_links(game_id,comm_id) VALUES(1,?1)", [format!("NPWR_{profile}")]).unwrap();
+            c.execute("INSERT INTO profile_settings(profile_id,key,value) VALUES(1,'profile_page',?1)", [format!(r#"{{"order":["score"],"note":"{profile}"}}"#)]).unwrap();
             let p = d.join("gallery").join("1").join(&shot);
             c.execute("INSERT INTO gallery_items(profile_id,game_id,path,hash) VALUES(1,1,?1,'h')", [p.to_string_lossy().to_string()]).unwrap();
             let key = crate::retro::secret::protect(&format!("KEY-{profile}")).unwrap();
@@ -1227,6 +1231,11 @@ mod tests {
         let name: String = one(&dbb, "SELECT display_name FROM profiles");
         assert_eq!(name, "ana");
         assert_eq!(one::<i64>(&dbb, "SELECT playtime_seconds FROM profile_games"), 3600);
+        // 1.1.0: tela cheia do emulador, vínculo de troféus e personalização do perfil vêm junto
+        assert_eq!(one::<String>(&dbb, "SELECT name FROM emulators"), "Vita3K ana");
+        assert!(one::<bool>(&dbb, "SELECT fullscreen FROM emulators"));
+        assert_eq!(one::<String>(&dbb, "SELECT comm_id FROM trophy_links"), "NPWR_ana");
+        assert!(one::<String>(&dbb, "SELECT value FROM profile_settings WHERE key='profile_page'").contains("ana"));
         // caminho da captura reescrito para a pasta de B, com o arquivo presente
         let gp: String = one(&dbb, "SELECT path FROM gallery_items");
         assert!(gp.starts_with(&*db_dir.join("gallery").to_string_lossy()), "{gp}");

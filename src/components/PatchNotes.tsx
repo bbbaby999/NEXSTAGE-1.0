@@ -1,7 +1,6 @@
 import Modal from "./Modal";
 import Button from "./Button";
 import { NOTE_LABEL, PATCH_NOTES } from "../data/patchnotes";
-import { CHANNEL } from "../lib/version";
 import { currentLang, t } from "../lib/i18n";
 
 const fmt = (d: string) => (/^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + "T12:00:00").toLocaleDateString(currentLang(), { day: "2-digit", month: "long", year: "numeric" }) : d);
@@ -14,7 +13,7 @@ export default function PatchNotes({ onClose }: { onClose: () => void }) {
         {PATCH_NOTES.map((n, i) => (
           <article key={n.version} className={`note ${i === 0 ? "latest" : ""}`}>
             <header>
-              <h3>{/^\d/.test(n.version) && !n.version.includes("–") ? `${CHANNEL} ${n.version}` : n.version}</h3>
+              <h3>{n.version}</h3>
               <span className="muted">{fmt(n.date)}{i === 0 ? t(" · versão atual") : ""}</span>
             </header>
             {n.summary && <p className="muted">{n.summary}</p>}

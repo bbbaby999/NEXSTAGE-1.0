@@ -64,15 +64,17 @@ fn expand_args(args: Vec<String>, file: Option<&str>) -> Vec<String> {
 struct Prepared {
     exe: std::path::PathBuf,
     args: Vec<String>,
+    /// Emulador reconhecido + opção de tela cheia: ajustes de configuração feitos só ao iniciar (RPCS3).
+    fullscreen: Option<(crate::emu_fullscreen::Kind, bool)>,
 }
 
 /// Valida o jogo (executável/emulador/arquivo existentes, argumentos) SEM iniciar nada.
 fn prepare(db: &Db, profile_id: i64, game_id: i64) -> AppResult<Prepared> {
-    let (mut exe, mut args, iso, emu_exe, emu_args) = {
+    let (mut exe, mut args, mut iso, emu_exe, emu_args, emu_name, emu_full) = {
         let conn = db.conn()?;
         let found = conn
             .query_row(
-                "SELECT g.executable_path, g.launch_args, COALESCE(g.iso_path, g.rom_path), e.exe_path, e.args
+                "SELECT g.executable_path, g.launch_args, COALESCE(g.iso_path, g.rom_path), e.exe_path, e.args, e.name, e.fullscreen
                  FROM profile_games pg JOIN games g ON g.id = pg.game_id
                  LEFT JOIN emulators e ON e.id = g.emulator_id
                  WHERE pg.profile_id=?1 AND pg.game_id=?2",
@@ -80,6 +82,7 @@ fn prepare(db: &Db, profile_id: i64, game_id: i64) -> AppResult<Prepared> {
                 |r| Ok((
                     r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, Option<String>>(2)?,
                     r.get::<_, Option<String>>(3)?, r.get::<_, Option<String>>(4)?,
+                    r.get::<_, Option<String>>(5)?, r.get::<_, Option<bool>>(6)?.unwrap_or(false),
                 )),
             )
             .map_err(|e| match e {
@@ -93,9 +96,16 @@ fn prepare(db: &Db, profile_id: i64, game_id: i64) -> AppResult<Prepared> {
 
     // Emulador associado (cadastrado em Emuladores): usa o executável dele; os argumentos do jogo, se
     // existirem, têm prioridade sobre o modelo do emulador. Sem emulador, vale o sistema anterior.
+    let mut fullscreen = None;
     if let Some(ee) = emu_exe {
+        fullscreen = crate::emu_fullscreen::detect(emu_name.as_deref().unwrap_or(""), &ee).map(|k| (k, emu_full));
         if !Path::new(&ee).is_file() {
             return Err(AppError::NotFound(format!("O emulador associado não foi encontrado: {ee}. Atualize o caminho na página Emuladores.")));
+        }
+        // Jogo sem ISO/ROM (ex.: adicionado por executável, EBOOT.BIN, .xex): o arquivo cadastrado no jogo
+        // é o que o emulador recebe em {iso}/{rom}.
+        if iso.is_none() && !exe.trim().is_empty() && !Path::new(&exe).eq(Path::new(&ee)) {
+            iso = Some(std::mem::take(&mut exe));
         }
         exe = ee;
         if args.trim().is_empty() {
@@ -132,7 +142,12 @@ fn prepare(db: &Db, profile_id: i64, game_id: i64) -> AppResult<Prepared> {
             "Executável não encontrado: {exe}. Edite o jogo e selecione o arquivo novamente."
         )));
     }
-    Ok(Prepared { exe: path.to_path_buf(), args: expand_args(split_args(&args)?, iso.as_deref()) })
+    let mut list = split_args(&args)?;
+    // Opção "Iniciar jogos em tela cheia" do emulador: vale para todos os jogos associados a ele.
+    if let Some((kind, on)) = fullscreen {
+        list = crate::emu_fullscreen::apply_args(kind, on, list);
+    }
+    Ok(Prepared { exe: path.to_path_buf(), args: expand_args(list, iso.as_deref()), fullscreen })
 }
 
 /// Como o jogo será iniciado.
@@ -203,11 +218,14 @@ pub fn gameboot_window(app: AppHandle, on: bool) {
 
 #[tauri::command]
 pub fn launch_game(app: AppHandle, db: State<Db>, profile_id: i64, game_id: i64) -> AppResult<()> {
-    let Prepared { exe, args } = match plan(&db, profile_id, game_id)? {
+    let Prepared { exe, args, fullscreen } = match plan(&db, profile_id, game_id)? {
         Launch::Exe(p) => p,
         Launch::Steam(appid) => return launch_via_steam(&app, &db, profile_id, game_id, appid),
     };
     let path = exe.as_path();
+    if let Some((kind, on)) = fullscreen {
+        crate::emu_fullscreen::apply_config(kind, on, path);
+    }
     let mut cmd = Command::new(path);
     cmd.args(args);
     if let Some(dir) = path.parent() {
@@ -291,6 +309,16 @@ mod tests {
         let args = split_args(r#"-fullscreen "{iso}""#).unwrap();
         let out = super::expand_args(args, Some(r"D:\Jogos\Meu Jogo.iso"));
         assert_eq!(out, vec!["-fullscreen", r"D:\Jogos\Meu Jogo.iso"]);
+    }
+
+    #[test]
+    fn lichii_template_keeps_options_before_game_path() {
+        // Modelo do Lichii: opções primeiro; o caminho vai inteiro como valor de -g (espaços, colchetes, acentos).
+        let rom = r"E:\Nova pasta\Jogos Ação\Zelda [0400486024DEC000] (v1.0).xci";
+        let out = super::expand_args(split_args(r#"-f -g "{rom}""#).unwrap(), Some(rom));
+        assert_eq!(out, vec!["-f", "-g", rom]);
+        let out = super::expand_args(split_args(r#"-g "{rom}""#).unwrap(), Some(rom));
+        assert_eq!(out, vec!["-g", rom]);
     }
 
     #[test]

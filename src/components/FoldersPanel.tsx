@@ -9,7 +9,8 @@ import { useSession } from "../state/session";
 import type { FolderRow } from "../types";
 import { t } from "../lib/i18n";
 
-/** Pastas de jogos do perfil: atualizar varredura (só novos aparecem como importáveis) ou remover o vínculo. */
+/** Pastas de jogos do perfil (botão "Pastas de jogos" da Biblioteca): adicionar pasta, atualizar a varredura
+ *  (só novos aparecem como importáveis) ou remover o vínculo. */
 export default function FoldersPanel({ profileId, onClose, onChanged }: { profileId: number; onClose: () => void; onChanged: () => void }) {
   const { toast } = useSession();
   const [rows, setRows] = useState<FolderRow[]>([]);
@@ -53,7 +54,8 @@ export default function FoldersPanel({ profileId, onClose, onChanged }: { profil
         <p className="muted note">{t("Remover uma pasta apenas a tira desta lista: os jogos já importados continuam na biblioteca e nenhum arquivo é apagado.")}</p>
         <div className="row end">
           <Button variant="ghost" onClick={onClose}>{t("Fechar")}</Button>
-          <Button variant="primary" onClick={add}>{t("Adicionar pasta de jogos")}</Button>
+          {/* sem pastas ainda, a ação principal recebe o foco (controle/teclado); com pastas, a 1ª "Atualizar varredura" */}
+          <Button variant="primary" data-autofocus={rows.length === 0 ? "" : undefined} onClick={add}>{t("Adicionar pasta de jogos")}</Button>
         </div>
       </Modal>
       {scan && <FolderImport profileId={profileId} folder={scan.path} folderId={scan.id} onClose={() => setScan(null)}

@@ -1,6 +1,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { isUnlocked, raDate } from "../lib/ra";
 import { t } from "../lib/i18n";
+import { raValue } from "../lib/score";
 import type { RaAchievement } from "../types";
 import { TrophyIcon } from "./RaUnlockToasts";
 
@@ -21,6 +22,7 @@ export default function RaAchievementItem({ a, showGame = true }: { a: RaAchieve
           {showGame && a.gameTitle && <>{a.gameTitle} · </>}
           {done ? (a.unlockedHcAt ? t("Hardcore em {d}", { d: raDate(a.unlockedHcAt) }) : t("Obtida em {d}", { d: raDate(a.unlockedAt) })) : t("Pendente")}
           {kindLabel && <> · {kindLabel}</>}
+          {" · "}<i className="ns-score" title={t("Pontuação de conquistas")}>+{raValue(a.points, !!a.unlockedHcAt)}</i>
         </small>
       </div>
       <div className="ra-ach-side">

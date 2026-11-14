@@ -220,3 +220,41 @@ html[data-motion="reduced"] .ra-toast,html[data-motion="reduced"] .ra-game:hover
 .ach-toast.pad.ev-battery .ach-icon{color:#ff6b61;animation:pad-low 1s ease-in-out infinite}
 .ach-toast.pad.ev-battery .ach-kicker{color:#ff7a70}
 @keyframes pad-low{0%,100%{box-shadow:0 0 0 3px #ff5a4f,0 0 10px rgba(255,90,79,.35)}50%{box-shadow:0 0 0 3px #ff5a4f,0 0 24px rgba(255,90,79,.85)}}
+
+/* Troféus (Vita3K/RPCS3): cor por tipo — platina, ouro, prata, bronze */
+.trophy-head{display:flex;gap:14px;align-items:center}
+.trophy-head .ra-prog{flex:1;min-width:0}
+.trophy-set-icon{width:72px;height:72px;object-fit:cover;border-radius:10px;flex:none;box-shadow:var(--elev-1)}
+.trophy-counts{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:.8rem;font-variant-numeric:tabular-nums;color:var(--text-dim)}
+.trophy-grade{display:inline-flex;align-items:center;gap:6px}
+.trophy-grade i{width:12px;height:12px;border-radius:50%;flex:none;background:var(--tg);box-shadow:0 0 0 1px rgba(0,0,0,.35),inset 0 1px 1px rgba(255,255,255,.45)}
+.trophy-grade.g-P{--tg:linear-gradient(135deg,#f4f7fb,#9fb3c8 60%,#e8eef5)}
+.trophy-grade.g-G{--tg:linear-gradient(135deg,#ffe58a,#d4a017 60%,#fff1b8)}
+.trophy-grade.g-S{--tg:linear-gradient(135deg,#f0f0f0,#a8adb4 60%,#dfe2e6)}
+.trophy-grade.g-B{--tg:linear-gradient(135deg,#f0b88a,#a8612b 60%,#e2a374)}
+.ra-ach-side .trophy-grade i{width:16px;height:16px}
+.ra-ach.locked .trophy-grade i{opacity:.45}
+/* ouro/prata/bronze dentro do resumo (mesmo cartão das outras estatísticas) */
+.trophy-mix{justify-content:space-between}
+.trophy-mix-row{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;min-height:2.2rem}
+.trophy-mix-row .trophy-grade b{font-size:1.25rem;font-weight:300;font-variant-numeric:tabular-nums;color:var(--text)}
+.trophy-mix-row .trophy-grade i{width:14px;height:14px}
+.trophy-user{cursor:default}
+
+/* Pontuação de conquistas */
+.ns-score{font-style:normal;font-weight:600;color:var(--b);font-variant-numeric:tabular-nums}
+.lvl-badge{display:inline-flex;align-items:baseline;gap:6px;margin-left:14px;padding:4px 12px;border-radius:999px;vertical-align:middle;
+  font-size:.9rem;font-weight:400;text-shadow:none;background:rgba(var(--ar),.18);border:1px solid rgba(var(--br),.35)}
+.lvl-badge b{font-size:1.15rem;font-weight:700;color:var(--b)}
+.lvl-badge span{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-dim)}
+.lvl-badge em{font-style:normal;font-size:.8rem;color:var(--text-dim)}
+.score-panel{display:flex;flex-direction:column;gap:var(--s4);padding:var(--s5);border-radius:var(--r-xl);background:var(--glass);border:1px solid var(--glass-line)}
+.score-level{display:flex;gap:var(--s5);align-items:center;flex-wrap:wrap}
+.score-ring{width:92px;height:92px;border-radius:50%;display:grid;place-content:center;text-align:center;flex:none;
+  background:radial-gradient(circle at 30% 25%,rgba(var(--br),.35),rgba(var(--ar),.12) 60%,transparent 70%);border:2px solid rgba(var(--br),.55);box-shadow:0 0 28px rgba(var(--ar),.25)}
+.score-ring b{font-size:2rem;font-weight:700;line-height:1;color:var(--text)}
+.score-ring span{font-size:.66rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-dim)}
+.score-main{flex:1;min-width:14rem;display:flex;flex-direction:column;gap:6px}
+.score-main strong{font-size:1.6rem;font-weight:300;font-variant-numeric:tabular-nums}
+.score-sources{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--s3)}
+.score-how ul{margin:6px 0 0;padding-left:1.2rem;display:flex;flex-direction:column;gap:4px;font-size:.84rem;line-height:1.45}

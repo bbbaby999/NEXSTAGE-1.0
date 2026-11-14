@@ -28,10 +28,10 @@ export function computeStats(games: StatGame[]) {
   };
 }
 
-export type SectionId = "stats" | "favorites" | "activity";
+export type SectionId = "stats" | "score" | "favorites" | "activity";
 export type Layout = "cinematic" | "compact" | "stats";
 export interface PageCfg { layout: Layout; order: SectionId[]; hidden: SectionId[]; accent: string | null }
-export const SECTIONS: SectionId[] = ["stats", "favorites", "activity"];
+export const SECTIONS: SectionId[] = ["stats", "score", "favorites", "activity"];
 export const DEFAULT_CFG: PageCfg = { layout: "cinematic", order: [...SECTIONS], hidden: [], accent: null };
 
 /** Lê a configuração salva com tolerância: valores inválidos voltam ao padrão, seções ausentes são acrescentadas. */

@@ -19,6 +19,30 @@ export const NOTE_LABEL: Record<NoteType, string> = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "1.1.0",
+    date: "2026-11-13",
+    summary: "Troféus de PS3 e PS Vita, pontuação e níveis no perfil, um novo visual para a página de perfil e suporte a arquivos XCI. O NEXSTAGE deixa a fase beta.",
+    sections: [
+      { type: "new", items: [
+        "Troféus de PlayStation 3 (RPCS3) e PS Vita (Vita3K): o NEXSTAGE lê os troféus gravados pelos emuladores e os exibe na página de cada jogo e na nova aba Troféus, em Conquistas, com tipo (platina, ouro, prata e bronze), descrição, data e progresso. Troféus ocultos permanecem ocultos até serem obtidos.",
+        "Aviso de troféu desbloqueado durante o jogo, com o mesmo cartão das conquistas da Steam e do RetroAchievements. A leitura é local: nenhuma conta é necessária e nada é enviado à internet.",
+        "Pontuação e níveis no perfil: cada conquista vale pontos, na escala dos troféus do PlayStation (bronze 15, prata 30, ouro 90, platina 180), somados de todas as fontes. Na Steam, o valor considera a raridade; no RetroAchievements, os pontos da conquista e o modo Hardcore; jogos 100% concluídos rendem um bônus. Os pontos sobem o nível do perfil e aparecem em cada conquista e nos avisos de desbloqueio.",
+        "Suporte a arquivos XCI (cartuchos do Nintendo Switch): reconhecidos na importação por pasta e em “Adicionar jogo”, com verificação do cabeçalho do arquivo.",
+      ] },
+      { type: "improve", items: [
+        "Tela cheia nos emuladores: a nova opção “Iniciar jogos em tela cheia”, em Emuladores → Editar, vale para todos os jogos associados. O NEXSTAGE aplica o método correto de cada emulador (PCSX2, DuckStation, RPCS3, PPSSPP, Vita3K, Ryujinx, yuzu e derivados, Lichii, xemu e Xenia), inclusive nos que não aceitam argumento de tela cheia, como o RPCS3. Argumentos de tela cheia já cadastrados foram convertidos automaticamente na nova opção.",
+        "Qualquer jogo pode ser associado a um emulador em “Editar jogo”, não apenas ISOs e ROMs importados.",
+        "Backup e restauração incluem as novas configurações: tela cheia dos emuladores, vínculos de troféus e a personalização do perfil.",
+      ] },
+      { type: "ui", items: [
+        "Nova página de perfil: cabeçalho maior com a arte do perfil, moldura do avatar e anel de nível na cor da sua faixa, vitrine de favoritos com destaque para o primeiro, atividade recente com a arte de cada jogo e uma coluna lateral com pontuação, números do perfil, conquistas recentes e as mais raras.",
+        "A aba Conquistas ganhou a opção Troféus, ao lado de RetroAchievements e Steam (no controle, L2 e R2 alternam entre as três).",
+        "O perfil ficou mais objetivo: saíram a lista de jogos recentes das estatísticas (já coberta pela atividade recente), a configuração de visibilidade das estatísticas e a nota sobre tempo de jogo.",
+        "O selo “Beta” foi removido: esta é a primeira versão estável do NEXSTAGE.",
+      ] },
+    ],
+  },
+  {
     version: "1.0.2",
     date: "2026-11-12",
     summary: "Nova central de Feedback e relatórios: envie sugestões e relate problemas direto do app.",

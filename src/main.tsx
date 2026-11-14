@@ -13,6 +13,7 @@ import "./depth.css";
 import "./ra.css";
 import "./steam.css";
 import "./stats.css";
+import "./profile.css";
 import "./controllers.css";
 import "./updates.css";
 import "./idle.css";

@@ -24,9 +24,9 @@ ok(s.topGenre === "Ação", "gênero mais jogado = Ação (15 h)");
 ok(computeStats([G("PC", ["Ação"], 0, null)]).topPlatform === null, "sem tempo registrado -> sem plataforma mais usada");
 
 const d = normalizeCfg(null);
-ok(d.layout === "cinematic" && d.order.length === 3 && d.hidden.length === 0 && d.accent === null, "configuração padrão");
+ok(d.layout === "cinematic" && d.order.length === 4 && d.hidden.length === 0 && d.accent === null, "configuração padrão");
 const c = normalizeCfg(JSON.stringify({ layout: "compact", order: ["activity", "stats"], hidden: ["favorites", "x"], accent: "#12b886" }));
-ok(c.layout === "compact" && c.order.join() === "activity,stats,favorites" && c.hidden.join() === "favorites" && c.accent === "#12b886", "ordem/ocultas/cor salvas; seção ausente acrescentada; inválidas descartadas");
+ok(c.layout === "compact" && c.order.join() === "activity,stats,score,favorites" && c.hidden.join() === "favorites" && c.accent === "#12b886", "ordem/ocultas/cor salvas; seção ausente acrescentada; inválidas descartadas");
 ok(normalizeCfg("{lixo").layout === "cinematic", "JSON inválido -> padrão");
 ok(normalizeCfg(JSON.stringify({ accent: "azul" })).accent === null, "cor inválida descartada");
 

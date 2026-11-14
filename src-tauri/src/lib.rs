@@ -8,6 +8,9 @@
 //! - `commands::*`: comandos expostos ao frontend
 
 mod commands;
+mod emu_fullscreen;
+mod trophies;
+mod score;
 mod detect;
 mod db;
 mod error;
@@ -121,6 +124,8 @@ pub fn run() {
             steam::sync::spawn(app.handle().clone());
             // Steam: aviso de conquista quase em tempo real (cartão por cima do jogo).
             steam::watch::spawn(app.handle().clone());
+            // Troféus do Vita3K/RPCS3: aviso na hora do desbloqueio (só lê os arquivos dos emuladores).
+            trophies::watch::spawn(app.handle().clone());
             // Janela da notificação de captura (oculta até a primeira captura).
             shot_toast::create(app.handle());
             // Avisos de controle conectado/desconectado e bateria baixa (mesma janela de notificação).
@@ -151,9 +156,14 @@ pub fn run() {
             emulators::save_emulator,
             emulators::delete_emulator,
             emulators::set_game_emulator,
+            emulators::emulator_fullscreen_supported,
+            trophies::game_trophies,
+            trophies::trophy_overview,
+            score::profile_score,
             scan::scan_folder,
             scan::cancel_scan,
             scan::import_scan_items,
+            scan::inspect_game_file,
             scan::list_library_folders,
             scan::remove_library_folder,
             activity::profile_activity,

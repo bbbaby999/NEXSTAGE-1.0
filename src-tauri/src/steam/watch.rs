@@ -167,6 +167,7 @@ fn notify(app: &AppHandle, profile: i64, fresh: &[store::AchEntry]) {
             rare: crate::shot_toast::steam_is_rare(a.global_pct),
             global_pct: a.global_pct,
             more: 0,
+            grade: None,
         })
         .collect();
     crate::shot_toast::notify_achievements(app, toasts, fresh.len().saturating_sub(5));

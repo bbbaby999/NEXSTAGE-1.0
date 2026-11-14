@@ -14,15 +14,17 @@ import { useInputDevice } from "../lib/inputDevice";
 import Glyph from "../components/Glyph";
 import { t, tk } from "../lib/i18n";
 import SteamAchievements from "./SteamAchievements";
+import TrophyAchievements from "./TrophyAchievements";
 import type { RaAchievement, RaEmuSupport, RaOverview } from "../types";
 
-type Source = "ra" | "steam";
+type Source = "ra" | "steam" | "trophies";
+const SOURCES: Source[] = ["ra", "steam", "trophies"];
 const SOURCE_KEY = "nexstage.achievementsSource";
-const readSource = (): Source | null => { try { const v = localStorage.getItem(SOURCE_KEY); return v === "ra" || v === "steam" ? v : null; } catch { return null; } };
+const readSource = (): Source | null => { try { const v = localStorage.getItem(SOURCE_KEY); return SOURCES.includes(v as Source) ? (v as Source) : null; } catch { return null; } };
 const saveSource = (v: Source) => { try { localStorage.setItem(SOURCE_KEY, v); } catch { /* sem armazenamento: só não lembra */ } };
 
 /**
- * Aba Conquistas: RetroAchievements ou Steam (seletor no topo). Sem escolha salva, abre na fonte que
+ * Aba Conquistas: RetroAchievements, Steam ou Troféus do Vita3K/RPCS3 (seletor no topo). Sem escolha salva, abre na fonte que
  * tem conta conectada (RetroAchievements primeiro).
  */
 export default function Achievements() {
@@ -31,13 +33,18 @@ export default function Achievements() {
   const [source, setSource] = useState<Source | null>(readSource);
   const device = useInputDevice();
   const pick = useCallback((v: Source) => { setSource(v); saveSource(v); }, []);
-  // Controle: L2 = RetroAchievements, R2 = Steam (só sem janela/lista/menu por cima, como na página do jogo)
+  // Controle: L2/R2 = fonte anterior/seguinte (só sem janela/lista/menu por cima, como na página do jogo)
   useEffect(() => onPadButton((b, e) => {
     if (e.defaultPrevented || (b !== "l2" && b !== "r2")) return;
     if (document.querySelector(".overlay, .pick-root, .kb-root, .sm-root:not(.leaving), .ctx-root")) return;
     e.preventDefault();
-    pick(b === "r2" ? "steam" : "ra");
-  }), [pick]);
+    setSource((cur) => {
+      const i = SOURCES.indexOf(cur ?? "ra");
+      const next = SOURCES[Math.max(0, Math.min(SOURCES.length - 1, i + (b === "r2" ? 1 : -1)))];
+      saveSource(next);
+      return next;
+    });
+  }), []);
   useEffect(() => {
     if (source) return;
     Promise.all([api.raGetAccount(p.id).catch(() => null), api.steamGetAccount(p.id).catch(() => null)])
@@ -50,11 +57,14 @@ export default function Achievements() {
         {device !== "keyboard" && <Glyph k="l2" />}RetroAchievements
       </button>
       <button type="button" role="tab" aria-selected={source === "steam"} data-focus className={source === "steam" ? "on" : ""} onClick={() => pick("steam")}>
-        Steam{device !== "keyboard" && <Glyph k="r2" />}
+        Steam
+      </button>
+      <button type="button" role="tab" aria-selected={source === "trophies"} data-focus className={source === "trophies" ? "on" : ""} onClick={() => pick("trophies")}>
+        {t("Troféus")}{device !== "keyboard" && <Glyph k="r2" />}
       </button>
     </div>
   );
-  return source === "steam" ? <SteamAchievements switcher={switcher} /> : <RaAchievements switcher={switcher} />;
+  return source === "steam" ? <SteamAchievements switcher={switcher} /> : source === "trophies" ? <TrophyAchievements switcher={switcher} /> : <RaAchievements switcher={switcher} />;
 }
 
 type Tab = "overview" | "recent" | "earned" | "pending" | "hardcore";

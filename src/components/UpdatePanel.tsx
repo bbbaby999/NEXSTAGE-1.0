@@ -3,7 +3,6 @@ import { getVersion } from "@tauri-apps/api/app";
 import { check, Update } from "@tauri-apps/plugin-updater";
 import Button from "./Button";
 import { api, errMsg } from "../lib/api";
-import { CHANNEL } from "../lib/version";
 import { idleBusy } from "../lib/idle";
 import { t } from "../lib/i18n";
 
@@ -57,7 +56,7 @@ export default function UpdatePanel() {
     <div className="settings">
       <div className="setting">
         <div>
-          <strong>{t("Versão instalada:")}{" "}{version ? `${CHANNEL} ${version}` : "…"}</strong>
+          <strong>{t("Versão instalada:")}{" "}{version || "…"}</strong>
           <small>
             {state === "idle" && t("Clique em Verificar para procurar uma versão nova.")}
             {state === "checking" && t("Verificando…")}

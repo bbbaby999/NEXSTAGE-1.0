@@ -9,6 +9,7 @@ import { TrophyIcon } from "../components/RaUnlockToasts";
 import { pct, raAgo, raDate } from "../lib/ra";
 import { useSteamEvents } from "../lib/steam";
 import { t, tk } from "../lib/i18n";
+import { steamValue } from "../lib/score";
 import type { SteamAch, SteamAchEntry, SteamAchGame, SteamAchOverview, SteamGameData } from "../types";
 
 type Tab = "overview" | "recent" | "earned" | "pending" | "rare";
@@ -31,6 +32,7 @@ function SteamAchItem({ a, gameName, onOpenGame }: { a: SteamAch; gameName?: str
         <small>
           {gameName && <>{gameName} · </>}
           {done ? (a.unlockedAt ? t("Obtida em {d}", { d: raDate(a.unlockedAt) }) : t("Obtida")) : t("Pendente")}
+          {" · "}<i className="ns-score" title={t("Pontuação de conquistas")}>+{steamValue(a.globalPct)}</i>
         </small>
       </div>
       {a.globalPct !== null && (

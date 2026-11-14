@@ -7,6 +7,7 @@ import { pct, raDate } from "../lib/ra";
 import { formatBytes } from "../lib/format";
 import { useSession } from "../state/session";
 import { t } from "../lib/i18n";
+import { steamValue } from "../lib/score";
 import type { Game, SteamAppStatus, SteamGameData } from "../types";
 
 /**
@@ -82,6 +83,7 @@ export default function SteamGamePanel({ game, status, onInstall, onChanged }: {
                       <small>
                         {done ? (a.unlockedAt ? t("Obtida em {d}", { d: raDate(a.unlockedAt) }) : t("Obtida")) : t("Pendente")}
                         {a.globalPct !== null && <> · {t("{p}% dos jogadores", { p: a.globalPct.toFixed(1) })}</>}
+                        {" · "}<i className="ns-score" title={t("Pontuação de conquistas")}>+{steamValue(a.globalPct)}</i>
                       </small>
                     </div>
                   </div>

@@ -180,6 +180,14 @@ CREATE TABLE IF NOT EXISTS emulators (
     formats     TEXT NOT NULL DEFAULT '[]',
     args        TEXT NOT NULL DEFAULT '',
     cover       TEXT,
+    fullscreen  INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Troféus (Vita3K/RPCS3): conjunto aprendido para um jogo (o que mudou enquanto ele rodava pelo NEXSTAGE).
+CREATE TABLE IF NOT EXISTS trophy_links (
+    game_id     INTEGER PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
+    comm_id     TEXT NOT NULL,
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -231,6 +239,29 @@ fn migrate(conn: &Connection) -> AppResult<()> {
     }
     if !has_column(conn, "emulators", "cover")? {
         conn.execute_batch("ALTER TABLE emulators ADD COLUMN cover TEXT;")?;
+    }
+    // Opção "Iniciar jogos em tela cheia": quem já tinha o argumento de tela cheia escrito nos argumentos
+    // passa a ter a caixa marcada, e o argumento sai do texto (a caixa é quem aplica, no método de cada emulador).
+    if !has_column(conn, "emulators", "fullscreen")? {
+        conn.execute_batch("ALTER TABLE emulators ADD COLUMN fullscreen INTEGER NOT NULL DEFAULT 0;")?;
+        let rows: Vec<(i64, String, String, String)> = {
+            let mut st = conn.prepare("SELECT id,name,exe_path,args FROM emulators")?;
+            let r = st.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?.collect::<Result<_, _>>()?;
+            r
+        };
+        for (id, name, exe, args) in rows {
+            let Some(kind) = crate::emu_fullscreen::detect(&name, &exe) else { continue };
+            let stripped = crate::emu_fullscreen::strip_text(kind, &args);
+            if let Some(on) = crate::emu_fullscreen::config_fullscreen(kind, std::path::Path::new(&exe)) {
+                // tela cheia pela configuração do emulador (RPCS3): a caixa nasce com o estado atual dela
+                conn.execute("UPDATE emulators SET fullscreen=?1 WHERE id=?2", rusqlite::params![on, id])?;
+            } else if stripped != args.trim() {
+                // havia argumento de modo: tela cheia, a menos que fosse o de janela
+                let l = args.to_lowercase();
+                let on = !l.contains("nofullscreen") && !l.contains("--windowed") && !l.contains("fullscreen=false");
+                conn.execute("UPDATE emulators SET args=?1, fullscreen=?2 WHERE id=?3", rusqlite::params![stripped, on, id])?;
+            }
+        }
     }
     // RetroAchievements: a conta usa a tabela reservada `platform_accounts` (uma por perfil), com a chave
     // cifrada (DPAPI), o último perfil sincronizado e o estado da sincronização.
@@ -334,14 +365,22 @@ mod tests {
                 "CREATE TABLE emulators (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, exe_path TEXT NOT NULL,
                    platforms TEXT NOT NULL DEFAULT '[]', formats TEXT NOT NULL DEFAULT '[]', args TEXT NOT NULL DEFAULT '',
                    created_at TEXT NOT NULL DEFAULT (datetime('now')));
-                 INSERT INTO emulators(name, exe_path) VALUES('PCSX2', 'C:/pcsx2.exe');",
+                 INSERT INTO emulators(name, exe_path, args) VALUES('PCSX2', 'C:/pcsx2.exe', '-batch -fullscreen -- \"{rom}\"');
+                 INSERT INTO emulators(name, exe_path, args) VALUES('Meu emu', 'C:/x.exe', '-fullscreen');",
             )
             .unwrap();
         }
         let db = Db::open(&p).unwrap();
         let conn = db.conn().unwrap();
         assert!(has_column(&conn, "emulators", "cover").unwrap());
-        let name: String = conn.query_row("SELECT name FROM emulators", [], |r| r.get(0)).unwrap();
+        let (name, args, full): (String, String, bool) =
+            conn.query_row("SELECT name,args,fullscreen FROM emulators WHERE id=1", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap();
         assert_eq!(name, "PCSX2");
+        // argumento de tela cheia escrito à mão vira a caixa marcada (e sai do texto)
+        assert_eq!(args, r#"-batch -- "{rom}""#);
+        assert!(full);
+        // emulador não reconhecido: argumentos intactos
+        let (args, full): (String, bool) = conn.query_row("SELECT args,fullscreen FROM emulators WHERE id=2", [], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+        assert_eq!((args.as_str(), full), ("-fullscreen", false));
     }
 }

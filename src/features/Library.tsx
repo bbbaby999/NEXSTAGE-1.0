@@ -6,12 +6,10 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useSession } from "../state/session";
 import { useLibrary } from "../state/useLibrary";
 import { api, errMsg } from "../lib/api";
-import { isIsoPath } from "../lib/iso";
 import { availableGenres, canonGenres, matchesGenre } from "../lib/genres";
 import Button from "../components/Button";
 import GameCard from "../components/GameCard";
 import GameForm from "../components/GameForm";
-import FolderImport from "../components/FolderImport";
 import FoldersPanel from "../components/FoldersPanel";
 import SteamImport from "../components/SteamImport";
 import Seg from "../components/Seg";
@@ -34,6 +32,11 @@ const DIR_LABEL: Record<SortKey, Record<Dir, string>> = {
   genre: { asc: tk("A → Z"), desc: tk("Z → A") },
   platform: { asc: tk("PC → Nintendinho"), desc: tk("Nintendinho → PC") },
 };
+/** Formatos do "Adicionar jogo": executáveis (jogo de PC) e arquivos iniciados por emulador. */
+const EXE_EXTS = ["exe", "bat", "cmd"];
+const FILE_EXTS = ["iso", "bin", "cue", "nsp", "xci", "nup", "pkg", "vpk"];
+type NewGame = { exePath?: string; isoPath?: string; platform?: string | null; emulatorId?: number | null };
+
 const byTitle = (a: Game, b: Game) => a.title.localeCompare(b.title, "pt");
 /** Posição na lista oficial de plataformas; valores antigos (ex.: RetroArch) ficam no fim. */
 const platRank = (p: string) => { const i = PLATFORMS.indexOf(p); return i < 0 ? 1000 : i; };
@@ -72,9 +75,7 @@ export default function Library() {
   const p = profile!;
   const { games, loading, reload } = useLibrary(p.id);
   const [q, setQ] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [isoPath, setIsoPath] = useState<string | null>(null);
-  const [scan, setScan] = useState<string | null>(null);
+  const [newGame, setNewGame] = useState<NewGame | null>(null);
   const [panel, setPanel] = useState(false);
   const [steamImport, setSteamImport] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; dir: Dir }>({ key: "title", dir: "asc" });
@@ -192,21 +193,25 @@ export default function Library() {
   const toClassify = games.filter((g) => g.platform === "PC" && (g.genres ?? []).length === 0);
   const needsData = (sort.key === "release" && games.some((g) => !g.releaseIso)) || (sort.key === "genre" && games.some((g) => !primaryGenre(g)));
 
-  /** Seletor de arquivos do Windows; o ISO só é referenciado (não é copiado, movido nem aberto). */
-  /** Escolhe a pasta pelo seletor do Windows e inicia a varredura (somente leitura). */
-  async function addFolder() {
+  /** "Adicionar jogo": seletor do Windows com todos os formatos reconhecidos. O arquivo é identificado pela
+   *  mesma detecção da varredura de pastas (plataforma, emulador compatível, duplicidade) e só referenciado
+   *  (nunca copiado, movido ou aberto). Executável → jogo de PC; demais → arquivo iniciado por emulador. */
+  async function addGame() {
     try {
-      const sel = await open({ directory: true, multiple: false, title: t("Escolha a pasta de jogos") });
-      if (typeof sel === "string") setScan(sel);
-    } catch (e) { toast(errMsg(e), "err"); }
-  }
-
-  async function importIso() {
-    try {
-      const sel = await open({ multiple: false, directory: false, filters: [{ name: t("Imagem de disco (ISO)"), extensions: ["iso"] }] });
+      const sel = await open({ multiple: false, directory: false, title: t("Escolha o jogo"), filters: [
+        { name: t("Jogos (todos os formatos)"), extensions: [...EXE_EXTS, ...FILE_EXTS] },
+        { name: t("Executáveis"), extensions: EXE_EXTS },
+        { name: t("Imagens de disco (ISO, BIN, CUE)"), extensions: ["iso", "bin", "cue"] },
+        { name: "Nintendo Switch (NSP, XCI, NUP)", extensions: ["nsp", "xci", "nup"] },
+        { name: t("Pacotes de PS3/PS4 e PS Vita (PKG, VPK)"), extensions: ["pkg", "vpk"] },
+      ] });
       if (typeof sel !== "string") return;
-      if (!isIsoPath(sel)) { toast(t("Selecione um arquivo com extensão .iso."), "err"); return; }
-      setIsoPath(sel);
+      const it = await api.inspectGameFile(p.id, sel);
+      if (it.status === "duplicate") { toast(t("Este jogo já está na sua biblioteca."), "err"); return; }
+      if (it.status === "invalid") { toast(t(it.note), "err"); return; }
+      if (it.kind === "windows") { setNewGame({ exePath: sel }); return; }
+      if (it.kind === "pkg" || it.kind === "vpk") toast(t("Pacotes .pkg e .vpk precisam ser instalados no emulador antes de jogar."));
+      setNewGame({ isoPath: sel, platform: it.platform, emulatorId: it.assigned });
     } catch (e) { toast(errMsg(e), "err"); }
   }
 
@@ -233,11 +238,9 @@ export default function Library() {
         <h1>{t("Biblioteca")}</h1>
         <div className="row">
           <input className="search" placeholder={t("Buscar por título")} value={q} onChange={(e) => setQ(e.target.value)} />
-          <Button onClick={addFolder}>{t("Adicionar pasta de jogos")}</Button>
           <Button onClick={() => setPanel(true)}>{t("Pastas de jogos")}</Button>
-          <Button onClick={importIso}>{t("Importar ISO")}</Button>
           <Button onClick={() => setSteamImport(true)}>{t("Importar da Steam")}</Button>
-          <Button variant="primary" onClick={() => setAdding(true)}>{t("Adicionar jogo")}</Button>
+          <Button variant="primary" onClick={addGame}>{t("Adicionar jogo")}</Button>
         </div>
       </div>
 
@@ -289,7 +292,7 @@ export default function Library() {
       {games.length === 0 ? (
         <div className="empty">
           <p>{t("Nenhum jogo ainda. Adicione o executável de um jogo ou de um emulador.")}</p>
-          <Button variant="primary" onClick={() => setAdding(true)}>{t("Adicionar jogo")}</Button>
+          <Button variant="primary" onClick={addGame}>{t("Adicionar jogo")}</Button>
         </div>
       ) : list.length === 0 ? (
         <div className="empty">
@@ -314,11 +317,9 @@ export default function Library() {
         )
       )}
 
-      {scan && <FolderImport profileId={p.id} folder={scan} folderId={null} onClose={() => setScan(null)} onImported={reload} />}
       {steamImport && <SteamImport onClose={() => setSteamImport(false)} onImported={reload} />}
       {panel && <FoldersPanel profileId={p.id} onClose={() => setPanel(false)} onChanged={reload} />}
-      {isoPath && <GameForm profileId={p.id} isoPath={isoPath} onClose={() => setIsoPath(null)} onSaved={() => { setIsoPath(null); reload(); }} />}
-      {adding && <GameForm profileId={p.id} onClose={() => setAdding(false)} onSaved={() => { setAdding(false); reload(); }} />}
+      {newGame && <GameForm profileId={p.id} {...newGame} onClose={() => setNewGame(null)} onSaved={() => { setNewGame(null); reload(); }} />}
     </>
   );
 }

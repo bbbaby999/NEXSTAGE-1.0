@@ -251,6 +251,7 @@ fn notify(app: &AppHandle, profile_id: i64, items: &[NewUnlock]) {
             rare: crate::shot_toast::ra_is_rare(r.points, r.true_ratio),
             global_pct: None,
             more: 0,
+            grade: None,
         })
         .collect();
     let extra = rows.len().saturating_sub(5);

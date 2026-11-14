@@ -12,8 +12,8 @@ import EmulatorCover from "../components/EmulatorCover";
 import type { Emulator } from "../types";
 import { t } from "../lib/i18n";
 
-type Draft = { id?: number; name: string; exePath: string; platforms: string[]; formats: string[]; args: string; cover: string | null };
-const EMPTY: Draft = { name: "", exePath: "", platforms: [], formats: [], args: "", cover: null };
+type Draft = { id?: number; name: string; exePath: string; platforms: string[]; formats: string[]; args: string; cover: string | null; fullscreen: boolean };
+const EMPTY: Draft = { name: "", exePath: "", platforms: [], formats: [], args: "", cover: null, fullscreen: false };
 
 /** Emuladores cadastrados. A importação por pasta e o "Editar jogo" usam esta lista. */
 export default function Emulators() {
@@ -22,6 +22,15 @@ export default function Emulators() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [note, setNote] = useState<string | undefined>();
   const [confirm, setConfirm] = useState<number | null>(null);
+  // O NEXSTAGE reconhece o emulador do formulário (nome/executável) e sabe aplicar a tela cheia?
+  const [fsOk, setFsOk] = useState(true);
+  const dName = draft?.name ?? "", dExe = draft?.exePath ?? "";
+  useEffect(() => {
+    if (!dName && !dExe) { setFsOk(true); return; }
+    let alive = true;
+    api.emulatorFullscreenSupported(dName, dExe).then((v) => { if (alive) setFsOk(v); }).catch(() => {});
+    return () => { alive = false; };
+  }, [dName, dExe]);
 
   const load = useCallback(() => api.listEmulators().then(setList).catch((e) => toast(errMsg(e), "err")), [toast]);
   useEffect(() => { load(); }, [load]);
@@ -59,8 +68,9 @@ export default function Emulators() {
               <p className="path">{e.exePath}{!e.exeExists && <b className="warn"> {t("· executável não encontrado")}</b>}</p>
               <div className="chips">{e.platforms.map((p) => <span key={p}>{p}</span>)}{e.formats.map((f) => <span key={f} className="fmt">.{f}</span>)}</div>
               {e.args && <p className="muted path">{t("Argumentos:")}{" "}{e.args}</p>}
+              {e.fullscreen && <p className="muted">{t("Inicia os jogos em tela cheia")}</p>}
               <div className="row">
-                <Button onClick={() => { setDraft({ id: e.id, name: e.name, exePath: e.exePath, platforms: e.platforms, formats: e.formats, args: e.args, cover: e.cover }); setNote(undefined); }}>{t("Editar")}</Button>
+                <Button onClick={() => { setDraft({ id: e.id, name: e.name, exePath: e.exePath, platforms: e.platforms, formats: e.formats, args: e.args, cover: e.cover, fullscreen: e.fullscreen }); setNote(undefined); }}>{t("Editar")}</Button>
                 {confirm === e.id ? (
                   <Button variant="danger" onClick={async () => {
                     try { await api.deleteEmulator(e.id); setConfirm(null); toast(t("Emulador removido. Os jogos foram mantidos, sem associação.")); load(); }
@@ -87,7 +97,7 @@ export default function Emulators() {
             {!draft.id && (
               <label>{t("Começar por uma sugestão")}<Select<string> value="" width="100%" title={t("Sugestões de emuladores")} onChange={(v) => {
                   const p = EMULATOR_PRESETS.find((x) => x.name === v);
-                  if (p) { setDraft({ ...draft, name: t(p.name), platforms: p.platforms, formats: p.formats, args: p.args }); setNote(p.note ? t(p.note) : p.note); }
+                  if (p) { setDraft({ ...draft, name: t(p.name), platforms: p.platforms, formats: p.formats, args: p.args, fullscreen: p.fullscreen }); setNote(p.note ? t(p.note) : p.note); }
                 }} options={[[t("Personalizado (preencher à mão)"), ""], ...EMULATOR_PRESETS.map((p): [string, string] => [t(p.name), p.name])]} />
               </label>
             )}
@@ -105,6 +115,11 @@ export default function Emulators() {
               ))}</div></div>
             <label>{t("Argumentos de inicialização")}<input value={draft.args} placeholder={t("Use {rom} para o caminho do jogo. Ex.: -fullscreen \"{rom}\"")} onChange={(e) => setDraft({ ...draft, args: e.target.value })} />
             </label>
+            <label className="ra-check"><input type="checkbox" checked={draft.fullscreen && fsOk} disabled={!fsOk} data-focus
+                onChange={(e) => setDraft({ ...draft, fullscreen: e.target.checked })} /> {t("Iniciar jogos em tela cheia")}</label>
+            <p className="muted note">{fsOk
+              ? t("Vale para todos os jogos associados a este emulador. O NEXSTAGE usa o método que este emulador entende (argumento ou configuração do próprio emulador); argumentos de tela cheia escritos à mão são substituídos.")
+              : t("Emulador não reconhecido: o NEXSTAGE não sabe como abri-lo em tela cheia. Escreva o argumento de tela cheia dele nos argumentos acima.")}</p>
             <p className="muted note">{t("Sugestões de argumentos variam por versão: confira a documentação do emulador. Você pode substituir os argumentos de um jogo específico em “Editar jogo”.")}</p>
           </div>
           </div>

@@ -124,6 +124,8 @@ pub struct AchievementToast {
     pub global_pct: Option<f64>,
     /// Quantas outras conquistas chegaram junto (mostrado no último cartão).
     pub more: usize,
+    /// Troféus (Vita3K/RPCS3): "P" platina, "G" ouro, "S" prata, "B" bronze.
+    pub grade: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -264,6 +266,7 @@ pub fn preview_achievement_toast(app: AppHandle, rare: bool, title: String, game
         rare,
         global_pct: Some(if rare { 2.7 } else { 58.0 }),
         more: 0,
+        grade: None,
     };
     push(&app, Queued::Ach(item));
 }
