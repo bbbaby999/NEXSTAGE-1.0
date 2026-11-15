@@ -245,11 +245,16 @@ impl Rawg {
         }
         Ok(self.get("/games", &q).await?.and_then(|v| v["results"].as_array().cloned()).unwrap_or_default())
     }
-    /// Candidatos: busca exata e precisa (filtradas pela plataforma) + o slug exato do título.
+    /// Candidatos: busca exata e precisa (filtradas pela plataforma), busca precisa SEM o filtro de plataforma
+    /// (o RAWG nem sempre lista o jogo na plataforma certa — filtrado, devolve parecidos sem relação) e o slug
+    /// exato do título. Quem chama descarta os que não se parecem com o nome pesquisado.
     async fn candidates(&self, term: &str, slug: Option<&str>) -> AppResult<Vec<Candidate>> {
         let mut raw = self.search(term, slug, true).await?;
         if raw.len() < 3 {
             raw.extend(self.search(term, slug, false).await?);
+        }
+        if slug.is_some() {
+            raw.extend(self.search(term, None, false).await?);
         }
         if let Some(g) = self.get(&format!("/games/{}", slugify(term)), &[]).await? {
             raw.push(g);
@@ -265,6 +270,9 @@ impl Rawg {
         Ok(out)
     }
 }
+
+/// Semelhança mínima de nome para um candidato aparecer (abaixo disso a pontuação já é zero).
+const MIN_NAME: f64 = 0.5;
 
 /// Busca/atualiza a nota. `rawg_id` = escolha do usuário entre os candidatos; `reidentify` ignora o
 /// jogo já confirmado (para corrigir uma identificação).
@@ -303,7 +311,9 @@ pub async fn fetch_metacritic(
         let id = match rawg_id.or(known) {
             Some(id) => id,
             None => {
-                let cands = rawg.candidates(&term, slug).await?;
+                let mut cands = rawg.candidates(&term, slug).await?;
+                // só nomes parecidos com o pesquisado (mesmo corte da pontuação): nada de lista sem relação
+                cands.retain(|c| crate::commands::info::name_score(&term, &c.name) >= MIN_NAME);
                 let year = stored.release_date.as_deref().and_then(crate::commands::games::parse_release).as_deref().and_then(year_of);
                 match pick_confident(&term, &cands, year) {
                     Some(id) => id,

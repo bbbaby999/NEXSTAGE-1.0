@@ -19,6 +19,37 @@ export const NOTE_LABEL: Record<NoteType, string> = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "1.2.0",
+    date: "2026-11-14",
+    summary: "Integração com o Xbox e a Microsoft Store, a nova página Zerei! para registrar os jogos que você zerou, logos dos jogos e uma página do jogo redesenhada.",
+    sections: [
+      { type: "new", items: [
+        "Jogos do Xbox / Microsoft Store (Game Pass): importe de uma vez os jogos do app Xbox instalados neste PC (Biblioteca → Importar → Xbox) ou adicione o atalho criado pelo app Xbox. Eles abrem pelo Windows e o NEXSTAGE registra o tempo de jogo. Não precisa de conta.",
+        "Conta Xbox (Configurações → Contas e plataformas): gamerscore, histórico de jogos, tempo de jogo e conquistas do Xbox na página de cada jogo, com sincronização automática opcional. O login acontece no site oficial da Microsoft: o NEXSTAGE nunca vê sua senha, a sessão fica cifrada pelo Windows e o acesso é somente leitura.",
+        "Aviso de conquista do Xbox durante o jogo: com um jogo do Xbox aberto, as conquistas novas aparecem no cartão por cima do jogo, com som.",
+        "Zerei!: uma página para acompanhar os jogos que você zerou, está jogando, pausou ou quer jogar, mesmo que não estejam na biblioteca. Pesquise pelo nome e registre datas de início e de conclusão, horas, tipo de conclusão (zerado ou platinado), nota, dificuldade e comentários. Zerou de novo? Cada nova conclusão ganha o próprio registro.",
+        "Estatísticas do Zerei!: jogos zerados, média das avaliações, zerados por plataforma, conclusões por ano e histórico, com filtros por nome, ano e nota.",
+        "Importação e exportação do Zerei! em CSV, sem duplicar registros já existentes.",
+        "“Marcar como zerado” na página do jogo inclui o jogo no Zerei!.",
+        "Logos dos jogos: escolha a logo de cada jogo no SteamGridDB (em “Editar jogo”). Ela substitui o título escrito na Home, na página do jogo e na tela de descanso.",
+        "Logos automáticas (opcional): jogos sem logo recebem a primeira logo encontrada no SteamGridDB, inclusive os adicionados depois. A sua escolha nunca é substituída.",
+        "Trazer o NEXSTAGE para frente pelo controle: segure Select + LB (configurável em Configurações → Controles e atalhos) por 0,7 s em qualquer janela, inclusive dentro do jogo, e o NEXSTAGE volta em tela cheia. No teclado, Alt+Enter alterna entre tela cheia e janela.",
+      ] },
+      { type: "improve", items: [
+        "Analógico direito: na vertical rola a página; na horizontal rola os carrosséis.",
+        "Editor de enquadramento de imagens funciona com o controle: o direcional move a imagem, L1/L2 e R1/R2 ajustam o zoom.",
+        "Pesquisa de imagens em duas etapas: escolha o jogo e depois as capas, logos e artes. Foto de perfil, banner e fundo da Home também podem ser pesquisados na internet.",
+        "Metacritic: resultados mais precisos e opção de trocar o nome e pesquisar de novo.",
+        "Fundos muito largos (como as artes da Steam) não são mais ampliados e cortados: aparecem na largura total, completados por uma cópia desfocada.",
+      ] },
+      { type: "ui", items: [
+        "Nova página do jogo: cabeçalho com a arte de fundo e a logo, selos de plataforma e gêneros no canto, botão Jogar em destaque e as opções (Zerado, Capturas, Coleções, Editar, Remover) reunidas em “Mais opções”, também pelo botão Menu/Options do controle.",
+        "Home: o jogo mais recente fica em destaque, seguido dos carrosséis Favoritos e “Volte a jogar”.",
+        "Remover um jogo da biblioteca pede confirmação.",
+      ] },
+    ],
+  },
+  {
     version: "1.1.0",
     date: "2026-11-13",
     summary: "Troféus de PS3 e PS Vita, pontuação e níveis no perfil, um novo visual para a página de perfil e suporte a arquivos XCI. O NEXSTAGE deixa a fase beta.",

@@ -143,7 +143,6 @@ input:focus,select:focus,textarea:focus{box-shadow:0 0 0 2px rgba(var(--br),.45)
 .bg-layer{will-change:opacity;transform:translate3d(calc(var(--px,0)*-14px),calc(var(--py,0)*-9px),0) scale(1.05);transition:transform .7s var(--ease)}
 .bg-layer.soft{transform:translate3d(calc(var(--px,0)*-14px),calc(var(--py,0)*-9px),0) scale(1.18)}
 .dp-hero-img{transform:translate3d(calc(var(--px,0)*-10px),calc(var(--py,0)*-6px),0) scale(1.04);transition:transform .7s var(--ease)}
-.dp-hero{border-radius:var(--r-xl);box-shadow:var(--elev-3)}
 
 /* ---------- 7. Carregamento (esqueleto) ---------- */
 .sk-card{display:flex;flex-direction:column;gap:var(--s3)}
@@ -315,6 +314,14 @@ html[data-motion="reduced"] .bg-layer,html[data-motion="reduced"] .dp-hero-img{t
 .crop-view canvas{display:block}
 .crop-tools{display:flex;flex-direction:column;gap:var(--s3);align-items:flex-start;width:100%}
 .crop-tools .row span:first-child{min-width:3.6rem;color:var(--text-dim)}
+/* janela do enquadramento: sempre cabe na tela (a prévia já é calculada para caber); prévia selecionável pelo controle */
+.modal.crop-modal{width:min(920px,100%);max-height:94vh;display:flex;flex-direction:column;overflow-y:auto}
+.crop-modal .crop{flex:1;min-height:0}
+.crop-view{max-width:100%;outline:none;transition:box-shadow var(--dur-fast,.15s)}
+.crop-view:focus-visible,.crop-view:focus{box-shadow:0 0 0 2px var(--b),0 0 26px rgba(var(--br),.45),var(--elev-2)}
+.crop-hint{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5);margin:0;color:var(--text-dim);font-size:.86rem}
+.crop-hint span{display:inline-flex;align-items:center;gap:6px}
+.crop-hint .glyph{margin:0}
 
 /* ---------- Biblioteca: grupos por plataforma ---------- */
 .plat-group{margin-bottom:var(--s5)}

@@ -440,6 +440,14 @@ pub async fn igdb_fetch(db: State<'_, Db>, profile_id: i64, game_id: i64, term: 
     Ok(IgdbResult { status: "found".into(), info: stored, candidates: vec![] })
 }
 
+/// Pesquisa livre por nome (página Zerei): sem filtro de plataforma e sem gravar nada.
+pub async fn search_titles(creds: &Creds, term: &str, limit: u32) -> AppResult<Vec<Candidate>> {
+    let esc = term.replace('"', "");
+    let q = format!("search \"{esc}\"; fields name,first_release_date,platforms.name,platforms.id,cover.image_id; limit {limit};");
+    let v = query_fallback(creds, "games", &q, &q).await?;
+    Ok(v.as_array().into_iter().flatten().filter_map(|g| parse_candidate(g, None, None)).collect())
+}
+
 /// Usa uma imagem do IGDB como capa ou fundo do jogo — só por ação explícita do usuário.
 #[tauri::command]
 pub fn igdb_apply_image(db: State<Db>, profile_id: i64, game_id: i64, kind: String, url: String) -> AppResult<()> {

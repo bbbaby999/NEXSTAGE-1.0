@@ -2,7 +2,7 @@
  * Estado de sessão em memória. Nada aqui é persistido: ao abrir o app a seleção
  * de perfil é sempre exibida (ASK) e "Trocar usuário" limpa a sessão (EXIT).
  */
-import { createContext, ReactNode, useCallback, useContext, useRef, useState } from "react";
+import { Context, createContext, ReactNode, useCallback, useContext, useRef, useState } from "react";
 import type { Profile, StatsTab, View } from "../types";
 import { api } from "../lib/api";
 
@@ -34,7 +34,11 @@ interface Ctx {
 /** Página de origem de uma página interna (ex.: Configurações → Central de Controles). */
 export interface ReturnTo { view: View; focus?: string }
 
-const SessionCtx = createContext<Ctx | null>(null);
+// O recarregamento automático do Vite (modo dev) pode reavaliar este módulo: o contexto precisa continuar
+// sendo o MESMO objeto, senão os componentes recarregados leem um contexto sem Provider e a tela trava
+// ("useSession fora do SessionProvider"). No app instalado o módulo roda uma vez só.
+const globalCtx = globalThis as { __nxSessionCtx?: Context<Ctx | null> };
+const SessionCtx = globalCtx.__nxSessionCtx ?? (globalCtx.__nxSessionCtx = createContext<Ctx | null>(null));
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [profile, setProfileState] = useState<Profile | null>(null);

@@ -88,7 +88,7 @@ fn net(e: reqwest::Error) -> AppError {
     AppError::Other(format!("Falha de rede ao pesquisar imagens: {}", e.without_url()))
 }
 
-fn client() -> AppResult<reqwest::Client> {
+pub(crate) fn client() -> AppResult<reqwest::Client> {
     reqwest::Client::builder().timeout(Duration::from_secs(20)).user_agent(UA).build().map_err(net)
 }
 
@@ -109,7 +109,7 @@ async fn all<T: Send + 'static>(futs: Vec<std::pin::Pin<Box<dyn Future<Output = 
 }
 
 /// Codifica um segmento de caminho de URL (espaço = %20).
-fn penc(s: &str) -> String {
+pub(crate) fn penc(s: &str) -> String {
     s.bytes()
         .map(|b| match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
@@ -549,7 +549,7 @@ async fn sgdb_first_grid(c: &reqwest::Client, key: &str, id: i64) -> Option<Stri
     v["data"].as_array()?.first()?["thumb"].as_str().map(String::from)
 }
 
-async fn sgdb_search(c: reqwest::Client, key: String, term: String) -> Vec<GameHit> {
+pub(crate) async fn sgdb_search(c: reqwest::Client, key: String, term: String) -> Vec<GameHit> {
     let Some(v) = get_json(sgdb(&c, &key, &format!("/search/autocomplete/{}", penc(&term)))).await else { return vec![] };
     let games: Vec<(i64, String, Option<i32>)> = v["data"]
         .as_array()
@@ -574,6 +574,23 @@ async fn sgdb_search(c: reqwest::Client, key: String, term: String) -> Vec<GameH
         })
         .collect();
     all(futs).await
+}
+
+/// Logo automática: a primeira logo do primeiro jogo da pesquisa do SteamGridDB (a mesma ordem do
+/// seletor de logos). `Ok(None)` = sem jogo ou sem logo; `Err` = falha de rede/limite (tentar depois).
+pub(crate) async fn sgdb_first_logo(c: &reqwest::Client, key: &str, term: &str) -> Result<Option<String>, ()> {
+    let fetch = |path: String| async move {
+        let r = sgdb(c, key, &path).send().await.map_err(|_| ())?;
+        match r.status().as_u16() {
+            200..=299 => r.json::<Value>().await.map_err(|_| ()),
+            404 => Ok(Value::Null),
+            _ => Err(()),
+        }
+    };
+    let v = fetch(format!("/search/autocomplete/{}", penc(term.trim()))).await?;
+    let Some(id) = v["data"].as_array().and_then(|a| a.first()).and_then(|g| g["id"].as_i64()) else { return Ok(None) };
+    let v = fetch(format!("/logos/game/{id}?types=static&nsfw=false&humor=false")).await?;
+    Ok(v["data"].as_array().and_then(|a| a.first()).and_then(|g| g["url"].as_str()).filter(|u| u.starts_with("https://")).map(String::from))
 }
 
 async fn sgdb_images(c: reqwest::Client, key: String, id: String) -> ImageSet {
@@ -792,8 +809,9 @@ pub fn add_web_screenshots(db: State<Db>, profile_id: i64, game_id: i64, shots: 
 }
 
 /// Hosts das fontes acima (as imagens escolhidas só podem vir delas).
-const IMAGE_HOSTS: [&str; 8] = [
+const IMAGE_HOSTS: [&str; 9] = [
     "steamstatic.com", "steampowered.com", "steamgriddb.com", "rawg.io", "wikimedia.org", "wikipedia.org", "githubusercontent.com", "akamaihd.net",
+    "igdb.com",
 ];
 
 pub fn allowed_image_url(url: &str) -> bool {
@@ -806,10 +824,16 @@ pub fn allowed_image_url(url: &str) -> bool {
 /// Nada é salvo aqui: a imagem só substitui a atual quando o usuário salva o formulário.
 #[tauri::command]
 pub async fn fetch_image_data(url: String) -> AppResult<String> {
-    if !allowed_image_url(&url) {
+    let (bytes, mime) = download_image(&url).await?;
+    Ok(format!("data:{mime};base64,{}", STANDARD.encode(&bytes)))
+}
+
+/// Baixa uma imagem de uma das fontes permitidas (bytes + tipo MIME), com limite de tamanho.
+pub(crate) async fn download_image(url: &str) -> AppResult<(Vec<u8>, String)> {
+    if !allowed_image_url(url) {
         return Err(AppError::Validation("Endereço de imagem não permitido.".into()));
     }
-    let r = client()?.get(&url).send().await.map_err(net)?.error_for_status().map_err(net)?;
+    let r = client()?.get(url).send().await.map_err(net)?.error_for_status().map_err(net)?;
     // Redirecionamentos não podem levar a um endereço fora da lista de fontes permitidas.
     if !allowed_image_url(r.url().as_str()) {
         return Err(AppError::Validation("Endereço de imagem não permitido.".into()));
@@ -825,7 +849,7 @@ pub async fn fetch_image_data(url: String) -> AppResult<String> {
     if bytes.len() > MAX_IMAGE_BYTES {
         return Err(AppError::Validation("Imagem grande demais (máx. 15 MB).".into()));
     }
-    Ok(format!("data:{mime};base64,{}", STANDARD.encode(&bytes)))
+    Ok((bytes.to_vec(), mime))
 }
 
 /// Remove uma screenshot (Steam ou internet) da galeria do NEXSTAGE. Só o registro local é apagado:

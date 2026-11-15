@@ -28,10 +28,12 @@ import AgeRatingBadge from "../components/AgeRatingBadge";
 import MetacriticPanel from "../components/MetacriticPanel";
 import SteamGamePanel from "../components/SteamGamePanel";
 import TrophyGamePanel from "../components/TrophyGamePanel";
+import XboxGamePanel from "../components/XboxGamePanel";
 import { isInstalled } from "../lib/steam";
 import { TrophyIcon } from "../components/RaUnlockToasts";
 import type { GalleryItem, GameInfo, SteamAppStatus, StoreHit, WebShot } from "../types";
 import CandidatePicker from "../components/CandidatePicker";
+import { CaptureMenu, ICON, type MenuAction } from "../components/CaptureUi";
 import { t, tk } from "../lib/i18n";
 
 const KIND: Record<string, string> = { snap: tk("Gameplay"), title: tk("Tela de título"), cover: tk("Capa"), background: tk("Fundo"), image: tk("Imagem") };
@@ -43,7 +45,7 @@ const SOURCE: Record<string, string> = { steam: "Steam", libretro: "libretro-thu
  * campos sem dado mostram "não encontrado". Descrição e gêneros podem ser editados à mão.
  */
 export default function GameDetail({ gameId }: { gameId: number }) {
-  const { profile, toast, setOpenGameId } = useSession();
+  const { profile, toast, setOpenGameId, setView, setGalleryIntent } = useSession();
   const device = useInputDevice();
   const p = profile!;
   const { games, loading, reload } = useLibrary(p.id);
@@ -68,6 +70,13 @@ export default function GameDetail({ gameId }: { gameId: number }) {
   }), []);
   const [hv, setHv] = useState({ main: "", extra: "", comp: "", all: "" });
   const [confirm, setConfirm] = useState(false);
+  // "Mais opções" (Zerado, Capturas, Coleções, Editar jogo, Remover): também pelo botão Menu/Options do controle, como na Home
+  const [menu, setMenu] = useState(false);
+  useEffect(() => {
+    const onCtx = () => { if (!document.querySelector(".overlay, .ctx-root, .pick-root, .sm-root:not(.leaving)")) setMenu(true); };
+    window.addEventListener("nexstage:context", onCtx);
+    return () => window.removeEventListener("nexstage:context", onCtx);
+  }, []);
   const [caps, setCaps] = useState<GalleryItem[]>([]);
   const [viewer, setViewer] = useState<number | null>(null);
   const [capSel, setCapSel] = useState(0);
@@ -145,6 +154,29 @@ export default function GameDetail({ gameId }: { gameId: number }) {
     setBusy(false);
   }
 
+  const genreList = (info?.genres ?? []).filter((g) => g !== game.platform);
+  // capturas próprias (arquivos do PC) para a galeria deste jogo
+  const importCaps = () => run(async () => {
+    const sel = await openDialog({ multiple: true, filters: [{ name: "Imagens", extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif"] }] });
+    const paths = Array.isArray(sel) ? sel : typeof sel === "string" ? [sel] : [];
+    if (!paths.length) return;
+    const r = await api.importScreenshots(p.id, game.id, paths);
+    toast(t("{imported} importada(s){v1}{v2}", { imported: r.imported, v1: r.duplicates ? t(", {n} já existia(m)", { n: r.duplicates }) : "", v2: r.failed.length ? t(". Erro: {msg}", { msg: r.failed[0] }) : "" }), r.failed.length && !r.imported ? "err" : "ok");
+    await loadCaps();
+  });
+  const moreActions: MenuAction[] = [
+    // zerado = registro "zerado" no Zerei! ligado a este jogo; editar ou desfazer é lá
+    game.completed
+      ? { label: t("✓ Zerado"), icon: ICON.select, run: () => { setOpenGameId(null); setView("zerei"); } }
+      : { label: t("Marcar como zerado"), icon: ICON.select,
+          run: () => run(async () => { await api.zereiMarkGame(p.id, game.id); reload(); }, t("Marcado como zerado: o jogo foi incluído no Zerei!.")) },
+    // capturas deste jogo na Galeria (como no ⋯ da Home); voltar à Biblioteca retorna a esta página
+    { label: t("Capturas de tela{v0}", { v0: caps.length ? ` (${caps.length})` : "" }), icon: ICON.open,
+      run: () => { setGalleryIntent({ gameId: game.id }); setView("gallery"); } },
+    { label: t("Coleções"), icon: ICON.folder, run: () => setDlg("collections") },
+    { label: t("Editar jogo"), icon: ICON.edit, run: () => setDlg("edit") },
+    { label: t("Remover"), icon: ICON.trash, danger: true, run: () => setConfirm(true) },
+  ];
   const shots = info?.screenshots ?? [];
   const web = info?.webScreenshots ?? [];
   const cur = web.length ? web[Math.min(wshot, web.length - 1)] : null;
@@ -159,7 +191,7 @@ export default function GameDetail({ gameId }: { gameId: number }) {
 
   return (
     <div className="dp">
-      <div className="dp-hero" data-parallax>
+      <header className="dp-hero" data-parallax>
         {heroSrc ? (
           <img className="dp-hero-img" src={heroSrc} alt="" decoding="async"
             style={{ objectPosition: game.background ? `${game.bgX}% ${game.bgY}%` : "50% 30%" }} />
@@ -167,7 +199,15 @@ export default function GameDetail({ gameId }: { gameId: number }) {
           <div className="dp-hero-soft" style={game.cover ? { backgroundImage: `url(${game.cover})` } : undefined} />
         )}
         <div className="dp-shade" />
-        {/* classificação etária (IGDB): selo discreto no canto inferior direito do banner */}
+        {/* canto superior direito: plataforma · gêneros · Steam · RetroAchievements (gêneros além de 3 no "+N", nome completo na dica) */}
+        <div className="chips dp-meta">
+          <span className="plat-tag" style={accent ? ({ "--game-rgb": accent } as CSSProperties) : undefined}>{game.platform}</span>
+          {genreList.slice(0, 3).map((g) => <span key={g}>{t(g)}</span>)}
+          {genreList.length > 3 && <span className="dp-more-genres" title={genreList.slice(3).map((g) => t(g)).join(", ")}>+{genreList.length - 3}</span>}
+          {game.steamAppId !== null && <span className="steam-chip-tag" title={t("Vinculado à Steam")}>Steam</span>}
+          {game.raGameId !== null && <span className="ra-chip-tag" title={t("Compatível com RetroAchievements")}><TrophyIcon size={12} /> RA</span>}
+        </div>
+        {/* classificação etária (IGDB): canto inferior direito, abaixo dos selos */}
         <AgeRatingBadge ratings={info?.igdb?.ageRatings} />
         {/* canto superior esquerdo da arte: vidro escuro (legível sobre qualquer imagem) + botão do controle */}
         <Button className="dp-back" onClick={() => setOpenGameId(null)} aria-label={t("Voltar")}>
@@ -175,40 +215,30 @@ export default function GameDetail({ gameId }: { gameId: number }) {
           <span>{t("Voltar")}</span>
           {device !== "keyboard" && <Glyph k="back" />}
         </Button>
+        {/* sem capa no cabeçalho (ela continua sendo a do jogo na Biblioteca e em "Editar jogo") */}
         <div className="dp-head">
-          <div className="cover dp-cover" style={game.cover ? { backgroundImage: `url(${game.cover})` } : undefined}>
-            {!game.cover && <span>{game.title.charAt(0).toUpperCase()}</span>}
-          </div>
           <div className="dp-title">
-            <h1>{game.title}</h1>
-            <div className="chips">
-              <span className="plat-tag" style={accent ? ({ "--game-rgb": accent } as CSSProperties) : undefined}>{game.platform}</span>
-              {(info?.genres ?? []).filter((g) => g !== game.platform).map((g) => <span key={g}>{t(g)}</span>)}
-              {game.steamAppId !== null && <span className="steam-chip-tag" title={t("Vinculado à Steam")}>Steam</span>}
-              {game.raGameId !== null && <span className="ra-chip-tag" title={t("Compatível com RetroAchievements")}><TrophyIcon size={12} /> RA</span>}
-            </div>
-            <div className="row">
+            {/* com logo, ela substitui o título escrito (o nome continua no texto alternativo) */}
+            {game.logo ? (
+              <h1 className="dp-logo-title"><img src={game.logo} alt={game.title} referrerPolicy="no-referrer" /></h1>
+            ) : <h1>{game.title}</h1>}
+            {/* Jogar/Instalar em destaque · Favoritar · Mais opções (Zerado, Capturas, Coleções, Editar, Remover) */}
+            <div className="dp-actions">
               {needInstall ? (
-                <Button variant="primary" className="dp-play" onClick={install} disabled={steamSt!.install === "installing"}>
+                <Button variant="primary" className="dp-play stage-play" onClick={install} disabled={steamSt!.install === "installing"}>
                   {steamSt!.install === "installing" ? t("Instalando na Steam…") : t("Instalar")}</Button>
               ) : (
-                <Button variant="primary" className="dp-play" onClick={() => run(async () => { await launchWithGameboot(game, () => api.launchGame(p.id, game.id), () => api.checkLaunch(p.id, game.id)); reload(); }, `Iniciando ${game.title}…`)}>{t("Jogar")}</Button>
+                <Button variant="primary" className="dp-play stage-play" onClick={() => run(async () => { await launchWithGameboot(game, () => api.launchGame(p.id, game.id), () => api.checkLaunch(p.id, game.id)); reload(); }, `Iniciando ${game.title}…`)}>{t("Jogar")}</Button>
               )}
-              <Button onClick={() => run(async () => { await api.setFavorite(p.id, game.id, !game.favorite); reload(); })}>
+              <Button className={`dp-act ${game.favorite ? "on" : ""}`} aria-pressed={game.favorite}
+                onClick={() => run(async () => { await api.setFavorite(p.id, game.id, !game.favorite); reload(); })}>
                 {game.favorite ? t("★ Favorito") : t("☆ Favoritar")}
               </Button>
-              <Button onClick={() => run(async () => { await api.setCompleted(p.id, game.id, !game.completed); reload(); }, game.completed ? t("Conclusão removida.") : t("Marcado como concluído."))}>
-                {game.completed ? t("✓ Concluído") : t("Marcar como concluído")}
-              </Button>
-              <Button onClick={() => setDlg("collections")}>{t("Coleções")}</Button>
-              <Button onClick={() => setDlg("edit")}>{t("Editar jogo")}</Button>
-              {confirm
-                ? <Button variant="danger" onClick={() => run(async () => { await api.removeGame(p.id, game.id); setOpenGameId(null); }, t("Jogo removido da biblioteca."))}>{t("Confirmar remoção")}</Button>
-                : <Button variant="danger" onClick={() => setConfirm(true)}>{t("Remover")}</Button>}
+              <Button className="dp-act" aria-haspopup="menu" onClick={() => setMenu(true)}>{t("Mais opções")}</Button>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
       <div className="dp-tabs" data-nav-group role="tablist" aria-label={t("Seções do jogo")}>
         <button data-focus type="button" role="tab" aria-selected={tab === "overview"} className={tab === "overview" ? "on" : ""} onClick={() => setTab("overview")}>{device !== "keyboard" && <Glyph k="l2" />}{t("Visão geral")}</button>
@@ -220,6 +250,25 @@ export default function GameDetail({ gameId }: { gameId: number }) {
         <div className="dp-main" data-nav-group>
           {/* IGDB: sempre o primeiro bloco da página do jogo */}
           <IgdbPanel game={game} info={info} loaded={infoLoaded} term={term} onInfo={setInfo} onGameChanged={reload} />
+
+          {/* descrição em destaque; busca de dados/imagens e edição ficam no rodapé do bloco */}
+          <Block title={t("Sobre o jogo")}>
+            <p className="desc">{info?.description || t("Descrição não encontrada.")}</p>
+            <div className="dp-tools">
+              <div className="row dp-search">
+                <input className="search" value={term} onChange={(e) => setTerm(e.target.value)} placeholder={t("Nome para buscar na Steam")} aria-label={t("Nome para buscar na Steam")} />
+                <Button onClick={search} disabled={busy}>{busy ? t("Buscando…") : t("Buscar na Steam")}</Button>
+                <Button onClick={() => setSearching(true)}>{t("Buscar na internet")}</Button>
+              </div>
+              <div className="row">
+                <Button variant="ghost" onClick={() => { setDesc(info?.description ?? ""); setGenres((info?.genres ?? []).join(", ")); setDlg("notes"); }}>{t("Editar descrição e gêneros")}</Button>
+                {info?.externalId && <Button variant="ghost" onClick={() => run(async () => { await api.applySteamCover(p.id, game.id); reload(); }, "Capa atualizada.")}>{t("Usar capa da Steam")}</Button>}
+                {info && (shots.length > 0 || web.length > 0 || (info.removedScreenshots?.length ?? 0) > 0) && (
+                  <Button variant="ghost" className="shots-manage" onClick={() => setDlg("shots")}>{t("Remover screenshots…")}</Button>
+                )}
+              </div>
+            </div>
+          </Block>
 
           {/* sem capturas (Steam ou internet), o bloco não aparece — nenhuma mensagem de "não encontrado" */}
           {(shots.length > 0 || web.length > 0) && (
@@ -265,16 +314,7 @@ export default function GameDetail({ gameId }: { gameId: number }) {
           </Block>
           )}
 
-          <Block title={t("Capturas do NEXSTAGE")} actions={
-            <Button onClick={() => run(async () => {
-              const sel = await openDialog({ multiple: true, filters: [{ name: "Imagens", extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif"] }] });
-              const paths = Array.isArray(sel) ? sel : typeof sel === "string" ? [sel] : [];
-              if (!paths.length) return;
-              const r = await api.importScreenshots(p.id, game.id, paths);
-              toast(t("{imported} importada(s){v1}{v2}", { imported: r.imported, v1: r.duplicates ? t(", {n} já existia(m)", { n: r.duplicates }) : "", v2: r.failed.length ? t(". Erro: {msg}", { msg: r.failed[0] }) : "" }), r.failed.length && !r.imported ? "err" : "ok");
-              await loadCaps();
-            })}>{t("Importar capturas")}</Button>
-          }>
+          <Block title={t("Capturas do NEXSTAGE")} actions={<Button onClick={importCaps}>{t("Importar capturas")}</Button>}>
             {caps.length ? (() => {
               // mesmo esquema das capturas da Steam/IGDB: imagem grande 16:9 + faixa de miniaturas;
               // a miniatura escolhe a captura em destaque e a imagem grande abre o visualizador em tela cheia
@@ -298,21 +338,6 @@ export default function GameDetail({ gameId }: { gameId: number }) {
             })() : <p className="muted">{t("Nenhuma captura importada para este jogo.")}</p>}
           </Block>
 
-          <Block title={t("Sobre o jogo")}>
-            <p className="desc">{info?.description || t("Descrição não encontrada.")}</p>
-            <div className="row dp-search">
-              <input className="search" value={term} onChange={(e) => setTerm(e.target.value)} placeholder={t("Nome para buscar na Steam")} aria-label={t("Nome para buscar na Steam")} />
-              <Button onClick={search} disabled={busy}>{busy ? t("Buscando…") : t("Buscar na Steam")}</Button>
-              {info && (shots.length > 0 || web.length > 0 || (info.removedScreenshots?.length ?? 0) > 0) && (
-                <Button className="shots-manage" onClick={() => setDlg("shots")}>{t("Remover screenshots…")}</Button>
-              )}
-              <Button onClick={() => setSearching(true)}>{t("Buscar na internet")}</Button>
-            </div>
-            <div className="row">
-              {info?.externalId && <Button variant="ghost" onClick={() => run(async () => { await api.applySteamCover(p.id, game.id); reload(); }, "Capa atualizada.")}>{t("Usar capa da Steam")}</Button>}
-              <Button variant="ghost" onClick={() => { setDesc(info?.description ?? ""); setGenres((info?.genres ?? []).join(", ")); setDlg("notes"); }}>{t("Editar descrição e gêneros")}</Button>
-            </div>
-          </Block>
         </div>
 
         <aside className="dp-side" data-nav-group>
@@ -320,6 +345,7 @@ export default function GameDetail({ gameId }: { gameId: number }) {
           <MetacriticPanel game={game} info={info} loaded={infoLoaded} term={term} onInfo={setInfo} />
 
           {game.steamAppId !== null && <SteamGamePanel game={game} status={steamSt} onInstall={install} onChanged={reload} />}
+          <XboxGamePanel game={game} />
           <RaGamePanel game={game} onChanged={reload} />
           <TrophyGamePanel game={game} />
 
@@ -359,6 +385,16 @@ export default function GameDetail({ gameId }: { gameId: number }) {
       </div>
       )}
 
+      {menu && <CaptureMenu actions={moreActions} onClose={() => setMenu(false)} />}
+      {confirm && (
+        <Modal title={t("Remover {title} da biblioteca?", { title: game.title })} onClose={() => setConfirm(false)}>
+          <p className="muted">{t("O jogo e o histórico de sessões dele saem da biblioteca deste perfil. Os arquivos do jogo no computador não são apagados.")}</p>
+          <div className="row end">
+            <Button variant="ghost" onClick={() => setConfirm(false)}>{t("Cancelar")}</Button>
+            <Button variant="danger" onClick={() => run(async () => { await api.removeGame(p.id, game.id); setOpenGameId(null); }, t("Jogo removido da biblioteca."))}>{t("Confirmar remoção")}</Button>
+          </div>
+        </Modal>
+      )}
       {viewer !== null && caps[viewer] && (
         <Viewer items={caps} index={viewer} onIndex={setViewer} onClose={() => setViewer(null)}
           onFavorite={(i) => run(async () => { await api.setGalleryFavorite(p.id, i.id, !i.favorite); await loadCaps(); })}

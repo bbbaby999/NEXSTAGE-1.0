@@ -9,6 +9,8 @@ import BackupPanel from "../components/BackupPanel";
 import UpdatePanel from "../components/UpdatePanel";
 import RaSettings from "../components/RaSettings";
 import SteamSettings from "../components/SteamSettings";
+import XboxSettings from "../components/XboxSettings";
+import AutoLogosSetting from "../components/AutoLogosSetting";
 import DataSources from "../components/DataSources";
 import { applyHomeBlur, applyParticles, applyTheme, applyWaves, clampHomeBlur, CUSTOM_THEME, CustomColors, DEFAULT_CUSTOM, DEFAULT_THEME, parseCustom, resolveCustom, setCustomColors, setLedSync, THEMES } from "../lib/theme";
 import ColorPicker from "../components/ColorPicker";
@@ -17,7 +19,7 @@ import { setSoundConfig, play } from "../lib/sound";
 import { LayoutOverride, setLayoutOverride } from "../lib/inputDevice";
 import { MotionMode, setMotion } from "../lib/motion";
 import { listen } from "@tauri-apps/api/event";
-import type { GalleryItem, PadCombos, ShortcutInfo, StartupInfo } from "../types";
+import type { GalleryItem, PadCombos, ShortcutInfo, StartupInfo, WebShot } from "../types";
 import { comboLabel, combosConflict, popcount, validateCombo } from "../lib/padCombo";
 import PatchNotes from "../components/PatchNotes";
 import { VERSION_LABEL } from "../lib/version";
@@ -26,7 +28,8 @@ import { setGamebootEnabled } from "../lib/gameboot";
 import { IdleMode, setIdleConfig, startIdlePreview, useIdleActive, useIdleConfig } from "../lib/idle";
 import { IdleShow } from "../components/IdleScreen";
 import { HomeBgMode, setHomeBg, useHomeBg } from "../lib/homeBg";
-import { fileToDataUrl } from "../lib/image";
+import { fileToDataUrl, srcToDataUrl } from "../lib/image";
+import ImageSearch from "../components/ImageSearch";
 import Modal from "../components/Modal";
 import { itemSrc } from "../components/Viewer";
 import { formatDate } from "../lib/format";
@@ -102,7 +105,11 @@ function ShortcutRow({ title, description, api: A }: {
  * combinação pressionada ao mesmo tempo vira a nova. Regra anti-conflito: 2 a 3 botões, incluindo
  * Select, Start, L3 ou R3; no jogo é preciso SEGURAR a combinação.
  */
-function PadComboRow({ slot, title, description, hold }: { slot: "overlay" | "screenshot"; title: string; description: string; hold: string }) {
+type ComboSlot = "overlay" | "screenshot" | "summon";
+const comboOf = (c: PadCombos, s: ComboSlot) => (s === "overlay" ? c.overlay : s === "screenshot" ? c.screenshot : c.summon);
+const comboDefault = (c: PadCombos, s: ComboSlot) => (s === "overlay" ? c.overlayDefault : s === "screenshot" ? c.screenshotDefault : c.summonDefault);
+
+function PadComboRow({ slot, title, description, hold }: { slot: ComboSlot; title: string; description: string; hold: string }) {
   const { toast } = useSession();
   const [combos, setCombos] = useState<PadCombos | null>(null);
   const [capturing, setCapturing] = useState(false);
@@ -122,9 +129,9 @@ function PadComboRow({ slot, title, description, hold }: { slot: "overlay" | "sc
       const chosen = peak;
       stop();
       const err = validateCombo(chosen);
-      const other = slot === "overlay" ? combos?.screenshot ?? 0 : combos?.overlay ?? 0;
+      const others = combos ? (["overlay", "screenshot", "summon"] as ComboSlot[]).filter((x) => x !== slot).map((x) => comboOf(combos, x)) : [];
       if (err) { toast(err, "err"); return; }
-      if (combosConflict(chosen, other)) { toast(t("Essa combinação conflita com a do outro comando (uma contém a outra)."), "err"); return; }
+      if (others.some((o) => combosConflict(chosen, o))) { toast(t("Essa combinação conflita com a do outro comando (uma contém a outra)."), "err"); return; }
       api.setPadCombo(slot, chosen).then((c) => { setCombos(c); toast(t("Combinação salva e ativa.")); }).catch((er) => toast(errMsg(er), "err"));
     }).then((f) => (cancelled ? f() : (un = f)));
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopImmediatePropagation(); stop(); } };
@@ -133,8 +140,8 @@ function PadComboRow({ slot, title, description, hold }: { slot: "overlay" | "sc
     return () => { window.removeEventListener("keydown", onKey, true); clearTimeout(timer); if (!cancelled) stop(); };
   }, [capturing]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const cur = combos ? (slot === "overlay" ? combos.overlay : combos.screenshot) : 0;
-  const def = combos ? (slot === "overlay" ? combos.overlayDefault : combos.screenshotDefault) : 0;
+  const cur = combos ? comboOf(combos, slot) : 0;
+  const def = combos ? comboDefault(combos, slot) : 0;
   return (
     <div className="setting">
       <div>
@@ -353,15 +360,20 @@ function HomeBgSetting({ profileId }: { profileId: number }) {
   const file = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [fromGallery, setFromGallery] = useState(false);
+  const [webSearch, setWebSearch] = useState(false);
+  // "Imagem própria" ainda sem imagem: mostra as opções (computador ou internet); o modo só muda depois da escolha
+  const [choosing, setChoosing] = useState(false);
 
   const saveMode = (mode: HomeBgMode) => {
+    setChoosing(false);
     setHomeBg({ mode });
     api.setProfileSetting(profileId, "home_bg_mode", mode).catch((e) => toast(errMsg(e), "err"));
   };
   const setMode = (mode: HomeBgMode) => {
     // Modo com imagem ainda não escolhida: já abre o seletor (o arquivo no mesmo clique, exigência do
     // navegador); o modo só muda depois da escolha.
-    if (mode === "custom" && !bg.image) { file.current?.click(); return; }
+    if (mode === "custom" && !bg.image) { setChoosing(true); return; }
+    setChoosing(false);
     if (mode === "gallery" && !bg.capture) { setFromGallery(true); return; }
     saveMode(mode);
   };
@@ -388,6 +400,17 @@ function HomeBgSetting({ profileId }: { profileId: number }) {
     } catch (e) { toast(errMsg(e), "err"); }
     finally { setBusy(false); }
   }
+  // Imagem escolhida na pesquisa da internet (baixada pelo app, só das fontes de jogos permitidas)
+  async function fromWeb([s]: WebShot[]) {
+    setBusy(true);
+    try {
+      const data = await srcToDataUrl(await api.fetchImageData(s.url), 3840, 2160);
+      const url = await api.setHomeBackground(profileId, data);
+      setHomeBg({ image: url });
+      saveMode("custom");
+      toast(t("Plano de fundo da Home atualizado."));
+    } finally { setBusy(false); }
+  }
   // Remove a imagem do modo atual ("Imagem própria" ou "Escolher da Galeria") e volta à arte do jogo.
   async function remove() {
     const gallery = bg.mode === "gallery";
@@ -399,26 +422,34 @@ function HomeBgSetting({ profileId }: { profileId: number }) {
   }
 
   const own = bg.mode === "custom" ? bg.image : bg.mode === "gallery" ? bg.capture : null;
+  const showCustom = bg.mode === "custom" || choosing;
 
   return (
     <div className="setting col-set">
       <div><strong>{t("Plano de fundo da Home")}</strong><small>{t("Arte do jogo em destaque, nenhum fundo (só as ondas), uma imagem do computador ou uma captura da Galeria. Salvo por perfil.")}</small></div>
-      <Seg<HomeBgMode> value={bg.mode} onChange={setMode}
+      <Seg<HomeBgMode> value={choosing ? "custom" : bg.mode} onChange={setMode}
         opts={[[t("Arte do jogo"), "game"], [t("Sem fundo (ondas)"), "waves"], [t("Imagem própria"), "custom"], [t("Escolher da Galeria"), "gallery"]]} />
-      {(bg.mode === "custom" || bg.mode === "gallery") && (
+      {(showCustom || bg.mode === "gallery") && (
         <div className="home-bg-pick">
           <div className="home-bg-thumb" style={own ? { backgroundImage: `url(${own})` } : undefined}>
             {!own && <span>{t("Nenhuma imagem")}</span>}
           </div>
           <div className="row">
-            {bg.mode === "custom"
-              ? <Button disabled={busy} onClick={() => file.current?.click()}>{own ? t("Trocar imagem") : t("Escolher imagem")}</Button>
+            {showCustom
+              ? <>
+                  <Button disabled={busy} onClick={() => file.current?.click()}>{own ? t("Trocar imagem") : t("Escolher imagem")}</Button>
+                  <Button disabled={busy} onClick={() => setWebSearch(true)}>{t("Pesquisar na internet")}</Button>
+                </>
               : <Button disabled={busy} onClick={() => setFromGallery(true)}>{own ? t("Trocar captura") : t("Escolher captura")}</Button>}
             {own && <Button variant="ghost" disabled={busy} onClick={remove}>{t("Remover")}</Button>}
           </div>
         </div>
       )}
       {fromGallery && <CapturePicker profileId={profileId} onPick={fromCapture} onClose={() => setFromGallery(false)} />}
+      {webSearch && (
+        <ImageSearch mode="background" term="" platform="" title={t("Pesquisar plano de fundo na internet")}
+          onConfirm={fromWeb} onClose={() => setWebSearch(false)} />
+      )}
       <input ref={file} type="file" accept="image/png,image/jpeg,image/webp,image/bmp,image/gif,image/avif" hidden
         onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />
     </div>
@@ -519,8 +550,11 @@ export default function Settings() {
   const [padToast, setPadToast] = useState(true);
   const [shotSecs, setShotSecs] = useState(4);
   const [ledSync, setLedSyncState] = useState(true);
+  // chaves de API: o backend só informa se há uma salva; o valor nunca volta para a interface
   const [sgdbKey, setSgdbKey] = useState("");
   const [rawgKey, setRawgKey] = useState("");
+  const [sgdbSet, setSgdbSet] = useState(false);
+  const [rawgSet, setRawgSet] = useState(false);
   const [start, setStart] = useState<StartPage>("home");
   const [sound, setSound] = useState(true);
   const [volume, setVolume] = useState(50);
@@ -538,8 +572,8 @@ export default function Settings() {
       setPadToast((await g("pad_toast")) !== "0");
       setShotSecs(Number((await g("shot_notify_secs")) ?? 4) || 4);
       setLedSyncState((await g("pad_led_sync")) !== "0");
-      setSgdbKey((await g("sgdb_key")) ?? "");
-      setRawgKey((await g("rawg_key")) ?? "");
+      setSgdbSet((await g("sgdb_key")) === "1");
+      setRawgSet((await g("rawg_key")) === "1");
       setStart(((await g("start_page")) as StartPage) ?? "home");
       setSound((await g("sound_enabled")) !== "0");
       setVolume(Number((await g("sound_volume")) ?? 50));
@@ -558,6 +592,16 @@ export default function Settings() {
   const saveApp = async (k: string, v: string) => {
     try { await api.setAppSetting(k, v); } catch (e) { toast(errMsg(e), "err"); }
   };
+
+  // tela cheia alterada por atalho (Alt+Enter ou a combinação do controle): o botão acompanha
+  useEffect(() => {
+    const onLocal = (e: Event) => setFull((e as CustomEvent<boolean>).detail);
+    window.addEventListener("nexstage:fullscreen", onLocal);
+    let un: (() => void) | undefined;
+    let cancelled = false;
+    listen<boolean>("fullscreen-changed", (e) => setFull(e.payload)).then((f) => (cancelled ? f() : (un = f)));
+    return () => { window.removeEventListener("nexstage:fullscreen", onLocal); cancelled = true; un?.(); };
+  }, []);
 
   async function toggleFull() {
     const next = !full;
@@ -789,6 +833,9 @@ export default function Settings() {
               api={{ get: api.getScreenshotShortcut, set: api.setScreenshotShortcut, reset: api.resetScreenshotShortcut }} />
             <PadComboRow slot="screenshot" title={t("Atalho de captura (controle)")} description={t("Segure a combinação (0,35 s); a captura é salva sem interromper o jogo.")}
               hold={t("Mesma regra de segurança.")} />
+            <PadComboRow slot="summon" title={t("Trazer o NEXSTAGE para frente (controle)")}
+              description={t("Segure a combinação (0,7 s) em qualquer janela, inclusive no jogo: o NEXSTAGE volta para a frente em tela cheia. No teclado, Alt+Enter alterna tela cheia e janela.")}
+              hold={t("Mesma regra de segurança.")} />
           </div>
 
           {/* ---------- Captura de tela ---------- */}
@@ -808,8 +855,12 @@ export default function Settings() {
           <h3 className="set-sub">{t("Steam")}</h3>
           <div className="settings">
             <SteamSettings />
+          </div>
+          <h3 className="set-sub" id="set-xbox">{t("Xbox")}</h3>
+          <div className="settings">
+            <XboxSettings />
             <div className="setting disabled">
-              <div><strong>{t("Epic Games e Xbox")}</strong><small>{t("Versões futuras.")}</small></div>
+              <div><strong>{t("Epic Games")}</strong><small>{t("Versões futuras.")}</small></div>
               <span className="soon-pill">{t("em breve")}</span>
             </div>
           </div>
@@ -833,15 +884,18 @@ export default function Settings() {
             <div className="setting">
               <div><strong>{t("SteamGridDB (opcional)")}</strong><small>{t("Banco de capas e fundos feitos para launchers (filtros de conteúdo adulto ligados). Crie uma chave gratuita em steamgriddb.com → Preferências → API e cole aqui.")}</small></div>
               <div className="row">
-                <input className="search" type="password" style={{ width: 240 }} value={sgdbKey} onChange={(e) => setSgdbKey(e.target.value)} placeholder={t("Chave da API")} aria-label={t("Chave da API do SteamGridDB")} />
-                <Button onClick={() => { saveApp("sgdb_key", sgdbKey.trim()); toast(sgdbKey.trim() ? t("SteamGridDB ativado na pesquisa.") : t("SteamGridDB desativado.")); }}>{t("Salvar")}</Button>
+                <input className="search" type="password" style={{ width: 240 }} value={sgdbKey} onChange={(e) => setSgdbKey(e.target.value)} placeholder={sgdbSet ? t("Chave salva (oculta)") : t("Chave da API")} aria-label={t("Chave da API do SteamGridDB")} />
+                <Button disabled={!sgdbKey.trim()} onClick={async () => { await saveApp("sgdb_key", sgdbKey.trim()); setSgdbKey(""); setSgdbSet(true); toast(t("SteamGridDB ativado na pesquisa.")); }}>{t("Salvar")}</Button>
+                {sgdbSet && <Button variant="ghost" onClick={async () => { await saveApp("sgdb_key", ""); setSgdbKey(""); setSgdbSet(false); toast(t("SteamGridDB desativado.")); }}>{t("Remover")}</Button>}
               </div>
             </div>
+            <AutoLogosSetting hasKey={sgdbSet} />
             <div className="setting">
               <div><strong>{t("RAWG (opcional)")}</strong><small>{t("Banco de dados de jogos com screenshots de várias plataformas. Chave gratuita em rawg.io/apidocs.")}</small></div>
               <div className="row">
-                <input className="search" type="password" style={{ width: 240 }} value={rawgKey} onChange={(e) => setRawgKey(e.target.value)} placeholder={t("Chave da API")} aria-label={t("Chave da API do RAWG")} />
-                <Button onClick={() => { saveApp("rawg_key", rawgKey.trim()); toast(rawgKey.trim() ? t("RAWG ativado na pesquisa.") : t("RAWG desativado.")); }}>{t("Salvar")}</Button>
+                <input className="search" type="password" style={{ width: 240 }} value={rawgKey} onChange={(e) => setRawgKey(e.target.value)} placeholder={rawgSet ? t("Chave salva (oculta)") : t("Chave da API")} aria-label={t("Chave da API do RAWG")} />
+                <Button disabled={!rawgKey.trim()} onClick={async () => { await saveApp("rawg_key", rawgKey.trim()); setRawgKey(""); setRawgSet(true); toast(t("RAWG ativado na pesquisa.")); }}>{t("Salvar")}</Button>
+                {rawgSet && <Button variant="ghost" onClick={async () => { await saveApp("rawg_key", ""); setRawgKey(""); setRawgSet(false); toast(t("RAWG desativado.")); }}>{t("Remover")}</Button>}
               </div>
             </div>
           </div>

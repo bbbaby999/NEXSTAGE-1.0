@@ -3,7 +3,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { currentLang, t } from "./i18n";
 import { idleBusy } from "./idle";
-import type { ScanItem, GameHit, ImageSet, SourceRef, WebShot, Emulator, FolderRow, ImportSummary, Activity, FandomLink, PadCombos, StartupInfo, ClassifyResult, Controller, Drive, GalleryItem, ImportResult, ShortcutInfo, Game, GameCollection, GameInfo, GameInput, Profile, ProfileInput, RaAccount, RaOverview, RaAchievement, RaGameDetail, RaSyncReport, RaLinkInfo, RaGame, RaScanReport, RaEmuSupport, SteamAccount, SteamOwnedList, SteamPreviewItem, SteamImportReport, SteamSyncReport, SteamAppStatus, SteamGameData, SteamClientStatus, SteamAchOverview, SteamAchEntry, SteamNewsOverview, BackupInfo, BackupTarget, BackupReport, BackupInspect, BackupVerify, BackupRestoreReport, BackupAuto, BackupAutoMode, GamerStats, StatsVisibility, MetacriticResult, StoreHit, SourceView, SourceId, IgdbResult, NexusLinkStatus, NexusGame, NexusModsPage, NexusModDetail, NexusMod, ModSort } from "../types";
+import type { ScanItem, GameHit, ImageSet, SourceRef, WebShot, Emulator, FolderRow, ImportSummary, Activity, FandomLink, PadCombos, StartupInfo, ClassifyResult, Controller, Drive, GalleryItem, ImportResult, ShortcutInfo, Game, GameCollection, GameInfo, GameInput, Profile, ProfileInput, RaAccount, RaOverview, RaAchievement, RaGameDetail, RaSyncReport, RaLinkInfo, RaGame, RaScanReport, RaEmuSupport, SteamAccount, SteamOwnedList, SteamPreviewItem, SteamImportReport, SteamSyncReport, SteamAppStatus, SteamGameData, SteamClientStatus, SteamAchOverview, SteamAchEntry, SteamNewsOverview, BackupInfo, BackupTarget, BackupReport, BackupInspect, BackupVerify, BackupRestoreReport, BackupAuto, BackupAutoMode, GamerStats, StatsVisibility, MetacriticResult, StoreHit, SourceView, SourceId, IgdbResult, NexusLinkStatus, NexusGame, NexusModsPage, NexusModDetail, NexusMod, ModSort, ZereiSearch, ZereiArt, ZereiEntry, ZereiInput, ZereiImport, LogoGames } from "../types";
 
 /**
  * Capas e fundos ficam em arquivos na pasta de dados do app (ver src-tauri/src/images.rs): o backend
@@ -13,7 +13,8 @@ import type { ScanItem, GameHit, ImageSet, SourceRef, WebShot, Emulator, FolderR
 const isPath = (v: string) => /^[a-zA-Z]:[\\/]/.test(v) || v.startsWith("\\\\");
 export const imgUrl = (v: string | null): string | null =>
   v && isPath(v) ? convertFileSrc(v).replace(/\(/g, "%28").replace(/\)/g, "%29") : v;
-const withGameImages = (g: Game): Game => ({ ...g, cover: imgUrl(g.cover), background: imgUrl(g.background) });
+const withGameImages = (g: Game): Game => ({ ...g, cover: imgUrl(g.cover), background: imgUrl(g.background), logo: imgUrl(g.logo) });
+const withZereiImages = (e: ZereiEntry): ZereiEntry => ({ ...e, cover: imgUrl(e.cover), logo: imgUrl(e.logo), background: imgUrl(e.background) });
 const withEmuImage = (e: Emulator): Emulator => ({ ...e, cover: imgUrl(e.cover) });
 
 export type FeedbackCategory = "improvement" | "feature" | "bug" | "general";
@@ -89,6 +90,26 @@ export const api = {
   addWebScreenshots: (profileId: number, gameId: number, shots: WebShot[]) =>
     invoke<GameInfo>("add_web_screenshots", { profileId, gameId, shots }),
   fetchImageData: (url: string) => invoke<string>("fetch_image_data", { url }),
+
+  // Zerei!
+  zereiSearch: (term: string) => invoke<ZereiSearch>("zerei_search", { term }),
+  /** Jogos do SteamGridDB para um nome (escolha do jogo antes das logos). */
+  sgdbGames: (term: string) => invoke<LogoGames>("sgdb_games", { term }),
+  zereiArtwork: (title: string, year: number | null, sgdbId: number | null) => invoke<ZereiArt>("zerei_artwork", { title, year, sgdbId }),
+  zereiList: (profileId: number) => invoke<ZereiEntry[]>("zerei_list", { profileId }).then((l) => l.map(withZereiImages)),
+  /** "Marcar como zerado": inclui o jogo da biblioteca no Zerei! como zerado (ou marca o registro existente). */
+  zereiMarkGame: (profileId: number, gameId: number) => invoke<ZereiEntry>("zerei_mark_game", { profileId, gameId }),
+  /** Logos automáticas (SteamGridDB) para jogos sem logo; `retry` pesquisa de novo os que ficaram sem resultado. */
+  autoLogos: (profileId: number, retry: boolean) => invoke<{ filled: number; notFound: number; interrupted: boolean }>("auto_logos", { profileId, retry }),
+  zereiSave: (profileId: number, id: number | null, input: ZereiInput, newRun = false) =>
+    invoke<ZereiEntry>("zerei_save", { profileId, id, input, newRun }).then(withZereiImages),
+  zereiDelete: (profileId: number, id: number) => invoke<void>("zerei_delete", { profileId, id }),
+  zereiExportCsv: (profileId: number, path: string) => invoke<number>("zerei_export_csv", { profileId, path }),
+  zereiImportCsv: (profileId: number, path: string) => invoke<ZereiImport>("zerei_import_csv", {
+    profileId, path,
+    // anotações que a importação acrescenta aos comentários, no idioma da interface
+    labels: { howTo: t("Como zerar"), difficulty: t("Dificuldade"), genre: t("Gênero"), started: t("Data de início informada") },
+  }),
   removeGameScreenshot: (profileId: number, gameId: number, url: string) =>
     invoke<GameInfo>("remove_game_screenshot", { profileId, gameId, url }),
   restoreRemovedScreenshots: (profileId: number, gameId: number) =>
@@ -130,8 +151,6 @@ export const api = {
     invoke<void>("set_gallery_favorite", { profileId, id, favorite }),
   deleteGalleryItem: (profileId: number, id: number) => invoke<void>("delete_gallery_item", { profileId, id }),
 
-  setCompleted: (profileId: number, gameId: number, completed: boolean) =>
-    invoke<void>("set_completed", { profileId, gameId, completed }),
   profileActivity: (profileId: number) => invoke<Activity>("profile_activity", { profileId }),
   deleteGalleryItems: (profileId: number, ids: number[]) =>
     invoke<number>("delete_gallery_items", { profileId, ids }),
@@ -144,8 +163,8 @@ export const api = {
   resetScreenshotShortcut: () => invoke<ShortcutInfo>("reset_screenshot_shortcut"),
   setActiveProfile: (id: number) => invoke<void>("set_active_profile", { id }),
   getPadCombos: () => invoke<PadCombos>("get_pad_combos"),
-  setPadCombo: (slot: "overlay" | "screenshot", mask: number) => invoke<PadCombos>("set_pad_combo", { slot, mask }),
-  resetPadCombo: (slot: "overlay" | "screenshot") => invoke<PadCombos>("reset_pad_combo", { slot }),
+  setPadCombo: (slot: "overlay" | "screenshot" | "summon", mask: number) => invoke<PadCombos>("set_pad_combo", { slot, mask }),
+  resetPadCombo: (slot: "overlay" | "screenshot" | "summon") => invoke<PadCombos>("reset_pad_combo", { slot }),
   setPadCapture: (on: boolean) => invoke<void>("set_pad_capture", { on }),
   takeScreenshot: () => invoke<string>("take_screenshot"),
   capturesFolder: () => invoke<string>("captures_folder"),
@@ -198,6 +217,14 @@ export const api = {
   quitGame: (gameId: number) => invoke<void>("quit_game", { gameId }),
   closeOverlay: () => invoke<void>("close_overlay"),
   setFullscreen: (enabled: boolean) => invoke<void>("set_fullscreen", { enabled }),
+  /** Alterna tela cheia ⇄ janela (Alt+Enter) e salva como preferência; avisa as telas abertas. */
+  toggleFullscreen: async () => {
+    const next = !(await getCurrentWindow().isFullscreen());
+    await invoke<void>("set_fullscreen", { enabled: next });
+    await invoke<void>("set_app_setting", { key: "fullscreen", value: next ? "1" : "0" });
+    window.dispatchEvent(new CustomEvent("nexstage:fullscreen", { detail: next }));
+    return next;
+  },
   /** Estado REAL da janela (a configuração "fullscreen" é só a preferência salva; o app pode estar em
    * tela cheia pelo modo de abertura, pelo Gameboot etc.). */
   isFullscreen: () => getCurrentWindow().isFullscreen(),
@@ -224,6 +251,17 @@ export const api = {
   steamGetAccount: (profileId: number) => invoke<SteamAccount | null>("steam_get_account", { profileId }),
   steamLogin: (profileId: number) => invoke<SteamAccount>("steam_login", { profileId }),
   steamCancelLogin: () => invoke<void>("steam_cancel_login"),
+  // Xbox (o refresh token nunca volta do backend)
+  xboxStatus: (profileId: number) => invoke<import("../types").XboxStatus>("xbox_status", { profileId }),
+  xboxSetClientId: (clientId: string | null) => invoke<void>("xbox_set_client_id", { clientId }),
+  xboxLogin: (profileId: number) => invoke<import("../types").XboxAccount>("xbox_login", { profileId }),
+  xboxCancelLogin: () => invoke<void>("xbox_cancel_login"),
+  xboxDisconnect: (profileId: number, clearCache: boolean) => invoke<void>("xbox_disconnect", { profileId, clearCache }),
+  xboxSync: (profileId: number) => idleBusy(invoke<{ titles: number }>("xbox_sync", { profileId, lang: currentLang() })),
+  xboxGame: (profileId: number, gameId: number, refresh = false) =>
+    invoke<import("../types").XboxGameData | null>("xbox_game", { profileId, gameId, refresh, lang: currentLang() }),
+  xboxInstalled: (profileId: number) => invoke<import("../types").XboxInstalled[]>("xbox_installed", { profileId }),
+  xboxImport: (profileId: number, aumids: string[]) => invoke<{ added: number; skipped: number }>("xbox_import", { profileId, aumids }),
   steamSetKey: (profileId: number, key: string | null) => invoke<SteamAccount>("steam_set_key", { profileId, key }),
   steamDisconnect: (profileId: number, clearCache: boolean) => invoke<void>("steam_disconnect", { profileId, clearCache }),
   steamSync: (profileId: number) => idleBusy(invoke<SteamSyncReport>("steam_sync", { profileId, lang: currentLang() })),

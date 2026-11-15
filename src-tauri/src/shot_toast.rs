@@ -110,12 +110,12 @@ pub fn notify(app: &AppHandle, thumb: String, title: Option<String>) {
 #[derive(Clone, Serialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AchievementToast {
-    /// "ra" | "steam"
+    /// "ra" | "steam" | "xbox" | "vita3k" | "rpcs3"
     pub source: String,
     pub icon: Option<String>,
     pub title: String,
     pub game: String,
-    /// Pontos (RetroAchievements); 0 na Steam.
+    /// Pontos (RetroAchievements) ou gamerscore (Xbox); 0 na Steam.
     pub points: i64,
     pub hardcore: bool,
     /// Rara: estilo dourado, som próprio e mais tempo na tela.

@@ -56,10 +56,11 @@ pub fn profile_activity(db: State<Db>, profile_id: i64) -> AppResult<Activity> {
     };
     let completed = {
         let mut st = conn.prepare(
-            "SELECT pg.game_id,g.title,pg.completed_at
-             FROM profile_games pg JOIN games g ON g.id=pg.game_id
-             WHERE pg.profile_id=?1 AND pg.completed=1 AND pg.completed_at IS NOT NULL
-             ORDER BY pg.completed_at DESC LIMIT 5",
+            // jogos da biblioteca zerados (registro do Zerei! ligado ao jogo)
+            "SELECT z.game_id,g.title,MAX(z.completed_at)
+             FROM zerei_entries z JOIN games g ON g.id=z.game_id
+             WHERE z.profile_id=?1 AND z.status='completed' AND z.completed_at IS NOT NULL
+             GROUP BY z.game_id ORDER BY MAX(z.completed_at) DESC LIMIT 5",
         )?;
         let rows = st
             .query_map([profile_id], |r| {

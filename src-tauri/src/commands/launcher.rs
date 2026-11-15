@@ -155,18 +155,31 @@ enum Launch {
     Exe(Prepared),
     /// Pelo cliente Steam (AppID).
     Steam(i64),
+    /// Jogo da Microsoft Store / Xbox (AUMID), iniciado pelo Explorer (ver `msstore`).
+    App(String),
 }
 
 /// Decide entre o cliente Steam e o executável/emulador, validando SEM iniciar nada.
 fn plan(db: &Db, profile_id: i64, game_id: i64) -> AppResult<Launch> {
-    let (appid, steam_only) = {
+    let (appid, steam_only, store_app) = {
         let conn = db.conn()?;
         super::games::ensure_owned(&conn, profile_id, game_id)?;
         let only: bool = conn
             .query_row("SELECT source='steam' AND trim(executable_path)='' FROM games WHERE id=?1", [game_id], |r| r.get(0))
             .unwrap_or(false);
-        (crate::steam::store::appid_of(&conn, game_id)?, only)
+        // Jogo da Microsoft Store / Xbox sem emulador: `shell:AppsFolder\<AUMID>` no lugar do executável.
+        let store_app = conn
+            .query_row("SELECT executable_path FROM games WHERE id=?1 AND emulator_id IS NULL", [game_id], |r| r.get::<_, String>(0))
+            .ok()
+            .and_then(|p| crate::msstore::aumid(&p).map(String::from));
+        (crate::steam::store::appid_of(&conn, game_id)?, only, store_app)
     };
+    if let Some(a) = store_app {
+        if crate::msstore::package_root(&a).is_none() {
+            return Err(AppError::NotFound("Este jogo da Microsoft Store / Xbox não está instalado neste PC. Instale-o pelo app Xbox.".into()));
+        }
+        return Ok(Launch::App(a));
+    }
     if let Some(a) = appid {
         match crate::steam::local::app(a) {
             Some(x) if x.installed => {
@@ -221,6 +234,7 @@ pub fn launch_game(app: AppHandle, db: State<Db>, profile_id: i64, game_id: i64)
     let Prepared { exe, args, fullscreen } = match plan(&db, profile_id, game_id)? {
         Launch::Exe(p) => p,
         Launch::Steam(appid) => return launch_via_steam(&app, &db, profile_id, game_id, appid),
+        Launch::App(aumid) => return launch_store_app(&app, &db, profile_id, game_id, aumid),
     };
     let path = exe.as_path();
     if let Some((kind, on)) = fullscreen {
@@ -250,26 +264,78 @@ pub fn launch_game(app: AppHandle, db: State<Db>, profile_id: i64, game_id: i64)
 
     std::thread::spawn(move || {
         let _ = child.wait();
-        let secs = started.elapsed().as_secs() as i64;
-        let db = app.state::<Db>();
-        if let Ok(conn) = db.conn() {
-            let offset = format!("-{secs} seconds");
-            let _ = conn.execute(
-                "INSERT INTO play_sessions(profile_id,game_id,started_at,ended_at,duration_seconds)
-                 VALUES(?1,?2,datetime('now',?3),datetime('now'),?4)",
-                params![profile_id, game_id, offset, secs],
-            );
-            let _ = conn.execute(
-                "UPDATE profile_games SET playtime_seconds=playtime_seconds+?1
-                 WHERE profile_id=?2 AND game_id=?3",
-                params![secs, profile_id, game_id],
-            );
-        }
-        // Se era o último jogo aberto, traz o NEXSTAGE de volta.
-        overlay::game_finished(&app, game_id);
-        let _ = app.emit("game-session-ended", game_id);
+        end_session(&app, profile_id, game_id, started.elapsed().as_secs() as i64);
     });
 
+    Ok(())
+}
+
+/// Registra a sessão encerrada (tempo de jogo), traz o NEXSTAGE de volta se era o último jogo aberto e
+/// avisa a interface.
+fn end_session(app: &AppHandle, profile_id: i64, game_id: i64, secs: i64) {
+    let db = app.state::<Db>();
+    if let Ok(conn) = db.conn() {
+        let offset = format!("-{secs} seconds");
+        let _ = conn.execute(
+            "INSERT INTO play_sessions(profile_id,game_id,started_at,ended_at,duration_seconds)
+             VALUES(?1,?2,datetime('now',?3),datetime('now'),?4)",
+            params![profile_id, game_id, offset, secs],
+        );
+        let _ = conn.execute(
+            "UPDATE profile_games SET playtime_seconds=playtime_seconds+?1
+             WHERE profile_id=?2 AND game_id=?3",
+            params![secs, profile_id, game_id],
+        );
+    }
+    overlay::game_finished(app, game_id);
+    let _ = app.emit("game-session-ended", game_id);
+}
+
+/// Jogo da Microsoft Store / Xbox: o Explorer inicia o app (o .exe não pode ser aberto direto). O processo
+/// do jogo é reconhecido pela pasta do pacote; enquanto houver algum aberto lá, a sessão continua (cobre
+/// o `gamelaunchhelper.exe` que abre o jogo de verdade e encerra). Sem processo em 2 min, nada é registrado.
+fn launch_store_app(app: &AppHandle, db: &Db, profile_id: i64, game_id: i64, aumid: String) -> AppResult<()> {
+    use std::time::Duration;
+    let roots = crate::msstore::process_roots(&aumid);
+    crate::msstore::launch(&aumid).map_err(|e| AppError::Other(format!("Falha ao iniciar o jogo: {e}")))?;
+    if let Ok(conn) = db.conn() {
+        let _ = conn.execute(
+            "UPDATE profile_games SET last_played_at=strftime('%Y-%m-%d %H:%M:%f','now') WHERE profile_id=?1 AND game_id=?2",
+            params![profile_id, game_id],
+        );
+    }
+    app.state::<Runtime>().last_game.store(game_id, std::sync::atomic::Ordering::SeqCst);
+    overlay::set_active(app, false); // desfaz o modo do Gameboot
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.minimize();
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let wait_start = Instant::now();
+        let mut started: Option<Instant> = None;
+        let mut gone_since: Option<Instant> = None;
+        loop {
+            std::thread::sleep(Duration::from_secs(2));
+            let pids = crate::msstore::pids_under(&roots);
+            match (pids.last(), started) {
+                (Some(&pid), _) => {
+                    started.get_or_insert_with(Instant::now);
+                    gone_since = None;
+                    app.state::<Runtime>().add(game_id, pid); // o mais recente: o jogo, não o lançador
+                }
+                (None, None) if wait_start.elapsed() > Duration::from_secs(120) => return,
+                (None, None) => {}
+                // alguns segundos sem processo (troca lançador → jogo) antes de dar a sessão por encerrada
+                (None, Some(t0)) => {
+                    let g = *gone_since.get_or_insert_with(Instant::now);
+                    if g.elapsed() >= Duration::from_secs(6) {
+                        end_session(&app, profile_id, game_id, g.duration_since(t0).as_secs() as i64);
+                        return;
+                    }
+                }
+            }
+        }
+    });
     Ok(())
 }
 

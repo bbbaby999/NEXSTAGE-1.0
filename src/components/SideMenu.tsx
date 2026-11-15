@@ -90,6 +90,7 @@ export default function SideMenu({ open, onClose, onGo }: {
     "Biblioteca": "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
     "Mídias": "M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6M9 9.5h.01",
     "Conquistas": "M8 4h8v5a4 4 0 0 1-8 0V4ZM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M10 17h4",
+    "Zerei!": "M7 4h10v4a5 5 0 0 1-10 0V4ZM4 5h3M17 5h3M12 13v3M8 20h8M9.5 16.5h5M9.5 8.2l1.8 1.8 3.2-3.4",
     "Ver perfil": "M12 12a4 4 0 100-8 4 4 0 000 8zM4 20c0-4 4-6 8-6s8 2 8 6",
     "Central de Controles": "M7 8h10a4 4 0 0 1 4 4v1.5a3.5 3.5 0 0 1-6.3 2.1L14 14.5h-4l-.7 1.1A3.5 3.5 0 0 1 3 13.5V12a4 4 0 0 1 4-4ZM7.5 10.5v3M6 12h3M15.5 11.5h0M17.5 13h0",
     "Configurações": "M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M6 15v4",
@@ -121,6 +122,7 @@ export default function SideMenu({ open, onClose, onGo }: {
             {item(tk("Biblioteca"), () => onGo("library"))}
             {item(tk("Mídias"), () => onGo("gallery"))}
             {item(tk("Conquistas"), () => onGo("achievements"))}
+            {item(tk("Zerei!"), () => onGo("zerei"))}
             {item(tk("Ver perfil"), () => onGo("profile"))}
             {item(tk("Central de Controles"), () => onGo("controllers"))}
             {item(tk("Configurações"), () => onGo("settings"))}

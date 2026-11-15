@@ -4,7 +4,7 @@ import { play } from "../lib/sound";
 import { markLayerClosed } from "../lib/nav";
 
 /** Modal com Escape (ou botão B do controle) para fechar; só o mais recente reage. */
-export default function Modal({ title, onClose, children, wide, xl, full }: {
+export default function Modal({ title, onClose, children, wide, xl, full, portal, className }: {
   title: string; onClose: () => void; children: ReactNode; wide?: boolean;
   /** Janela larga para telas de resultados (ex.: importação da Steam). */
   xl?: boolean;
@@ -13,6 +13,14 @@ export default function Modal({ title, onClose, children, wide, xl, full }: {
    * a animação 3D (transform) do modal de fora prenderia o `position: fixed` desta à caixa dele (cortada).
    */
   full?: boolean;
+  /**
+   * Janela normal, mas renderizada direto no <body> (mesmo motivo de `full`): para janelas abertas de
+   * dentro de outra (ex.: pesquisa de imagens a partir de "Editar jogo"), que não podem ficar presas à
+   * caixa — e à rolagem — da janela de fora.
+   */
+  portal?: boolean;
+  /** Classe extra na caixa da janela (layout próprio). */
+  className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -51,12 +59,13 @@ export default function Modal({ title, onClose, children, wide, xl, full }: {
     </div>,
     document.body
   );
-  return (
+  const box = (
     <div className="overlay" ref={ref} role="dialog" aria-modal="true" aria-label={title}>
-      <div className={`modal ${wide ? "wide" : ""} ${xl ? "xl" : ""}`}>
+      <div className={`modal ${wide ? "wide" : ""} ${xl ? "xl" : ""} ${className ?? ""}`}>
         <h2>{title}</h2>
         {children}
       </div>
     </div>
   );
+  return portal ? createPortal(box, document.body) : box;
 }

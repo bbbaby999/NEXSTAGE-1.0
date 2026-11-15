@@ -33,6 +33,9 @@ export default function MetacriticPanel({ game, info, loaded, term, onInfo }: {
   const [editing, setEditing] = useState(false);
   const [manual, setManual] = useState("");
   const [choices, setChoices] = useState<MetacriticCandidate[] | null>(null);
+  // nome pesquisado: o mesmo da busca da Steam no rodapé da página; editável na janela de escolha
+  const [query, setQuery] = useState("");
+  const name = () => (term || game.title).trim();
   const tried = useRef<number | null>(null);
   const lastPlatform = useRef(game.platform);
 
@@ -43,13 +46,15 @@ export default function MetacriticPanel({ game, info, loaded, term, onInfo }: {
       : r.status === "choose" ? t("Escolha qual destes é o seu jogo.")
       : t("Nota não encontrada para esse nome.");
 
-  const fetchScore = async (silent: boolean, rawgId: number | null = null, reidentify = false) => {
+  /** `searchName`: nome digitado na janela de escolha (a janela continua aberta se nada for encontrado). */
+  const fetchScore = async (silent: boolean, rawgId: number | null = null, reidentify = false, searchName?: string) => {
     setBusy(true);
     try {
-      const r = await api.fetchMetacritic(p.id, game.id, term || game.title, rawgId, reidentify);
+      const r = await api.fetchMetacritic(p.id, game.id, searchName ?? name(), rawgId, reidentify);
       onInfo(r.info);
       setNote(explain(r));
-      if (r.status === "choose") { setChoices(r.candidates); return; }
+      if (r.status === "choose") { setQuery(searchName ?? name()); setChoices(r.candidates); return; }
+      if (searchName !== undefined && r.status === "not_found") { setChoices([]); return; }
       setChoices(null);
       if (!silent) toast(r.status === "found" ? t("Nota do Metacritic atualizada.") : explain(r)!, r.status === "found" ? "ok" : "err");
     } catch (e) {
@@ -118,14 +123,24 @@ export default function MetacriticPanel({ game, info, loaded, term, onInfo }: {
         <div className="row">
           <Button onClick={() => openUrl(pageUrl).catch(() => {})}>{info?.metacriticUrl ? t("Ver no Metacritic") : t("Procurar no Metacritic")}</Button>
           <Button variant="ghost" disabled={busy} onClick={() => fetchScore(false)}>{busy ? t("Buscando…") : t("Atualizar nota")}</Button>
-          {info?.rawgId && <Button variant="ghost" disabled={busy} onClick={() => fetchScore(false, null, true)}>{t("Não é este jogo?")}</Button>}
+          {info?.rawgId
+            ? <Button variant="ghost" disabled={busy} onClick={() => fetchScore(false, null, true)}>{t("Não é este jogo?")}</Button>
+            : score === null && <Button variant="ghost" disabled={busy} onClick={() => { setQuery(name()); setChoices([]); }}>{t("Pesquisar por nome")}</Button>}
           <Button variant="ghost" onClick={() => { setManual(score !== null ? String(score) : ""); setEditing(true); }}>{t("Informar manualmente")}</Button>
         </div>
       </div>
 
       {choices && (
         <CandidatePicker title={t("Qual destes é o seu jogo?")} onClose={() => setChoices(null)}
-          intro={t("Encontramos mais de um jogo parecido com “{name}” no RAWG. A escolha fica salva e as próximas atualizações usam este jogo.", { name: term || game.title })}
+          intro={choices.length
+            ? t("Encontramos mais de um jogo parecido com “{name}” no RAWG. A escolha fica salva e as próximas atualizações usam este jogo.", { name: query || name() })
+            : t("Digite o nome do jogo como ele é conhecido (de preferência o original, em inglês) e pesquise.")}
+          footer={
+            <form className="is-search mc-search" onSubmit={(e) => { e.preventDefault(); if (query.trim()) fetchScore(false, null, true, query.trim()); }}>
+              <input className="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("Nome do jogo")} aria-label={t("Nome do jogo")} />
+              <Button type="submit" variant="primary" disabled={busy || !query.trim()}>{busy ? t("Pesquisando…") : t("Pesquisar")}</Button>
+            </form>
+          }
           onPick={(id) => { setChoices(null); fetchScore(false, Number(id)); }}
           items={choices.map((c) => ({
             id: c.id, title: `${c.name}${c.year ? ` (${c.year})` : ""}`, image: c.image,

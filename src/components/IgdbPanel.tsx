@@ -87,12 +87,8 @@ export default function IgdbPanel({ game, info, loaded, term, onInfo, onGameChan
         {!d && <p className="muted">{busy ? t("Buscando no IGDB…") : note ?? t("Sem dados do IGDB para este jogo.")}</p>}
         {d && (
           <>
+            {/* sem capa aqui: ela já aparece no cabeçalho da página, junto da logo */}
             <div className="igdb-head">
-              {d.cover && (
-                <div className="igdb-cover">
-                  <img src={d.cover} alt="" loading="lazy" />
-                </div>
-              )}
               <div className="igdb-text">
                 <strong>{d.name}</strong>
                 {d.summary && <p className="desc">{d.summary}</p>}

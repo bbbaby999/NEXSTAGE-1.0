@@ -4,7 +4,7 @@ import Button from "./Button";
 import { api, errMsg } from "../lib/api";
 import { useSession } from "../state/session";
 import type { GameHit, ImageSet, WebShot } from "../types";
-import { t } from "../lib/i18n";
+import { t, tk } from "../lib/i18n";
 
 export type SearchMode = "screenshots" | "cover" | "background";
 
@@ -12,7 +12,7 @@ const SOURCE: Record<string, string> = {
   steam: "Steam", libretro: "libretro", wikipedia: "Wikipédia", steamgriddb: "SteamGridDB", rawg: "RAWG",
 };
 const TITLE: Record<SearchMode, string> = {
-  screenshots: "Pesquisar imagens na internet", cover: "Pesquisar capa na internet", background: "Pesquisar fundo na internet",
+  screenshots: tk("Pesquisar imagens na internet"), cover: tk("Pesquisar capa na internet"), background: tk("Pesquisar fundo na internet"),
 };
 
 /**
@@ -23,8 +23,10 @@ const TITLE: Record<SearchMode, string> = {
  *     uma (e quem chamou só a aplica ao salvar o formulário).
  * Controle/teclado: tudo é navegável por foco; Voltar fecha (ou volta aos resultados).
  */
-export default function ImageSearch({ mode, term, platform, onConfirm, onClose }: {
+export default function ImageSearch({ mode, term, platform, onConfirm, onClose, title }: {
   mode: SearchMode; term: string; platform: string; onConfirm: (shots: WebShot[]) => Promise<void> | void; onClose: () => void;
+  /** Título da janela (padrão: conforme o modo). Ex.: foto de perfil, banner, plano de fundo da Home. */
+  title?: string;
 }) {
   const { toast } = useSession();
   const [query, setQuery] = useState(term);
@@ -132,8 +134,8 @@ export default function ImageSearch({ mode, term, platform, onConfirm, onClose }
   const sources = (h: GameHit) => [...new Set(h.sources.map((s) => SOURCE[s.source] ?? s.source))].join(" · ");
 
   return (
-    <Modal title={TITLE[mode]} onClose={onClose} wide>
-      <div className="is-body" ref={body}>
+    <Modal title={title ?? t(TITLE[mode])} onClose={onClose} xl portal className="is-modal">
+      <div className={`is-body ${game && images ? "picking" : ""}`} ref={body}>
         {!game ? (
           <>
             <form className="is-search" onSubmit={(e) => { e.preventDefault(); search(); }}>
@@ -141,7 +143,10 @@ export default function ImageSearch({ mode, term, platform, onConfirm, onClose }
               <Button type="submit" variant="primary" disabled={busy}>{busy ? t("Pesquisando…") : t("Pesquisar")}</Button>
             </form>
             <p className="muted note">{t("Escolha o jogo correto (confira plataforma e ano). Nenhuma imagem é adicionada sem a sua confirmação.")}</p>
-            {hits === null || (busy && !hits.length) ? (
+            {hits === null && !busy && !term.trim() ? (
+              // aberta sem nome (foto/banner do perfil, fundo da Home): espera o usuário digitar
+              <div className="is-loading">{t("Digite o nome do jogo e pesquise.")}</div>
+            ) : hits === null || (busy && !hits.length) ? (
               <div className="is-loading">{t("Pesquisando em bancos de dados de jogos…")}</div>
             ) : hits.length === 0 ? (
               <div className="is-loading">{t("Nenhum jogo encontrado. Tente o nome original ou mais curto.")}</div>
@@ -173,7 +178,9 @@ export default function ImageSearch({ mode, term, platform, onConfirm, onClose }
             {!images ? (
               <div className="is-loading">{t("Carregando as imagens deste jogo…")}</div>
             ) : (
-              <>
+              // jogo escolhido: prévia grande à esquerda e listas de imagens à direita (só elas rolam, se precisar)
+              <div className="is-picked">
+                <div className="is-stage">
                 {preview && (
                   <div className="is-preview" style={{ backgroundImage: `url("${preview.thumb}")` }}>
                     <img key={preview.url} src={preview.url} alt="" referrerPolicy="no-referrer"
@@ -181,6 +188,8 @@ export default function ImageSearch({ mode, term, platform, onConfirm, onClose }
                     <span>{SOURCE[preview.source] ?? preview.source}{preview.title && preview.title !== SOURCE[preview.source] ? ` · ${preview.title}` : ""}</span>
                   </div>
                 )}
+                </div>
+                <div className="is-lists">
                 {order(images).map(([label, list]) => (
                   <section key={label}>
                     <h3 className="section sub">{label} <small>({list.length})</small></h3>
@@ -196,7 +205,8 @@ export default function ImageSearch({ mode, term, platform, onConfirm, onClose }
                     </div>
                   </section>
                 ))}
-              </>
+                </div>
+              </div>
             )}
           </>
         )}

@@ -22,12 +22,13 @@ export function useLibrary(profileId: number) {
 
   useEffect(() => {
     reload();
-    let un: (() => void) | undefined;
+    const uns: (() => void)[] = [];
     let cancelled = false;
-    listen("game-session-ended", () => reload()).then((f) => (cancelled ? f() : (un = f)));
+    // sessão encerrada (tempo de jogo) ou logos automáticas adicionadas em segundo plano
+    for (const ev of ["game-session-ended", "library-changed"]) listen(ev, () => reload()).then((f) => (cancelled ? f() : uns.push(f)));
     return () => {
       cancelled = true;
-      un?.();
+      uns.forEach((f) => f());
     };
   }, [reload]);
 

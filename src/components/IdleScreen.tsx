@@ -18,8 +18,10 @@ import { steamHero } from "../lib/steam";
  * ===================================================================================== */
 
 type Kind = "art" | "cover" | "shot";
-interface Item { src: string; fallback: string | null; kind: Kind; x: number; y: number; title: string | null; sub: string | null }
-interface Layer { k: number; src: string; kind: Kind; item: Item; kb: CSSProperties }
+/** `logo`: logo do jogo (no lugar do título; nas capturas, o do jogo da captura). */
+interface Item { src: string; fallback: string | null; kind: Kind; x: number; y: number; title: string | null; sub: string | null; logo: string | null }
+/** `logo`: o do item, se carregou (senão o título aparece em texto). */
+interface Layer { k: number; src: string; kind: Kind; item: Item; kb: CSSProperties; logo: string | null }
 
 /** Tempo de cada imagem e duração do crossfade (ms). */
 const HOLD: Record<"library" | "captures", number> = { library: 9000, captures: 7000 };
@@ -85,15 +87,22 @@ export function IdleShow({ mode, profileId, hint = false }: { mode: Exclude<Idle
           const hero = g.steamId ? steamHero(g.steamId) : null;
           return {
             src: (g.background ?? hero)!, fallback: g.background ? hero : null, kind: "art",
-            x: g.background ? g.bgX : 50, y: g.background ? g.bgY : 50, title: g.title, sub: null,
+            x: g.background ? g.bgX : 50, y: g.background ? g.bgY : 50, title: g.title, sub: null, logo: g.logo,
           };
         }))
-      : api.listGallery(profileId).then((list) => list
-        .filter((i) => i.exists)
-        .map((i): Item => ({
-          src: itemSrc(i), fallback: null, kind: "shot", x: 50, y: 50,
-          title: i.gameTitle, sub: formatDate(i.takenAt ?? i.addedAt),
-        })));
+      // Capturas: o logo é o do jogo da captura (biblioteca do perfil); sem jogo ou sem logo, o nome.
+      : Promise.all([api.listGallery(profileId), api.listLibrary(profileId).catch(() => [])]).then(([list, games]) => {
+        const byId = new Map(games.map((g) => [g.id, g]));
+        return list
+          .filter((i) => i.exists)
+          .map((i): Item => {
+            const g = i.gameId !== null ? byId.get(i.gameId) : undefined;
+            return {
+              src: itemSrc(i), fallback: null, kind: "shot", x: 50, y: 50,
+              title: i.gameTitle ?? g?.title ?? null, sub: formatDate(i.takenAt ?? i.addedAt), logo: g?.logo ?? null,
+            };
+          });
+      });
     load.then((l) => { if (!dead) setItems(l); }).catch(() => { if (!dead) setItems([]); });
     return () => { dead = true; };
   }, [mode, profileId]);
@@ -114,9 +123,11 @@ export function IdleShow({ mode, profileId, hint = false }: { mode: Exclude<Idle
           if (!item.fallback || dead || !(await preload(item.fallback))) { if (dead) return; continue; }
           src = item.fallback; kind = item.kind === "art" ? "art" : "cover";
         }
+        // logo que não carrega (link quebrado, sem internet): mostra o título em texto
+        const logo = item.logo && (await preload(item.logo)) ? item.logo : null;
         if (dead) return;
         const k = ++counter.current;
-        setLayers((l) => [...l.slice(-1), { k, src, kind, item, kb: kenBurns(kind, hold + FADE * 2) }]);
+        setLayers((l) => [...l.slice(-1), { k, src, kind, item, kb: kenBurns(kind, hold + FADE * 2), logo }]);
         setTimeout(() => { if (!dead) setLayers((l) => l.filter((v) => v.k >= k)); }, FADE + 100);
         break;
       }
@@ -136,9 +147,11 @@ export function IdleShow({ mode, profileId, hint = false }: { mode: Exclude<Idle
           {l.kind !== "art" && <img className="idle-backdrop" src={l.src} alt="" draggable={false} />}
           <img className="idle-img" src={l.src} alt="" draggable={false}
             style={{ ...l.kb, objectPosition: `${l.item.x}% ${l.item.y}%` }} />
-          {(l.item.title || l.item.sub) && (
+          {(l.logo || l.item.title || l.item.sub) && (
             <div className="idle-caption">
-              {l.item.title && <strong>{l.item.title}</strong>}
+              {l.logo
+                ? <img className="idle-logo" src={l.logo} alt={l.item.title ?? ""} draggable={false} referrerPolicy="no-referrer" />
+                : l.item.title && <strong>{l.item.title}</strong>}
               {l.item.sub && <small>{l.item.sub}</small>}
             </div>
           )}

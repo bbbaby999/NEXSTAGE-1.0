@@ -29,6 +29,11 @@ export default function ControlHints() {
       const layer = document.querySelector<HTMLElement>(".overlay:not(.leaving)");
       if (layer) {
         if (layer.matches("[data-viewer]")) return [[["dpad"], tk("Anterior / próxima")], [["back"], tk("Fechar")]];
+        // Zerei!: formulário (L2/R2 ajustam o campo em foco ou mudam o status)
+        if (layer.querySelector(".zr-edit")) {
+          const adj = (document.activeElement as HTMLElement | null)?.dataset?.zrAdjust;
+          return [[["dpad"], tk("Mover")], [["confirm"], tk("Selecionar")], [["l2", "r2"], adj ? tk("Ajustar") : tk("Status")], [["back"], tk("Fechar")]];
+        }
         if (layer.querySelector(".cp")) return [[["dpad"], tk("Ajustar")], [["confirm"], tk("Selecionar")], [["menu"], tk("Aplicar")], [["back"], tk("Cancelar")]];
         return [[["dpad"], tk("Mover")], [["confirm"], tk("Selecionar")], [["back"], tk("Fechar")]];
       }
@@ -41,6 +46,11 @@ export default function ControlHints() {
         case "home": return [[["confirm"], tk("Selecionar")], [["menu"], tk("Opções")], pages, [["back"], tk("Menu")]];
         case "stats": return [[["confirm"], tk("Selecionar")], [["l2", "r2"], tk("Abas")], pages, [["back"], tk("Voltar")]];
         case "achievements": return [[["confirm"], tk("Selecionar")], [["l2", "r2"], tk("RetroAchievements / Steam")], pages, [["back"], tk("Voltar")]];
+        case "zerei":
+          if (document.querySelector(".zr-detail")) return [[["confirm"], tk("Selecionar")], [["l2", "r2"], tk("Registro anterior / próximo")], pages, [["back"], tk("Voltar")]];
+          if (document.querySelector(".zr-stats")) return [[["confirm"], tk("Selecionar")], [["menu"], tk("Coleção")], pages, [["back"], tk("Voltar")]];
+          if (!document.querySelector(".zr-grid, .zr-filters")) return [[["confirm"], tk("Selecionar")], [["menu"], tk("Estatísticas")], pages, [["back"], tk("Voltar")]];
+          return [[["confirm"], tk("Abrir")], [["x"], tk("Ordenar")], [["l2", "r2"], tk("Status")], [["menu"], tk("Estatísticas")], pages, [["back"], tk("Voltar")]];
         case "library": return [[["confirm"], tk("Abrir")], [["x"], tk("Ordenar")], [["l2"], tk("Gênero")], [["r2"], tk("Plataforma")], pages, [["back"], tk("Voltar")]];
         default: return [[["confirm"], tk("Selecionar")], pages, [["back"], tk("Voltar")]];
       }

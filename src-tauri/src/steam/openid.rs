@@ -76,7 +76,7 @@ pub fn parse_query(q: &str) -> HashMap<String, String> {
 }
 
 /// Página exibida no navegador depois do retorno (sem scripts, sem recursos externos).
-fn page(ok: bool) -> String {
+pub(crate) fn page(ok: bool) -> String {
     let (title, msg) = if ok {
         ("Login concluído", "Pronto! Você já pode fechar esta aba e voltar ao NEXSTAGE.<br><small>Done! You can close this tab and return to NEXSTAGE.</small>")
     } else {
@@ -95,7 +95,7 @@ fn page(ok: bool) -> String {
 }
 
 /// Lê uma requisição e devolve (caminho, query).
-fn read_request(stream: &mut TcpStream) -> Option<(String, String)> {
+pub(crate) fn read_request(stream: &mut TcpStream) -> Option<(String, String)> {
     stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
     let mut buf = vec![0u8; 16 * 1024];
     let mut n = 0;

@@ -12,6 +12,8 @@ import GameCard from "../components/GameCard";
 import GameForm from "../components/GameForm";
 import FoldersPanel from "../components/FoldersPanel";
 import SteamImport from "../components/SteamImport";
+import XboxImport from "../components/XboxImport";
+import type { ImportSource } from "../components/ImportSource";
 import Seg from "../components/Seg";
 import { GLYPHS } from "../components/Glyph";
 import Select from "../components/Select";
@@ -33,9 +35,9 @@ const DIR_LABEL: Record<SortKey, Record<Dir, string>> = {
   platform: { asc: tk("PC → Nintendinho"), desc: tk("Nintendinho → PC") },
 };
 /** Formatos do "Adicionar jogo": executáveis (jogo de PC) e arquivos iniciados por emulador. */
-const EXE_EXTS = ["exe", "bat", "cmd"];
+const EXE_EXTS = ["exe", "bat", "cmd", "lnk"]; // .lnk: atalhos, inclusive de jogos do app Xbox / Microsoft Store
 const FILE_EXTS = ["iso", "bin", "cue", "nsp", "xci", "nup", "pkg", "vpk"];
-type NewGame = { exePath?: string; isoPath?: string; platform?: string | null; emulatorId?: number | null };
+type NewGame = { exePath?: string; title?: string; isoPath?: string; platform?: string | null; emulatorId?: number | null };
 
 const byTitle = (a: Game, b: Game) => a.title.localeCompare(b.title, "pt");
 /** Posição na lista oficial de plataformas; valores antigos (ex.: RetroArch) ficam no fim. */
@@ -77,7 +79,8 @@ export default function Library() {
   const [q, setQ] = useState("");
   const [newGame, setNewGame] = useState<NewGame | null>(null);
   const [panel, setPanel] = useState(false);
-  const [steamImport, setSteamImport] = useState(false);
+  /** Biblioteca → Importar: origem aberta (Steam ou Xbox), ou fechado. */
+  const [importSrc, setImportSrc] = useState<ImportSource | null>(null);
   const [sort, setSort] = useState<{ key: SortKey; dir: Dir }>({ key: "title", dir: "asc" });
   const [genre, setGenre] = useState("");
   const [platform, setPlatform] = useState("");
@@ -209,7 +212,8 @@ export default function Library() {
       const it = await api.inspectGameFile(p.id, sel);
       if (it.status === "duplicate") { toast(t("Este jogo já está na sua biblioteca."), "err"); return; }
       if (it.status === "invalid") { toast(t(it.note), "err"); return; }
-      if (it.kind === "windows") { setNewGame({ exePath: sel }); return; }
+      // it.path: o destino real (atalho .lnk resolvido; jogo do Xbox → shell:AppsFolder\…)
+      if (it.kind === "windows") { setNewGame({ exePath: it.path, title: /\.lnk$/i.test(sel) ? it.name : undefined }); return; }
       if (it.kind === "pkg" || it.kind === "vpk") toast(t("Pacotes .pkg e .vpk precisam ser instalados no emulador antes de jogar."));
       setNewGame({ isoPath: sel, platform: it.platform, emulatorId: it.assigned });
     } catch (e) { toast(errMsg(e), "err"); }
@@ -239,7 +243,7 @@ export default function Library() {
         <div className="row">
           <input className="search" placeholder={t("Buscar por título")} value={q} onChange={(e) => setQ(e.target.value)} />
           <Button onClick={() => setPanel(true)}>{t("Pastas de jogos")}</Button>
-          <Button onClick={() => setSteamImport(true)}>{t("Importar da Steam")}</Button>
+          <Button onClick={() => setImportSrc("steam")}>{t("Importar")}</Button>
           <Button variant="primary" onClick={addGame}>{t("Adicionar jogo")}</Button>
         </div>
       </div>
@@ -317,7 +321,8 @@ export default function Library() {
         )
       )}
 
-      {steamImport && <SteamImport onClose={() => setSteamImport(false)} onImported={reload} />}
+      {importSrc === "steam" && <SteamImport onClose={() => setImportSrc(null)} onImported={reload} onSource={setImportSrc} />}
+      {importSrc === "xbox" && <XboxImport onClose={() => setImportSrc(null)} onImported={reload} onSource={setImportSrc} />}
       {panel && <FoldersPanel profileId={p.id} onClose={() => setPanel(false)} onChanged={reload} />}
       {newGame && <GameForm profileId={p.id} {...newGame} onClose={() => setNewGame(null)} onSaved={() => { setNewGame(null); reload(); }} />}
     </>

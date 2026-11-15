@@ -3,9 +3,9 @@ import { useLang } from "./lib/i18n";
 import { check } from "@tauri-apps/plugin-updater";
 import { listen } from "@tauri-apps/api/event";
 import { SessionProvider, useSession } from "./state/session";
-import { layerJustClosed, useSpatialNav } from "./lib/nav";
+import { layerJustClosed, recoverFocusTarget, useSpatialNav } from "./lib/nav";
 import { resetPageFocus } from "./lib/pageFocus";
-import { api } from "./lib/api";
+import { api, errMsg } from "./lib/api";
 import { applyHomeBlur, applyParticles, applyTheme, applyWaves, DEFAULT_THEME, loadProfileTheme, setLedSync } from "./lib/theme";
 import { play, preloadSounds, setSoundConfig } from "./lib/sound";
 import { LayoutOverride, setLayoutOverride } from "./lib/inputDevice";
@@ -47,6 +47,7 @@ const PAGES = {
   settings: () => import("./features/Settings"),
   achievements: () => import("./features/Achievements"),
   controllers: () => import("./features/Controllers"),
+  zerei: () => import("./features/Zerei"),
 };
 const Collection = lazy(PAGES.collection);
 const Gallery = lazy(PAGES.gallery);
@@ -56,6 +57,7 @@ const Stats = lazy(PAGES.stats);
 const Settings = lazy(PAGES.settings);
 const Achievements = lazy(PAGES.achievements);
 const Controllers = lazy(PAGES.controllers);
+const Zerei = lazy(PAGES.zerei);
 const preloadPages = () => { for (const load of Object.values(PAGES)) load().catch(() => {}); };
 
 type Phase = "loading" | "boot" | "done";
@@ -159,6 +161,33 @@ function Shell() {
   }, []);
   useEffect(() => { document.documentElement.classList.toggle("overlay-mode", ingame); }, [ingame]);
 
+  // Chamado pelo controle (combinação "trazer para frente"): a janela já está ativa; garante o foco do
+  // documento e um item focado, para teclado e controle navegarem na hora.
+  useEffect(() => {
+    let un: (() => void) | undefined;
+    let cancelled = false;
+    listen("app-summoned", () => {
+      window.focus();
+      const a = document.activeElement;
+      if (!a || a === document.body) recoverFocusTarget()?.focus({ preventScroll: true });
+    }).then((f) => (cancelled ? f() : (un = f)));
+    return () => { cancelled = true; un?.(); };
+  }, []);
+
+  // Alt+Enter: alterna tela cheia ⇄ janela (e salva como preferência). Fase de captura: o Enter não
+  // chega a "clicar" no item em foco nem a enviar formulários. No overlay em jogo, fica sem efeito.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey || e.key !== "Enter" || e.ctrlKey || e.shiftKey || e.metaKey) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (e.repeat || ingame) return;
+      api.toggleFullscreen().catch((err) => toast(errMsg(err), "err"));
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [ingame, toast]);
+
   /**
    * Hierarquia única de "voltar" (ESC / Círculo):
    * janela ou visualizador → fecha só ele (tratado pelo próprio componente);
@@ -215,6 +244,7 @@ function Shell() {
       {view === "emulators" && <Emulators />}
       {view === "achievements" && <Achievements />}
       {view === "controllers" && <Controllers />}
+      {view === "zerei" && <Zerei />}
     </Suspense>
   );
 

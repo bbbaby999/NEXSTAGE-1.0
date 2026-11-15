@@ -18,7 +18,8 @@ export interface CropSpec { aspectW: number; aspectH: number; outW: number; outH
 export default function ImagePicker({ label, value, onChange, maxW, maxH, shape, crop, search }: {
   label: string; value: string | null; onChange: (v: string | null) => void;
   maxW: number; maxH: number; shape: "round" | "wide" | "tall"; crop?: CropSpec;
-  search?: { term: string; platform: string; kind: "cover" | "background" };
+  /** Pesquisa na internet: `term` vazio abre a janela com a caixa de busca para digitar o nome do jogo. */
+  search?: { term: string; platform: string; kind: "cover" | "background"; title?: string };
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const { toast } = useSession();
@@ -27,6 +28,8 @@ export default function ImagePicker({ label, value, onChange, maxW, maxH, shape,
 
   async function fromWeb([s]: WebShot[]) {
     const data = await api.fetchImageData(s.url); // baixada pelo app (só das fontes de jogos permitidas)
+    // com recorte (foto redonda, banner): abre o enquadramento antes de aplicar
+    if (crop) { setEditing(await srcToDataUrl(data, 2400, 2400)); return; }
     onChange(await srcToDataUrl(data, maxW, maxH));
     toast(t("{v0} escolhido. Salve para aplicar.", { v0: search?.kind === "background" ? "Fundo" : "Capa" }));
   }
@@ -55,7 +58,7 @@ export default function ImagePicker({ label, value, onChange, maxW, maxH, shape,
       <input ref={ref} type="file" accept="image/*" hidden
         onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />
       {search && searching && (
-        <ImageSearch mode={search.kind} term={search.term} platform={search.platform} onConfirm={fromWeb} onClose={() => setSearching(false)} />
+        <ImageSearch mode={search.kind} term={search.term} platform={search.platform} title={search.title} onConfirm={fromWeb} onClose={() => setSearching(false)} />
       )}
       {crop && editing && (
         <ImageCropper src={editing} aspectW={crop.aspectW} aspectH={crop.aspectH} outW={crop.outW} outH={crop.outH}

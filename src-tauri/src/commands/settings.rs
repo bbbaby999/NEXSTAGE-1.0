@@ -11,11 +11,28 @@ pub fn get_app_setting(db: State<Db>, key: String) -> AppResult<Option<String>> 
     let v: Option<String> = conn
         .query_row("SELECT value FROM app_settings WHERE key=?1", [&key], |r| r.get(0))
         .optional()?;
-    // chaves de API ficam cifradas no banco; a interface recebe o valor legível
+    // Chaves de API nunca saem do backend: a interface só fica sabendo se há uma chave salva ("1").
     if crate::apikeys::is_secret(&key) {
-        return Ok(v.and_then(|v| crate::apikeys::open(&key, &v)));
+        return Ok(secret_status(&conn, &key));
     }
     Ok(v)
+}
+
+/// "1" se a chave de API está salva e legível neste computador; `None` se não.
+fn secret_status(conn: &rusqlite::Connection, key: &str) -> Option<String> {
+    crate::apikeys::read(conn, key).map(|_| "1".to_string())
+}
+
+#[cfg(test)]
+mod secret_tests {
+    #[test]
+    fn api_keys_are_never_returned_to_the_ui() {
+        let c = rusqlite::Connection::open_in_memory().unwrap();
+        c.execute_batch("CREATE TABLE app_settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);").unwrap();
+        assert_eq!(super::secret_status(&c, "rawg_key"), None);
+        crate::apikeys::write(&c, "rawg_key", "MINHA-CHAVE-SECRETA").unwrap();
+        assert_eq!(super::secret_status(&c, "rawg_key").as_deref(), Some("1"));
+    }
 }
 
 #[tauri::command]

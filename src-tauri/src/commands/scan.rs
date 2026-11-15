@@ -246,6 +246,30 @@ pub(crate) fn inspect(db: &Db, profile_id: i64, path: &str) -> AppResult<ScanIte
         return Err(AppError::Validation("O arquivo não existe ou está inacessível.".into()));
     }
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    // Atalho (.lnk): segue para o destino. Jogo da Microsoft Store / Xbox vira `shell:AppsFolder\<AUMID>`;
+    // o nome do item é o do atalho (o app Xbox usa o nome do jogo).
+    if ext == "lnk" {
+        let sc = crate::msstore::resolve_lnk(&path).map_err(AppError::Validation)?;
+        if !crate::msstore::is_app(&sc.target) {
+            let mut it = inspect(db, profile_id, &sc.target)?;
+            it.name = sc.title;
+            return Ok(it);
+        }
+        let conn = db.conn()?;
+        let dup = library_keys(&conn, profile_id)?.contains(&norm_key(&sc.target));
+        return Ok(ScanItem {
+            path: sc.target,
+            name: sc.title,
+            ext: String::new(),
+            kind: "windows".into(),
+            platform: Some("PC".into()),
+            status: if dup { "duplicate" } else { "new" }.into(),
+            note: if dup { "Já está na biblioteca." } else { "Jogo da Microsoft Store / Xbox" }.into(),
+            size: 0,
+            compatible: vec![],
+            assigned: None,
+        });
+    }
     let cue_bin = (ext == "cue").then(|| {
         let mut txt = String::new();
         let _ = File::open(&path).and_then(|f| f.take(256 * 1024).read_to_string(&mut txt));

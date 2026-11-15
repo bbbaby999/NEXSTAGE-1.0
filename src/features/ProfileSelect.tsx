@@ -11,7 +11,7 @@ import { t } from "../lib/i18n";
 /** Entrada automática: só na abertura do app (não ao voltar por "Trocar usuário"). */
 let autoTried = false;
 
-const START_VIEWS: View[] = ["home", "library", "collection", "gallery", "stats", "settings", "emulators", "achievements", "controllers"];
+const START_VIEWS: View[] = ["home", "library", "collection", "gallery", "stats", "settings", "emulators", "achievements", "controllers", "zerei"];
 
 /** Tela exibida sempre na inicialização e após "Trocar usuário". */
 export default function ProfileSelect() {

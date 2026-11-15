@@ -72,13 +72,14 @@
 .replay{padding:6px 0 26px;animation:stage-in .6s .12s var(--ease) both}
 .replay-head{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .replay-head .section{margin:0}
-.replay-track{display:flex;gap:18px;overflow-x:auto;scroll-behavior:smooth;scroll-snap-type:x proximity;padding:16px 8px 18px;margin:0 -8px;scrollbar-width:none;
+/* 10 capas cabem na largura do carrossel (10 cartões + 9 espaços); abaixo do mínimo, volta a rolar */
+.replay-track{--rp-gap:clamp(10px,1vw,18px);display:flex;gap:var(--rp-gap);overflow-x:auto;scroll-behavior:smooth;scroll-snap-type:x proximity;padding:16px 8px 18px;margin:0 -8px;scrollbar-width:none;
   -webkit-mask-image:linear-gradient(90deg,transparent,#000 44px,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(90deg,transparent,#000 44px,#000 calc(100% - 44px),transparent)}
 .replay-track.at-start{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 44px),transparent)}
 .replay-track.at-end{-webkit-mask-image:linear-gradient(90deg,transparent,#000 44px);mask-image:linear-gradient(90deg,transparent,#000 44px)}
 .replay-track.at-start.at-end{-webkit-mask-image:none;mask-image:none}
 .replay-track::-webkit-scrollbar{display:none}
-.replay-card{flex:none;width:clamp(8.5rem,9.6vw,11.5rem);display:flex;flex-direction:column;gap:6px;padding:0;background:none;border:none;color:var(--text);
+.replay-card{flex:none;width:max(6.5rem,calc((100% - 9 * var(--rp-gap)) / 10));display:flex;flex-direction:column;gap:6px;padding:0;background:none;border:none;color:var(--text);
   text-align:left;cursor:pointer;scroll-snap-align:start}
 .replay-inner{display:flex;flex-direction:column;gap:6px;min-width:0;animation:replay-in .45s calc(var(--i) * 45ms + .15s) var(--ease) both}
 @keyframes replay-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
@@ -102,7 +103,14 @@
 .modal .btn.danger:focus::after{box-shadow:0 0 28px 2px rgba(255,77,109,.55)}
 
 /* Fundo da Home: preenche a tela sem zoom exagerado; parallax leve; sombra só onde há texto */
-.bg-layer{transform:translate3d(calc(var(--px,0)*-12px),calc(var(--py,0)*-8px),0) scale(1.035)}
+/* escala mínima para o parallax (até 12px) não revelar as bordas */
+.bg-layer{transform:translate3d(calc(var(--px,0)*-12px),calc(var(--py,0)*-8px),0) scale(1.02)}
+/* arte bem mais larga que a janela: largura total no topo, esmaecendo para uma cópia desfocada dela */
+.bg-layer.wide .bg-fill,.bg-layer.wide .bg-art{position:absolute;inset:0;background-repeat:no-repeat}
+.bg-layer.wide .bg-fill{background-size:cover;background-position:center;filter:blur(44px) saturate(1.15) brightness(.72);transform:scale(1.12)}
+.bg-layer.wide .bg-art{background-size:100% auto;
+  -webkit-mask-image:linear-gradient(180deg,#000 0%,#000 calc(var(--art-h) * .62),transparent var(--art-h));
+  mask-image:linear-gradient(180deg,#000 0%,#000 calc(var(--art-h) * .62),transparent var(--art-h))}
 .bg-layer.soft{transform:translate3d(calc(var(--px,0)*-12px),calc(var(--py,0)*-8px),0) scale(1.16)}
 .bg-shade{background:
   linear-gradient(90deg,rgba(4,6,12,.86) 0%,rgba(4,6,12,.5) 26%,rgba(4,6,12,.1) 54%,transparent 70%),
@@ -271,8 +279,31 @@ html.toast-window #root{display:flex;align-items:flex-end;justify-content:flex-e
   background:linear-gradient(180deg,rgba(var(--game-rgb),.16),rgba(8,11,20,.62));
   -webkit-backdrop-filter:blur(10px) saturate(1.4);backdrop-filter:blur(10px) saturate(1.4);text-shadow:0 1px 2px rgba(0,0,0,.6)}
 
-/* ---------- Pesquisa inteligente de imagens (escolher jogo → escolher imagens) ---------- */
-.is-body{max-height:min(66vh,760px);overflow-y:auto;padding:2px 6px 10px 2px;margin-bottom:var(--s3)}
+/* ---------- Pesquisa inteligente de imagens (escolher jogo → escolher imagens) ----------
+   Janela de altura fixa (~90% da tela): título e botões sempre visíveis; só a área de conteúdo rola.
+   Com o jogo escolhido: prévia grande à esquerda e listas à direita, cada uma no seu espaço. */
+.is-body{max-height:min(70vh,860px);overflow-y:auto;padding:2px 6px 10px 2px;margin-bottom:var(--s3)}
+.modal.is-modal{height:min(90vh,1000px);max-height:none;overflow:hidden}
+.modal.is-modal>h2{flex:none}
+.is-modal .is-body{flex:1;min-height:0;max-height:none;display:flex;flex-direction:column}
+.is-modal .is-body>*{flex:none}
+.is-modal .is-body.picking{overflow:hidden}
+.is-modal .is-foot{flex:none;margin-top:0;padding-top:var(--s3);border-top:1px solid var(--glass-line)}
+/* rolagem discreta: barra fina, sem trilho, só aparece onde há conteúdo a rolar */
+.is-modal :is(.is-body,.is-lists){scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
+.is-modal :is(.is-body,.is-lists)::-webkit-scrollbar{width:8px}
+.is-modal :is(.is-body,.is-lists)::-webkit-scrollbar-track{background:transparent}
+.is-modal :is(.is-body,.is-lists)::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px}
+.is-modal :is(.is-body,.is-lists)::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.26)}
+.is-picked{flex:1!important;min-height:0;display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);gap:var(--s5)}
+.is-stage{min-height:0;display:flex}
+.is-stage .is-preview{flex:1;height:auto;margin:0}
+.is-lists{min-height:0;overflow-y:auto;padding:0 8px 8px 2px}
+.is-lists .section.sub:first-child,.is-lists>section:first-child .section.sub{margin-top:0}
+@media (max-width:900px){
+  .is-picked{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+  .is-stage .is-preview{flex:none;height:clamp(160px,30vh,280px)}
+}
 .is-search{display:flex;gap:var(--s3);align-items:center}
 .is-search .search{flex:1;min-width:0}
 .is-body .note{margin:var(--s2) 0 var(--s4)}
@@ -391,6 +422,8 @@ html.toast-window #root{display:flex;align-items:flex-end;justify-content:flex-e
 .mc-chip.mid{border-color:rgba(255,204,51,.5)}
 .mc-chip.bad{border-color:rgba(255,77,77,.55)}
 .mc-cands{display:flex;flex-direction:column;gap:8px;max-height:56vh;overflow-y:auto;padding-right:4px}
+/* Metacritic: caixa de pesquisa na janela de escolha (trocar o nome e pesquisar de novo) */
+.mc-search{margin:var(--s2) 0 var(--s4)}
 .mc-cand{display:grid;grid-template-columns:88px minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 12px 8px 8px;border-radius:var(--r-md);cursor:pointer;text-align:left;color:inherit;
   background:linear-gradient(180deg,var(--glass-hi),var(--glass));border:1px solid var(--glass-line)}
 .mc-cand.other{opacity:.7}
@@ -425,7 +458,6 @@ html .dp-card :is(.hltb,.rate-row)::before{display:none}
 .dp-card .hltb tr.mine td:last-child{border-radius:0 8px 8px 0;padding-right:10px}
 .dp-card .shot-big{border-radius:var(--r-md)}
 .dp-card .shots{padding:4px 2px 6px;margin:0}
-.dp-card .desc{max-width:none}
 .dp-card .web-shots{margin-top:var(--s2)}
 .dp-card .web-shots .section.sub{margin:0 0 var(--s2)}
 /* informações: rótulo | valor, alinhados */
@@ -442,18 +474,78 @@ html .dp-card :is(.hltb,.rate-row)::before{display:none}
 .dp-side .mc.mid{border-color:rgba(255,204,51,.45)}
 .dp-side .mc.bad{border-color:rgba(255,77,77,.5)}
 
-/* ---------- Página do jogo: abas (Visão geral · Mods) ---------- */
-.dp-tabs{display:flex;gap:6px;margin-top:var(--s5);padding:4px;border-radius:999px;width:max-content;background:var(--glass);border:1px solid var(--glass-line)}
-.dp-tabs button{display:inline-flex;align-items:center;gap:8px;background:none;border:none;color:var(--text-dim);padding:9px 22px;border-radius:999px;cursor:pointer;font-weight:600;font-size:.9rem}
+/* ---------- Página do jogo: cabeçalho, ações e abas ----------
+   Composição inspirada na página de jogo do PS5: arte do jogo ocupando todo o cabeçalho, degradê escuro
+   embaixo e à esquerda (legibilidade sobre qualquer imagem), logo/título + ações
+   alinhados à base. Altura por faixa (não por proporção fixa): sem vazio em janelas largas e sem cortar
+   o conteúdo em janelas baixas — o topo reserva o espaço do botão Voltar, nada se sobrepõe. */
+.dp{--dp-pad:clamp(20px,2.4vw,40px)}
+.dp-hero{position:relative;isolation:isolate;display:flex;align-items:flex-end;width:100%;
+  min-height:clamp(330px,44vh,500px);padding-top:84px;overflow:hidden;
+  border-radius:var(--r-xl);border:1px solid var(--glass-line);background:#0a0d17;box-shadow:var(--elev-3)}
+.dp-hero-img{position:absolute;inset:0;z-index:-2;width:100%;height:100%;object-fit:cover;animation:fade .6s ease both}
+.dp-hero-soft{position:absolute;inset:-30px;z-index:-2;background:#101a38 center/cover;filter:blur(40px) saturate(1.2)}
+.dp-shade{position:absolute;inset:0;z-index:-1;pointer-events:none;background:
+  linear-gradient(0deg,rgba(5,6,10,.97) 0%,rgba(5,6,10,.8) 26%,rgba(5,6,10,.2) 62%,rgba(5,6,10,.46) 100%),
+  linear-gradient(90deg,rgba(5,6,10,.8) 0%,rgba(5,6,10,.38) 42%,transparent 72%)}
+/* classificação etária: canto inferior direito (posição padrão do selo); a coluna da esquerda não passa por baixo dele */
+.dp-hero:has(.age-badge) .dp-head{padding-right:calc(var(--dp-pad) + 64px)}
+
+.dp-head{display:flex;align-items:flex-end;gap:clamp(18px,2vw,32px);width:100%;padding:0 var(--dp-pad) var(--dp-pad)}
+.dp-title{display:flex;flex-direction:column;gap:var(--s4);min-width:0;flex:1}
+.dp-title h1{margin:0;font-size:clamp(1.9rem,3.1vw,3rem);line-height:1.06;letter-spacing:-.01em;
+  text-shadow:0 2px 18px rgba(0,0,0,.6);overflow-wrap:anywhere}
+/* logo no lugar do título (o nome continua no texto alternativo) */
+.dp-title h1.dp-logo-title{line-height:0}
+.dp-logo-title img{display:block;max-width:min(480px,100%);max-height:clamp(80px,13vh,140px);object-fit:contain;object-position:left bottom;
+  filter:drop-shadow(0 6px 18px rgba(0,0,0,.65))}
+
+/* plataforma · gêneros · Steam · RetroAchievements: canto superior direito, mesma altura, legível sobre a arte.
+   Largura limitada para nunca encostar no botão Voltar (canto oposto); se precisar, quebra em mais linhas. */
+.dp-meta{position:absolute;top:22px;right:var(--dp-pad);z-index:2;max-width:calc(100% - 240px);
+  align-items:center;justify-content:flex-end;gap:var(--s2)}
+.dp-meta>span{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 11px;border-radius:7px;font-size:.78rem;line-height:1;
+  background:rgba(8,11,20,.5);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.dp-meta>.plat-tag{height:26px;padding:0 11px}
+.dp-meta>.dp-more-genres{color:var(--text-dim);border-color:rgba(255,255,255,.18)}
+
+/* ações: Jogar/Instalar em destaque (o mesmo botão da Home), Favoritar e Mais opções na mesma altura, em vidro escuro */
+.dp-actions{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap}
+.dp-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;white-space:nowrap}
+.dp-actions .btn.primary.dp-play{padding:0 40px;font-size:1.04rem}
+.dp-actions .dp-act{padding:0 24px;background:rgba(12,16,28,.7);border:1px solid rgba(255,255,255,.14);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.dp-actions .dp-act:hover{background:rgba(26,32,50,.85)}
+.dp-actions .dp-act.on{color:#ffd76a;border-color:rgba(255,215,106,.4)}
+
+/* abas: barra de largura total logo abaixo do cabeçalho; seleção = sublinhado na cor de destaque */
+.dp-tabs{display:flex;align-items:stretch;gap:var(--s5);margin-top:var(--s4);padding:0 var(--s2);border-bottom:1px solid var(--glass-line)}
+.dp-tabs button{position:relative;display:inline-flex;align-items:center;gap:8px;height:50px;padding:0 6px;
+  background:none;border:none;border-radius:10px 10px 0 0;color:var(--text-dim);cursor:pointer;font:inherit;font-weight:600;font-size:.95rem;letter-spacing:.02em;
+  transition:color var(--dur,.2s)}
+.dp-tabs button::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;border-radius:3px 3px 0 0;
+  background:linear-gradient(90deg,var(--a),var(--b));box-shadow:0 0 14px rgba(var(--ar),.6);transform:scaleX(0);transition:transform .25s var(--ease)}
+.dp-tabs button:hover{color:var(--text)}
+.dp-tabs button.on{color:#fff}
+.dp-tabs button.on::after{transform:scaleX(1)}
 .dp-tabs .glyph{margin:0}
-.dp-tabs button.on{background:rgba(var(--ar),.35);color:#fff}
 .dp-mods{margin-top:var(--s2)}
-.dp-mods>.dp-block:first-child .dp-block-head{margin-top:var(--s4)}
+.dp-mods>.dp-block:first-child .dp-block-head{margin-top:var(--s5)}
+
+/* conteúdo: texto em largura confortável e ferramentas no rodapé do bloco, separadas por uma linha sutil */
+.dp-card .desc{max-width:78ch;margin:0;line-height:1.65;color:var(--text)}
+.dp-tools{display:flex;flex-direction:column;gap:var(--s3);padding-top:var(--s4);border-top:1px solid var(--glass-line)}
+.dp-tools .row{gap:10px}
+
+/* janelas estreitas: capa menor e informações abaixo dela; ações continuam inteiras */
+@media (max-width:760px){
+  .dp-head{flex-direction:column;align-items:flex-start}
+  .dp-meta{max-width:calc(100% - 180px)}
+  .dp-hero{min-height:0}
+}
 
 /* ---------- IGDB ---------- */
-.igdb-head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:start}
-.igdb-cover{display:flex;flex-direction:column;gap:8px;width:132px}
-.igdb-cover img{width:132px;aspect-ratio:3/4;object-fit:cover;border-radius:var(--r-md);box-shadow:var(--elev-2)}
+.igdb-head{display:block}
 .igdb-text{display:flex;flex-direction:column;gap:8px;min-width:0}
 .igdb-text strong{font-size:1.1rem}
 .igdb-text .desc{margin:0}
@@ -504,8 +596,6 @@ html[data-motion="reduced"] .mod-card:hover{transform:none}
 .age-badge.red b{background:#e03131}
 .age-badge.black b{background:#111}
 .age-badge.neutral b{background:#2b2f3a;font-size:.95rem}
-/* o conteúdo do banner (capa, título, botões) não passa por baixo do selo */
-.dp-hero:has(.age-badge) .dp-head{padding-right:86px}
 
 /* IGDB: ações no rodapé do bloco, separadas do conteúdo por uma linha sutil */
 .igdb-actions{padding-top:12px;border-top:1px solid var(--glass-line)}
@@ -572,3 +662,7 @@ html[data-motion="reduced"] .mod-card:hover{transform:none}
 .igdb-stage:focus .igdb-hud.inline,.igdb-stage:hover .igdb-hud.inline{opacity:1;transform:none;transition-duration:.15s;pointer-events:auto}
 /* glifos do PlayStation em vetor (barra de dicas, abas etc.) */
 .glyph.vec svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block}
+/* Home: logo do jogo no lugar do título escrito */
+.stage-title.stage-logo{line-height:0;text-shadow:none}
+.stage-logo img{display:block;max-width:min(520px,72vw);max-height:clamp(90px,16vh,170px);object-fit:contain;object-position:left bottom;
+  filter:drop-shadow(0 6px 22px rgba(0,0,0,.7));animation:fade .35s ease both}

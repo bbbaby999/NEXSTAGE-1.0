@@ -3,7 +3,7 @@
 //! Dois usos:
 //!  1. Navegação: eventos `pad-input`, só com a janela do NEXSTAGE em foco (apertar botões dentro de um
 //!     jogo não navega pelo launcher). 1 movimento por toque, atraso de 380 ms e repetição a cada 95 ms.
-//!     Analógico direito (vertical): eventos `pad-scroll` com a inclinação já tratada pela zona morta
+//!     Analógico direito (vertical e horizontal): eventos `pad-scroll` com a inclinação já tratada pela zona morta
 //!     (-1 = cima, 1 = baixo). A interface converte isso em rolagem contínua.
 //!  2. Combinações de botões para abrir o overlay e capturar a tela. Estas funcionam MESMO COM O JOGO EM
 //!     FOCO: são detectadas aqui (não na interface) e exigem SEGURAR a combinação, para não conflitar
@@ -48,6 +48,8 @@ pub mod btn {
 
 pub const DEFAULT_OVERLAY_COMBO: u16 = btn::SELECT | btn::START;
 pub const DEFAULT_SHOT_COMBO: u16 = btn::SELECT | btn::RB;
+/// Trazer o NEXSTAGE para frente em tela cheia (par com a captura: Select + LB).
+pub const DEFAULT_SUMMON_COMBO: u16 = btn::SELECT | btn::LB;
 const HOLD_OVERLAY: Duration = Duration::from_millis(700);
 const HOLD_SHOT: Duration = Duration::from_millis(350);
 
@@ -330,15 +332,16 @@ impl Tracker {
 /// Detecta "segurar a combinação": dispara uma vez e só rearma depois de soltar.
 #[derive(Default)]
 pub struct Combos {
-    since: [Option<Instant>; 2],
-    fired: [bool; 2],
+    since: [Option<Instant>; 3],
+    fired: [bool; 3],
 }
 
 impl Combos {
-    pub fn update(&mut self, mask: u16, combos: [u16; 2], now: Instant) -> [bool; 2] {
-        let holds = [HOLD_OVERLAY, HOLD_SHOT];
-        let mut fire = [false; 2];
-        for i in 0..2 {
+    /// `combos`: overlay, captura, trazer para frente.
+    pub fn update(&mut self, mask: u16, combos: [u16; 3], now: Instant) -> [bool; 3] {
+        let holds = [HOLD_OVERLAY, HOLD_SHOT, HOLD_OVERLAY];
+        let mut fire = [false; 3];
+        for i in 0..3 {
             let on = combos[i] != 0 && (mask & combos[i]) == combos[i];
             if on {
                 let s = *self.since[i].get_or_insert(now);
@@ -360,7 +363,10 @@ impl Combos {
 
 #[derive(Clone, Serialize)]
 struct ScrollEvent {
+    /// Vertical (negativo = cima): rola a página.
     value: f32,
+    /// Horizontal (negativo = esquerda): rola os carrosséis.
+    x: f32,
     device: &'static str,
 }
 
@@ -552,6 +558,9 @@ fn is_mirrored(prev: Option<&(Instant, String, bool)>, key: &str, is_virtual: bo
 fn fire(app: &AppHandle, which: usize) {
     if which == 0 {
         overlay::toggle(app);
+    } else if which == 2 {
+        let a = app.clone();
+        let _ = app.run_on_main_thread(move || overlay::summon(&a));
     } else {
         let a = app.clone();
         std::thread::spawn(move || {
@@ -572,6 +581,7 @@ pub fn spawn(app: AppHandle) {
         let rt = app.state::<Runtime>();
         rt.pad_overlay.store(read_mask_setting(&app, "pad_combo_overlay", DEFAULT_OVERLAY_COMBO) as u32, Ordering::SeqCst);
         rt.pad_shot.store(read_mask_setting(&app, "pad_combo_shot", DEFAULT_SHOT_COMBO) as u32, Ordering::SeqCst);
+        rt.pad_summon.store(read_mask_setting(&app, "pad_combo_summon", DEFAULT_SUMMON_COMBO) as u32, Ordering::SeqCst);
     }
     std::thread::spawn(move || {
         let mut xt: [Tracker; 4] = Default::default();
@@ -595,6 +605,7 @@ pub fn spawn(app: AppHandle) {
         let mut next_focus = start;
         let mut last_mask: u16 = 0;
         let mut last_scroll: f32 = 0.0;
+        let mut last_scroll_x: f32 = 0.0;
         let mut next_scroll = start;
 
         // configuração individual (cópia local; recarregada quando a interface envia uma nova)
@@ -623,15 +634,17 @@ pub fn spawn(app: AppHandle) {
             let monitor = MONITOR.load(Ordering::Relaxed);
             let (combos, capture) = {
                 let rt = app.state::<Runtime>();
-                ([rt.pad_overlay.load(Ordering::Relaxed) as u16, rt.pad_shot.load(Ordering::Relaxed) as u16], rt.capture.load(Ordering::Relaxed))
+                ([rt.pad_overlay.load(Ordering::Relaxed) as u16, rt.pad_shot.load(Ordering::Relaxed) as u16, rt.pad_summon.load(Ordering::Relaxed) as u16], rt.capture.load(Ordering::Relaxed))
             };
             // (ação, tipo, dispositivo)
             let mut out: Vec<(&'static str, &'static str, String)> = Vec::new();
             let mut states: Vec<PadState> = Vec::new();
             let mut mask_all: u16 = 0;
-            let mut fires = [false; 2];
+            let mut fires = [false; 3];
             // analógico direito: vale o controle mais inclinado
             let mut scroll: (f32, &'static str) = (0.0, "xbox");
+            // horizontal (carrosséis): também o controle mais inclinado
+            let mut scroll_x: (f32, &'static str) = (0.0, "xbox");
             loops += 1;
             if now.duration_since(rate_since) >= Duration::from_secs(1) {
                 let secs = now.duration_since(rate_since).as_secs_f32();
@@ -676,9 +689,14 @@ pub fn spawn(app: AppHandle) {
                         if v.abs() > scroll.0.abs() {
                             scroll = (v, "xbox");
                         }
+                        let h = scroll_axis_dz(raw.rx, cfg.dz_right);
+                        if h.abs() > scroll_x.0.abs() {
+                            scroll_x = (h, "xbox");
+                        }
                         let f = xc[i].update(raw.mask, combos, now);
                         fires[0] |= f[0];
                         fires[1] |= f[1];
+                        fires[2] |= f[2];
                         for a in xt[i].update_mapped(&raw, &cfg.map, now) {
                             out.push((a, "xbox", key.clone()));
                         }
@@ -756,9 +774,14 @@ pub fn spawn(app: AppHandle) {
                 if v.abs() > scroll.0.abs() {
                     scroll = (v, p.kind);
                 }
+                let h = scroll_axis_dz(p.raw.rx, cfg.dz_right);
+                if h.abs() > scroll_x.0.abs() {
+                    scroll_x = (h, p.kind);
+                }
                 let f = p.combos.update(p.raw.mask, combos, now);
                 fires[0] |= f[0];
                 fires[1] |= f[1];
+                fires[2] |= f[2];
                 let raw = p.raw.clone();
                 for a in p.tracker.update_mapped(&raw, &cfg.map, now) {
                     out.push((a, p.kind, p.key.to_string()));
@@ -806,10 +829,16 @@ pub fn spawn(app: AppHandle) {
                 }
             }
             // Rolagem: sem foco (ou escolhendo combinação / testando) conta como alavanca solta.
-            let value = if focused && !capture && !monitor { scroll.0 } else { 0.0 };
-            if value != last_scroll && (value == 0.0 || now >= next_scroll) {
-                let _ = app.emit("pad-scroll", ScrollEvent { value, device: scroll.1 });
+            let live = focused && !capture && !monitor;
+            let value = if live { scroll.0 } else { 0.0 };
+            let x = if live { scroll_x.0 } else { 0.0 };
+            let device = if x.abs() > value.abs() { scroll_x.1 } else { scroll.1 };
+            let changed = value != last_scroll || x != last_scroll_x;
+            let released = (value == 0.0 && last_scroll != 0.0) || (x == 0.0 && last_scroll_x != 0.0);
+            if changed && (released || now >= next_scroll) {
+                let _ = app.emit("pad-scroll", ScrollEvent { value, x, device });
                 last_scroll = value;
+                last_scroll_x = x;
                 next_scroll = now + SCROLL_EMIT_EVERY;
             }
             last_mask = mask_all;
@@ -872,16 +901,20 @@ pub fn pad_rumble(key: String, strength: u8, ms: u16) {
 pub struct PadCombos {
     pub overlay: u16,
     pub screenshot: u16,
+    pub summon: u16,
     pub overlay_default: u16,
     pub screenshot_default: u16,
+    pub summon_default: u16,
 }
 
 fn combos_info(rt: &Runtime) -> PadCombos {
     PadCombos {
         overlay: rt.pad_overlay.load(Ordering::SeqCst) as u16,
         screenshot: rt.pad_shot.load(Ordering::SeqCst) as u16,
+        summon: rt.pad_summon.load(Ordering::SeqCst) as u16,
         overlay_default: DEFAULT_OVERLAY_COMBO,
         screenshot_default: DEFAULT_SHOT_COMBO,
+        summon_default: DEFAULT_SUMMON_COMBO,
     }
 }
 
@@ -891,13 +924,15 @@ pub fn get_pad_combos(rt: State<Runtime>) -> PadCombos {
 }
 
 fn save_combo(rt: &Runtime, db: &Db, slot: &str, mask: u16, persist: bool) -> AppResult<()> {
-    let (mine, other_mask, key) = match slot {
-        "overlay" => (&rt.pad_overlay, rt.pad_shot.load(Ordering::SeqCst) as u16, "pad_combo_overlay"),
-        "screenshot" => (&rt.pad_shot, rt.pad_overlay.load(Ordering::SeqCst) as u16, "pad_combo_shot"),
+    let (o, s, u) = (rt.pad_overlay.load(Ordering::SeqCst) as u16, rt.pad_shot.load(Ordering::SeqCst) as u16, rt.pad_summon.load(Ordering::SeqCst) as u16);
+    let (mine, others, key) = match slot {
+        "overlay" => (&rt.pad_overlay, [s, u], "pad_combo_overlay"),
+        "screenshot" => (&rt.pad_shot, [o, u], "pad_combo_shot"),
+        "summon" => (&rt.pad_summon, [o, s], "pad_combo_summon"),
         _ => return Err(AppError::Validation("Opção inválida.".into())),
     };
     validate_combo(mask).map_err(|m| AppError::Validation(m.into()))?;
-    if combos_conflict(mask, other_mask) {
+    if others.iter().any(|x| combos_conflict(mask, *x)) {
         return Err(AppError::Validation("Essa combinação conflita com a do outro comando (uma contém a outra).".into()));
     }
     let conn = db.conn()?;
@@ -921,7 +956,11 @@ pub fn set_pad_combo(rt: State<Runtime>, db: State<Db>, slot: String, mask: u16)
 
 #[tauri::command]
 pub fn reset_pad_combo(rt: State<Runtime>, db: State<Db>, slot: String) -> AppResult<PadCombos> {
-    let def = if slot == "overlay" { DEFAULT_OVERLAY_COMBO } else { DEFAULT_SHOT_COMBO };
+    let def = match slot.as_str() {
+        "overlay" => DEFAULT_OVERLAY_COMBO,
+        "summon" => DEFAULT_SUMMON_COMBO,
+        _ => DEFAULT_SHOT_COMBO,
+    };
     save_combo(&rt, &db, &slot, def, false)?;
     Ok(combos_info(&rt))
 }
@@ -1010,14 +1049,29 @@ mod tests {
         let mut c = Combos::default();
         let t0 = Instant::now();
         let both = btn::SELECT | btn::START;
-        let combos = [both, btn::SELECT | btn::RB];
-        assert_eq!(c.update(both, combos, t0), [false, false]);
-        assert_eq!(c.update(both, combos, t0 + Duration::from_millis(500)), [false, false]);
-        assert_eq!(c.update(both, combos, t0 + Duration::from_millis(750)), [true, false]);
-        assert_eq!(c.update(both, combos, t0 + Duration::from_millis(900)), [false, false]); // não repete
-        assert_eq!(c.update(0, combos, t0 + Duration::from_millis(950)), [false, false]); // soltou
-        assert_eq!(c.update(both, combos, t0 + Duration::from_millis(1000)), [false, false]);
-        assert_eq!(c.update(both, combos, t0 + Duration::from_millis(1800)), [true, false]);
+        let combos = [both, btn::SELECT | btn::RB, btn::SELECT | btn::LB];
+        assert_eq!(c.update(both, combos, t0), [false, false, false]);
+        assert_eq!(c.update(both, combos, t0 + Duration::from_millis(500)), [false, false, false]);
+        assert_eq!(c.update(both, combos, t0 + Duration::from_millis(750)), [true, false, false]);
+        assert_eq!(c.update(both, combos, t0 + Duration::from_millis(900)), [false, false, false]); // não repete
+        assert_eq!(c.update(0, combos, t0 + Duration::from_millis(950)), [false, false, false]); // soltou
+        assert_eq!(c.update(both, combos, t0 + Duration::from_millis(1000)), [false, false, false]);
+        assert_eq!(c.update(both, combos, t0 + Duration::from_millis(1800)), [true, false, false]);
+    }
+
+    #[test]
+    fn summon_combo_fires_after_hold_and_defaults_do_not_clash() {
+        let mut c = Combos::default();
+        let t0 = Instant::now();
+        let combos = [DEFAULT_OVERLAY_COMBO, DEFAULT_SHOT_COMBO, DEFAULT_SUMMON_COMBO];
+        let summon = btn::SELECT | btn::LB;
+        assert_eq!(c.update(summon, combos, t0), [false, false, false]);
+        assert_eq!(c.update(summon, combos, t0 + Duration::from_millis(400)), [false, false, false], "toque curto não chama o app");
+        assert_eq!(c.update(summon, combos, t0 + Duration::from_millis(750)), [false, false, true]);
+        assert!(validate_combo(DEFAULT_SUMMON_COMBO).is_ok());
+        for (a, b) in [(0, 1), (0, 2), (1, 2)] {
+            assert!(!combos_conflict(combos[a], combos[b]), "padrões {a} e {b} não podem se conter");
+        }
     }
 
     #[test]

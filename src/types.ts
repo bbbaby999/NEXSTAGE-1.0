@@ -19,12 +19,16 @@ export interface Game {
   launchArgs: string;
   cover: string | null;
   favorite: boolean;
+  /** Quando entrou nos favoritos (null em favoritos antigos, de antes desta informação existir). */
+  favoritedAt: string | null;
   playtimeSeconds: number;
   lastPlayedAt: string | null;
   addedAt: string;
   background: string | null;
   bgX: number;
   bgY: number;
+  /** Logo do jogo (SteamGridDB ou arquivo): substitui o título escrito na página do jogo. */
+  logo: string | null;
   steamId: string | null;
   releaseDate: string | null;
   releaseIso: string | null;
@@ -45,7 +49,7 @@ export interface Game {
   /** Pronto para jogar neste PC (Steam: instalado pelo cliente; demais: arquivo presente). */
   installed: boolean;
 }
-export type GameInput = Pick<Game, "title" | "platform" | "executablePath" | "launchArgs" | "cover" | "background" | "bgX" | "bgY" | "isoPath">;
+export type GameInput = Pick<Game, "title" | "platform" | "executablePath" | "launchArgs" | "cover" | "background" | "bgX" | "bgY" | "isoPath" | "logo">;
 
 
 export interface Hltb {
@@ -142,7 +146,7 @@ export interface Controller {
 
 export type View =
   | "home" | "library" | "emulators" | "collection"
-  | "stats" | "settings" | "gallery" | "profile" | "achievements" | "controllers";
+  | "stats" | "settings" | "gallery" | "profile" | "achievements" | "controllers" | "zerei";
 
 /** Plataformas oficiais (mesma ordem do backend). */
 export const PLATFORMS = [
@@ -179,7 +183,7 @@ export interface Activity {
 }
 
 export interface StartupInfo { mode: "none" | "minimized" | "window" | "fullscreen"; autostartEnabled: boolean; devBuild: boolean }
-export interface PadCombos { overlay: number; screenshot: number; overlayDefault: number; screenshotDefault: number }
+export interface PadCombos { overlay: number; screenshot: number; summon: number; overlayDefault: number; screenshotDefault: number; summonDefault: number }
 export interface FandomLink { url: string; direct: boolean }
 
 export interface Emulator { id: number; name: string; exePath: string; platforms: string[]; formats: string[]; args: string; cover: string | null; exeExists: boolean; games: number; fullscreen: boolean; fullscreenSupported: boolean }
@@ -397,3 +401,43 @@ export interface BackupAuto {
   keep: number; hasPassword: boolean; includeCaptures: boolean;
 }
 export interface BackupProgress { op: "create" | "verify" | "restore"; kind: string; phase: string; done: number; total: number; cancelable: boolean }
+
+/* ---------- Zerei! (acompanhamento de jogos, independente da biblioteca) ---------- */
+export type ZereiStatus = "not_started" | "playing" | "paused" | "completed" | "wishlist";
+export type ZereiCompletion = "campaign" | "full";
+export type ZereiDifficulty = "very_easy" | "easy" | "normal" | "hard" | "very_hard";
+export interface ZereiHit {
+  title: string; year: number | null; platforms: string[]; cover: string | null; background: string | null;
+  igdbId: number | null; rawgId: number | null; sources: string[];
+}
+export interface ZereiSearch { hits: ZereiHit[]; fallback: boolean }
+export interface ZereiArt { sgdbId: number | null; covers: WebShot[]; logos: WebShot[]; backgrounds: WebShot[]; sgdb: boolean }
+export interface ZereiEntry {
+  id: number; uid: string; title: string; platform: string; run: number;
+  cover: string | null; logo: string | null; background: string | null;
+  year: number | null; platforms: string[]; igdbId: number | null; rawgId: number | null; sgdbId: number | null;
+  status: ZereiStatus; completionType: ZereiCompletion | null; difficulty: ZereiDifficulty | null;
+  startedAt: string | null; completedAt: string | null; hours: number | null; rating: number | null; notes: string;
+  createdAt: string; updatedAt: string;
+}
+export type ZereiInput = Omit<ZereiEntry, "id" | "uid" | "run" | "createdAt" | "updatedAt">;
+export interface LogoGame { id: number; name: string; year: number | null; cover: string | null }
+export interface LogoGames { sgdb: boolean; games: LogoGame[] }
+export interface ZereiImport { added: number; updated: number; duplicates: number; completed: number; errors: { line: number; message: string }[] }
+
+// ---------- Xbox (conta Microsoft) ----------
+export interface XboxAccount {
+  gamertag: string; xuid: string; gamerpic: string | null; gamerscore: number | null;
+  syncedAt: string | null; syncError: string | null; titles: number; needsLogin: boolean;
+}
+export interface XboxStatus { account: XboxAccount | null; clientId: string | null; embedded: boolean }
+export interface XboxAch {
+  id: string; name: string; description: string; icon: string | null; secret: boolean; gamerscore: number;
+  rarity: number | null; unlocked: boolean; unlockedAt: number | null;
+}
+export interface XboxGameData {
+  titleId: string; name: string; image: string | null; achCurrent: number | null; achTotal: number | null;
+  gsCurrent: number | null; gsTotal: number | null; minutes: number | null; lastPlayed: number | null;
+  fetchedAt: string | null; achievements: XboxAch[]; error: string | null;
+}
+export interface XboxInstalled { aumid: string; name: string; image: string | null; inLibrary: boolean }

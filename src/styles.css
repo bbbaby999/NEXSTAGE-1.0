@@ -219,13 +219,6 @@ html.overlay-mode .waves{display:none}
 .modal{animation:pop .26s var(--ease)}
 
 /* ===== Página do jogo ===== */
-.dp-hero{position:relative;border-radius:22px;overflow:hidden;background:linear-gradient(120deg,#101a38,#0a0d17) center/cover;border:1px solid var(--line);min-height:300px;display:flex;align-items:flex-end}
-.dp-shade{position:absolute;inset:0;background:linear-gradient(0deg,rgba(5,6,10,.96),rgba(5,6,10,.35) 70%),linear-gradient(90deg,rgba(5,6,10,.7),transparent)}
-.dp-back{position:absolute;top:16px;left:16px;z-index:2}
-.dp-head{position:relative;display:flex;gap:28px;align-items:flex-end;padding:28px;width:100%}
-.dp-cover{width:150px;flex:none;font-size:2.4rem}
-.dp-title{display:flex;flex-direction:column;gap:14px;min-width:0}
-.dp-title h1{font-size:2.8rem}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
 .chips span{border:1px solid rgba(var(--br),.4);color:var(--b);border-radius:999px;padding:2px 12px;font-size:.78rem}
 .dp-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:36px;margin-top:8px}
@@ -262,7 +255,7 @@ html.overlay-mode .waves{display:none}
 .batt.low{color:#ffb454}
 .cell{display:inline-block;width:24px;height:11px;border:1px solid currentColor;border-radius:3px;padding:1px}
 .cell b{display:block;height:100%;background:currentColor;border-radius:1px}
-@media (max-width:1100px){.dp-grid{grid-template-columns:1fr}.dp-head{flex-direction:column;align-items:flex-start}}
+@media (max-width:1100px){.dp-grid{grid-template-columns:1fr}}
 
 /* ===== Glifos de comando (mudam com o dispositivo) ===== */
 .glyph{display:inline-grid;place-items:center;min-width:26px;height:24px;padding:0 7px;border-radius:7px;font-style:normal;font-weight:700;font-size:.74rem;border:1px solid var(--line);color:var(--text);margin-right:6px;background:rgba(255,255,255,.05)}
@@ -314,12 +307,10 @@ html.overlay-mode .waves{display:none}
 .seg{display:inline-flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
 .seg button{background:none;border:none;color:var(--muted);padding:8px 16px;border-radius:999px;cursor:pointer;font-weight:600}
 .seg button.on{background:rgba(var(--ar),.35);color:#fff}
+/* Biblioteca → Importar: origem (Steam / Xbox) no topo da janela */
+.import-src{display:flex;width:max-content;margin:0 0 14px}
+.import-src button{padding:8px 26px}
 
-/* ===== Página do jogo: banner 3840×1240 (3,1:1), sem esticar nem ampliar artificialmente ===== */
-.dp-hero{aspect-ratio:3840/1240;min-height:300px;max-height:70vh;width:100%;background:#0a0d17}
-.dp-hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:fade .6s ease both}
-.dp-hero-soft{position:absolute;inset:-30px;background:#101a38 center/cover;filter:blur(40px) saturate(1.2)}
-.dp-shade{background:linear-gradient(0deg,rgba(5,6,10,.97),rgba(5,6,10,.25) 65%,transparent),linear-gradient(90deg,rgba(5,6,10,.65),transparent 55%)}
 
 /* ===== Galeria / visualizador ===== */
 .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
@@ -373,3 +364,8 @@ html.overlay-mode .home-bg{display:none}
 .bk-grid b{font-size:1.2rem;font-weight:500}
 .bk-grid small{color:var(--muted)}
 .overlay.bk-exit{z-index:10000}
+/* "Editar jogo" em formato horizontal: capa | dados | imagens (empilha em janelas estreitas) */
+.gf-grid{display:grid;grid-template-columns:200px minmax(0,1.1fr) minmax(0,1fr);gap:26px;align-items:start;overflow-y:auto;min-height:0}
+.gf-grid .seg{flex-wrap:wrap}
+@media (max-width:1100px){.gf-grid{grid-template-columns:180px minmax(0,1fr)}.gf-grid .gf-art{grid-column:1 / -1}}
+@media (max-width:700px){.gf-grid{grid-template-columns:1fr}}

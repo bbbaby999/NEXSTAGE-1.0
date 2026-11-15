@@ -14,7 +14,7 @@ import { api } from "./api";
 import { play } from "./sound";
 import { NINTENDO_PAD, setActivePad, setDetected, useInputDetection } from "./inputDevice";
 import { cfgForDevice, gamepadKeys, type PadCfg } from "./controllers";
-import { applyDeadzone, refocusAfterScroll, setScrollInput } from "./padScroll";
+import { applyDeadzone, refocusAfterScroll, setScrollInput, setScrollInputX } from "./padScroll";
 import { idleSwallow } from "./idle";
 
 type Dir = "left" | "right" | "up" | "down";
@@ -263,6 +263,11 @@ export function pickNext(cur: HTMLElement, els: HTMLElement[], dir: Dir, aligned
  * (ex.: as abas da barra superior, trocadas só com L1/R1 ou o mouse); "key" (setas do teclado) alcança todos.
  */
 export function moveFocus(dir: Dir, source: "pad" | "key" = "key") {
+  // Uma tela pode usar as direções para outra coisa (ex.: mover a imagem no editor de enquadramento):
+  // quem tratar chama preventDefault() e o foco não se move.
+  const claim = new CustomEvent<Dir>("nexstage:direction", { detail: dir, cancelable: true });
+  window.dispatchEvent(claim);
+  if (claim.defaultPrevented) return;
   // Visualizador de imagens: esquerda/direita trocam de imagem — só quando ele é a camada ativa.
   // (Com um menu ou confirmação por cima, ex.: "Excluir captura", as setas navegam nos botões dela.)
   const root = navRoot();
@@ -484,11 +489,14 @@ export function useSpatialNav() {
       setDetected(e.payload.device);
       handle(e.payload.action);
     }).then((f) => (cancelled ? f() : (un = f)));
-    // Analógico direito (zona morta já aplicada pelo backend)
+    // Analógico direito (zona morta já aplicada pelo backend): vertical rola a página, horizontal os carrosséis
     let unScroll: (() => void) | undefined;
-    listen<{ value: number; device: "xbox" | "playstation" | "nintendo" }>("pad-scroll", (e) => {
-      if (e.payload.value !== 0) setDetected(e.payload.device);
-      setScrollInput("native", e.payload.value !== 0 && idleSwallow() ? 0 : e.payload.value);
+    listen<{ value: number; x?: number; device: "xbox" | "playstation" | "nintendo" }>("pad-scroll", (e) => {
+      const x = e.payload.x ?? 0;
+      if (e.payload.value !== 0 || x !== 0) setDetected(e.payload.device);
+      const swallow = (e.payload.value !== 0 || x !== 0) && idleSwallow();
+      setScrollInput("native", swallow ? 0 : e.payload.value);
+      setScrollInputX("native", swallow ? 0 : x);
     }).then((f) => (cancelled ? f() : (unScroll = f)));
 
     // Fallback: controles genéricos
@@ -527,23 +535,30 @@ export function useSpatialNav() {
       const cfg = new Map<Gamepad, PadCfg>(pads.map((p) => [p, cfgForDevice(keys.get(p)!)]));
       // Tipo do controle genérico ativo (glifos e indicadores L/R da barra de páginas).
       const padKind = pads.some((p) => NINTENDO_PAD.test(p.id)) ? "nintendo" : "generic";
-      // Analógico direito vertical (eixo 3 no mapeamento padrão); vale o controle mais inclinado.
-      let ry = 0;
+      // Analógico direito (eixos 2 e 3 no mapeamento padrão): vertical rola a página, horizontal os
+      // carrosséis; vale o controle mais inclinado.
+      let ry = 0, rx = 0;
       if (document.hasFocus()) {
         for (const p of pads) {
           const v = applyDeadzone(p.axes[3] ?? 0, cfg.get(p)!.dzRight);
           if (Math.abs(v) > Math.abs(ry)) ry = v;
+          // eixo horizontal só depois de visto em repouso (como os do analógico esquerdo): alguns dispositivos
+          // têm um eixo 2 parado em -1/+1, que faria os carrosséis rolarem sozinhos
+          const h = centered.get(keys.get(p)!)?.has(2) ? applyDeadzone(p.axes[2] ?? 0, cfg.get(p)!.dzRight) : 0;
+          if (Math.abs(h) > Math.abs(rx)) rx = h;
         }
       }
-      if (ry !== 0) setDetected(padKind);
-      setScrollInput("generic", ry !== 0 && idleSwallow() ? 0 : ry);
+      if (ry !== 0 || rx !== 0) setDetected(padKind);
+      const swallowR = (ry !== 0 || rx !== 0) && idleSwallow();
+      setScrollInput("generic", swallowR ? 0 : ry);
+      setScrollInputX("generic", swallowR ? 0 : rx);
       if (pads.length) {
         const pressed = (i: number) => pads.some((p) => p.buttons[i]?.pressed);
         for (const p of pads) {
           const k = keys.get(p)!;
           const set = centered.get(k) ?? new Set<number>();
           centered.set(k, set);
-          for (const a of [0, 1]) if (Math.abs(p.axes[a] ?? 0) < Math.min(0.25, cfg.get(p)!.dzLeft)) set.add(a);
+          for (const a of [0, 1, 2]) if (Math.abs(p.axes[a] ?? 0) < Math.min(0.25, cfg.get(p)!.dzLeft)) set.add(a);
         }
         const axis = (a: number, neg: boolean, was: boolean) =>
           pads.some((p) => {

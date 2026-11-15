@@ -17,12 +17,16 @@ pub struct Game {
     pub launch_args: String,
     pub cover: Option<String>,
     pub favorite: bool,
+    /// Quando entrou nos favoritos (ordem do carrossel Favoritos da Home); vazio em favoritos antigos.
+    pub favorited_at: Option<String>,
     pub playtime_seconds: i64,
     pub last_played_at: Option<String>,
     pub added_at: String,
     pub background: Option<String>,
     pub bg_x: i64,
     pub bg_y: i64,
+    /// Logo (SteamGridDB ou arquivo): aparece no lugar do título na página do jogo.
+    pub logo: Option<String>,
     pub steam_id: Option<String>,
     pub release_date: Option<String>,
     pub release_iso: Option<String>,
@@ -60,16 +64,25 @@ pub struct GameInput {
     pub bg_x: Option<i64>,
     #[serde(default)]
     pub bg_y: Option<i64>,
+    /// Ausente = mantém a logo atual; `null` = remove; texto = nova logo.
+    #[serde(default, deserialize_with = "present")]
+    pub logo: Option<Option<String>>,
     /// Caminho do .iso importado (nunca copiado, movido ou modificado).
     #[serde(default)]
     pub iso_path: Option<String>,
 }
 
+/// Campo presente no JSON (mesmo `null`) vira `Some(..)`; ausente fica `None` (pelo `default`).
+fn present<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Option<String>>, D::Error> {
+    Option::<String>::deserialize(d).map(Some)
+}
+
 const SELECT: &str = "SELECT g.id,g.title,g.platform,g.executable_path,g.launch_args,g.cover,
     pg.favorite,pg.playtime_seconds,pg.last_played_at,pg.added_at,
     g.background,g.bg_x,g.bg_y,json_extract(gi.data,'$.externalId'),
-    json_extract(gi.data,'$.releaseDate'),json_extract(gi.data,'$.genres[0]'),json_extract(gi.data,'$.genres'),pg.completed,pg.completed_at,g.iso_path,g.rom_path,g.emulator_id,em.name,rl.ra_game_id,g.source,
-    COALESCE(sl.appid, CASE WHEN g.source='steam' THEN CAST(g.external_id AS INTEGER) END)
+    json_extract(gi.data,'$.releaseDate'),json_extract(gi.data,'$.genres[0]'),json_extract(gi.data,'$.genres'),EXISTS(SELECT 1 FROM zerei_entries z WHERE z.profile_id=pg.profile_id AND z.game_id=g.id AND z.status='completed'),
+    (SELECT MAX(z.completed_at) FROM zerei_entries z WHERE z.profile_id=pg.profile_id AND z.game_id=g.id AND z.status='completed'),g.iso_path,g.rom_path,g.emulator_id,em.name,rl.ra_game_id,g.source,
+    COALESCE(sl.appid, CASE WHEN g.source='steam' THEN CAST(g.external_id AS INTEGER) END),g.logo,pg.favorited_at
     FROM profile_games pg JOIN games g ON g.id = pg.game_id
     LEFT JOIN game_info gi ON gi.game_id = g.id
     LEFT JOIN emulators em ON em.id = g.emulator_id
@@ -126,12 +139,14 @@ fn map(r: &Row) -> rusqlite::Result<Game> {
         launch_args: r.get(4)?,
         cover: crate::images::resolve(r.get(5)?),
         favorite: r.get::<_, i64>(6)? != 0,
+        favorited_at: r.get(27)?,
         playtime_seconds: r.get(7)?,
         last_played_at: r.get(8)?,
         added_at: r.get(9)?,
         background: crate::images::resolve(r.get(10)?),
         bg_x: r.get(11)?,
         bg_y: r.get(12)?,
+        logo: crate::images::resolve(r.get(26)?),
         steam_id: r.get(13)?,
     })
 }
@@ -145,6 +160,7 @@ fn mark_installed(games: &mut [Game]) {
         let file_ok = || {
             let exists = |p: &Option<String>| p.as_deref().map(|p| !p.trim().is_empty() && Path::new(p).exists()).unwrap_or(false);
             exists(&Some(g.executable_path.clone())) || exists(&g.iso_path) || exists(&g.rom_path)
+                || crate::msstore::installed(&g.executable_path)
         };
         g.installed = steam_ok || (!steam_only && file_ok());
     }
@@ -171,7 +187,12 @@ fn validate(i: &mut GameInput, allow_no_exe: bool) -> AppResult<()> {
     if i.executable_path.is_empty() && !allow_no_exe {
         return Err(AppError::Validation("Selecione o executável do jogo.".into()));
     }
-    if !i.executable_path.is_empty() && !Path::new(&i.executable_path).is_file() {
+    // Jogo da Microsoft Store / Xbox: `shell:AppsFolder\<AUMID>` (ver `msstore`), não é um arquivo.
+    if crate::msstore::is_app(&i.executable_path) {
+        if !crate::msstore::installed(&i.executable_path) {
+            return Err(AppError::Validation("Este jogo da Microsoft Store / Xbox não está instalado neste PC.".into()));
+        }
+    } else if !i.executable_path.is_empty() && !Path::new(&i.executable_path).is_file() {
         return Err(AppError::Validation(
             "O executável selecionado não existe neste computador.".into(),
         ));
@@ -296,6 +317,7 @@ fn add(db: &Db, profile_id: i64, mut input: GameInput) -> AppResult<Game> {
     validate(&mut input, iso.is_some())?;
     input.cover = crate::images::store(input.cover.take())?;
     input.background = crate::images::store(input.background.take())?;
+    let logo = crate::images::store(input.logo.take().flatten())?;
     let mut conn = db.conn()?;
     let is_iso = match &iso {
         Some(p) => validate_game_file(&conn, profile_id, p)?,
@@ -309,8 +331,8 @@ fn add(db: &Db, profile_id: i64, mut input: GameInput) -> AppResult<Game> {
     let (iso_col, rom_col) = if is_iso { (iso.clone(), None) } else { (None, iso.clone()) };
     let tx = conn.transaction()?;
     tx.execute(
-        "INSERT INTO games(title,platform,executable_path,launch_args,cover,background,bg_x,bg_y,iso_path,rom_path,source)
-         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+        "INSERT INTO games(title,platform,executable_path,launch_args,cover,background,bg_x,bg_y,iso_path,rom_path,source,logo)
+         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
         params![
             input.title,
             input.platform,
@@ -322,7 +344,8 @@ fn add(db: &Db, profile_id: i64, mut input: GameInput) -> AppResult<Game> {
             input.bg_y.unwrap_or(50).clamp(0, 100),
             iso_col,
             rom_col,
-            match (&iso, is_iso) { (Some(_), true) => "iso", (Some(_), false) => "rom", _ => "manual" }
+            match (&iso, is_iso) { (Some(_), true) => "iso", (Some(_), false) => "rom", _ => "manual" },
+            logo
         ],
     )?;
     let game_id = tx.last_insert_rowid();
@@ -352,9 +375,15 @@ pub fn update_game(
     let old_platform: Option<String> = conn.query_row("SELECT platform FROM games WHERE id=?1", [game_id], |r| r.get(0)).ok();
     input.cover = crate::images::store(input.cover.take())?;
     input.background = crate::images::store(input.background.take())?;
+    // logo: só muda quando o formulário a envia (ausente = mantém)
+    let (set_logo, logo) = match input.logo.take() {
+        Some(v) => (true, crate::images::store(v)?),
+        None => (false, None),
+    };
+    let old_logo: Option<String> = conn.query_row("SELECT logo FROM games WHERE id=?1", [game_id], |r| r.get(0)).ok().flatten();
     let n = conn.execute(
         "UPDATE games SET title=?1,platform=?2,executable_path=?3,launch_args=?4,cover=?5,
-         background=?6,bg_x=?7,bg_y=?8
+         background=?6,bg_x=?7,bg_y=?8,logo=CASE WHEN ?11 THEN ?12 ELSE logo END
          WHERE id=?9 AND id IN (SELECT game_id FROM profile_games WHERE profile_id=?10)",
         params![
             input.title,
@@ -366,11 +395,17 @@ pub fn update_game(
             input.bg_x.unwrap_or(50).clamp(0, 100),
             input.bg_y.unwrap_or(50).clamp(0, 100),
             game_id,
-            profile_id
+            profile_id,
+            set_logo,
+            logo
         ],
     )?;
     if n == 0 {
         return Err(AppError::NotFound("Jogo não encontrado na biblioteca.".into()));
+    }
+    // logo escolhida ou removida pelo usuário: a busca automática não mexe mais neste jogo
+    if set_logo && logo != old_logo {
+        conn.execute("INSERT OR REPLACE INTO logo_auto(game_id, found) VALUES(?1, 1)", [game_id])?;
     }
     if let Some(new_file) = input.iso_path.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         relocate_file(&conn, profile_id, game_id, new_file)?;
@@ -402,25 +437,14 @@ pub fn remove_game(db: State<Db>, profile_id: i64, game_id: i64) -> AppResult<()
     Ok(())
 }
 
-/// Marca/desmarca o jogo como concluído neste perfil (grava a data da conclusão).
-#[tauri::command]
-pub fn set_completed(db: State<Db>, profile_id: i64, game_id: i64, completed: bool) -> AppResult<()> {
-    let conn = db.conn()?;
-    ensure_owned(&conn, profile_id, game_id)?;
-    conn.execute(
-        "UPDATE profile_games SET completed=?1,
-         completed_at=CASE WHEN ?1=1 THEN datetime('now') ELSE NULL END
-         WHERE profile_id=?2 AND game_id=?3",
-        params![completed as i64, profile_id, game_id],
-    )?;
-    Ok(())
-}
-
 #[tauri::command]
 pub fn set_favorite(db: State<Db>, profile_id: i64, game_id: i64, favorite: bool) -> AppResult<()> {
     let conn = db.conn()?;
     conn.execute(
-        "UPDATE profile_games SET favorite=?1 WHERE profile_id=?2 AND game_id=?3",
+        // a data de entrada nos favoritos define a ordem do carrossel Favoritos (mais recente primeiro)
+        "UPDATE profile_games SET favorite=?1,
+         favorited_at=CASE WHEN ?1=1 THEN COALESCE(CASE WHEN favorite=1 THEN favorited_at END, strftime('%Y-%m-%d %H:%M:%f','now')) ELSE NULL END
+         WHERE profile_id=?2 AND game_id=?3",
         params![favorite as i64, profile_id, game_id],
     )?;
     Ok(())
@@ -475,10 +499,47 @@ pub fn canonical_platform(s: &str) -> Option<&'static str> {
 mod platform_tests {
     use super::*;
 
+    #[test]
+    fn favorite_date_is_set_kept_and_cleared() {
+        let p = std::env::temp_dir().join(format!("nexstage-fav-{}.db", std::process::id()));
+        let _ = std::fs::remove_file(&p);
+        let db = Db::open(&p).unwrap();
+        let c = db.conn().unwrap();
+        c.execute_batch(
+            "INSERT INTO profiles(id,username,display_name) VALUES(1,'ana','Ana');
+             INSERT INTO games(id,title,executable_path) VALUES(1,'Jogo','x');
+             INSERT INTO profile_games(profile_id,game_id) VALUES(1,1);",
+        ).unwrap();
+        let fav = |c: &Connection| -> (bool, Option<String>) {
+            let g = c.prepare(&format!("{SELECT} WHERE pg.profile_id=1")).unwrap().query_map([], map).unwrap().next().unwrap().unwrap();
+            (g.favorite, g.favorited_at)
+        };
+        let set = |c: &Connection, on: bool| {
+            c.execute(
+                "UPDATE profile_games SET favorite=?1,
+                 favorited_at=CASE WHEN ?1=1 THEN COALESCE(CASE WHEN favorite=1 THEN favorited_at END, strftime('%Y-%m-%d %H:%M:%f','now')) ELSE NULL END
+                 WHERE profile_id=1 AND game_id=1",
+                [on as i64],
+            ).unwrap();
+        };
+        assert_eq!(fav(&c), (false, None));
+        set(&c, true);
+        let (on, at) = fav(&c);
+        assert!(on && at.is_some(), "favoritar grava a data (coluna lida na posição certa)");
+        set(&c, true);
+        assert_eq!(fav(&c).1, at, "favoritar de novo mantém a data original");
+        set(&c, false);
+        assert_eq!(fav(&c), (false, None), "desfavoritar limpa a data");
+        drop(c);
+        drop(db);
+        let _ = std::fs::remove_file(&p);
+    }
+
+
     fn game(source: &str, exe: &str, iso: Option<String>, appid: Option<i64>) -> Game {
         Game {
-            id: 1, title: "x".into(), platform: "PC".into(), executable_path: exe.into(), launch_args: String::new(), cover: None, favorite: false,
-            playtime_seconds: 0, last_played_at: None, added_at: String::new(), background: None, bg_x: 50, bg_y: 50, steam_id: None,
+            id: 1, title: "x".into(), platform: "PC".into(), executable_path: exe.into(), launch_args: String::new(), cover: None, favorite: false, favorited_at: None,
+            playtime_seconds: 0, last_played_at: None, added_at: String::new(), background: None, bg_x: 50, bg_y: 50, logo: None, steam_id: None,
             release_date: None, release_iso: None, genre: None, genres: vec![], completed: false, completed_at: None, iso_path: iso, rom_path: None,
             emulator_id: None, emulator_name: None, ra_game_id: None, source: source.into(), steam_app_id: appid, installed: false,
         }
@@ -521,8 +582,29 @@ mod add_tests {
     fn input(title: &str, platform: &str, exe: &str, file: Option<&Path>) -> GameInput {
         GameInput {
             title: title.into(), platform: platform.into(), executable_path: exe.into(), launch_args: String::new(),
-            cover: None, background: None, bg_x: None, bg_y: None, iso_path: file.map(|p| p.to_string_lossy().to_string()),
+            cover: None, background: None, bg_x: None, bg_y: None, logo: None, iso_path: file.map(|p| p.to_string_lossy().to_string()),
         }
+    }
+
+    #[test]
+    fn logo_absent_keeps_null_removes_value_sets() {
+        let base = r#""title":"Celeste","platform":"PC","executablePath":"C:/c.exe","cover":null"#;
+        let parse = |extra: &str| serde_json::from_str::<GameInput>(&format!("{{{base}{extra}}}")).unwrap().logo;
+        assert_eq!(parse(""), None, "formulário antigo sem o campo: mantém a logo");
+        assert_eq!(parse(r#","logo":null"#), Some(None), "remover");
+        assert_eq!(parse(r#","logo":"https://cdn2.steamgriddb.com/logo/a.png""#), Some(Some("https://cdn2.steamgriddb.com/logo/a.png".to_string())));
+        // gravada no cadastro e devolvida na listagem
+        let dir = std::env::temp_dir().join(format!("nexstage-logo-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = Db::open(&dir.join("t.db")).unwrap();
+        db.conn().unwrap().execute_batch("INSERT INTO profiles(id, username, display_name) VALUES(1,'a','A');").unwrap();
+        let exe = dir.join("celeste.exe");
+        std::fs::write(&exe, b"MZ").unwrap();
+        let mut i = input("Celeste", "PC", &exe.to_string_lossy(), None);
+        i.logo = Some(Some(String::from("https://cdn2.steamgriddb.com/logo/a.png")));
+        let g = add(&db, 1, i).unwrap();
+        assert_eq!(g.logo.as_deref(), Some("https://cdn2.steamgriddb.com/logo/a.png"));
     }
 
     #[test]

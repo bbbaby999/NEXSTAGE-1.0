@@ -28,8 +28,8 @@ const cardTilt = tiltHandlers<HTMLButtonElement>((el) => el.querySelector<HTMLEl
 /** Miniaturas na faixa abaixo das ações (como na composição de referência). */
 const THUMBS = 3;
 const MAX_TAGS = 4;
-/** Jogos no carrossel "Volte a jogar" (mais recente → mais antigo). */
-const REPLAY = 8;
+/** Jogos no carrossel "Volte a jogar" (mais recente → mais antigo), sem contar o jogo em destaque. */
+const REPLAY = 10;
 
 type Thumb = { key: string; src: string; label: string; open: () => void };
 
@@ -54,7 +54,11 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [preview]);
 
-  const recent = recentGames(games, REPLAY);
+  // o mais recente fica em destaque no topo; o "Volte a jogar" mostra os 10 seguintes
+  const recent = recentGames(games, REPLAY + 1);
+  const replay = recent.slice(1);
+  const favorites = favoriteGames(games);
+  const openGame = (g: Game) => { setView("library"); setOpenGameId(g.id); };
   const game = recent[0];
   // cor de destaque tirada da capa (tinge brilhos e detalhes da Home; legível sobre qualquer arte)
   const accent = useAccent(game?.cover);
@@ -156,7 +160,10 @@ export default function Home() {
 
         <div className="stage-info">
           <div className="stage-head">
-            <h2 className="stage-title">{game.title}</h2>
+            {/* com logo, ela substitui o título escrito (o nome continua no texto alternativo) */}
+            {game.logo ? (
+              <h2 className="stage-title stage-logo"><img key={game.logo} src={game.logo} alt={game.title} referrerPolicy="no-referrer" /></h2>
+            ) : <h2 className="stage-title">{game.title}</h2>}
             <div className="stage-tags">
               {tags.map((tag) => <span key={tag}>{t(tag)}</span>)}
             </div>
@@ -186,8 +193,14 @@ export default function Home() {
         </div>
       </div>
       </div>
-      <Replay games={recent} onPreview={setPreview} onOpen={(g) => { setView("library"); setOpenGameId(g.id); }} />
-      {/* complementa a Home: fica abaixo do destaque e do "Volte a jogar" */}
+      {/* todos os favoritos do perfil, primeiro carrossel abaixo do destaque (favoritado mais recentemente primeiro) */}
+      <Replay title={t("Favoritos")} games={favorites} onPreview={setPreview} onOpen={openGame}
+        label={(g) => g.title}
+        meta={(g) => g.lastPlayedAt ? [formatDate(g.lastPlayedAt), formatPlaytime(g.playtimeSeconds)].filter(Boolean).join(" · ") : g.platform} />
+      <Replay title={t("Volte a jogar")} games={replay} onPreview={setPreview} onOpen={openGame}
+        label={(g) => t("{title}, jogado em {v1}", { title: g.title, v1: formatDate(g.lastPlayedAt) })}
+        meta={(g) => [formatDate(g.lastPlayedAt), formatPlaytime(g.playtimeSeconds)].filter(Boolean).join(" · ")} />
+      {/* complementa a Home: fica abaixo do destaque, dos Favoritos e do "Volte a jogar" */}
       <HomeUniverse />
       {/* notas de atualização oficiais dos jogos Steam (carrega sozinha, sem atrasar a Home) */}
       <SteamUpdates />
@@ -197,10 +210,27 @@ export default function Home() {
 }
 
 /**
- * "Volte a jogar": carrossel horizontal com os últimos jogos iniciados. Controle e teclado navegam
+ * Favoritos do perfil na ordem em que foram favoritados, o mais recente primeiro. Favoritos antigos (sem
+ * data) vêm depois: jogados mais recentemente primeiro, depois em ordem alfabética.
+ */
+function favoriteGames(games: Game[]): Game[] {
+  return games
+    .filter((g) => g.favorite)
+    .sort((a, b) =>
+      (b.favoritedAt ?? "").localeCompare(a.favoritedAt ?? "")
+      || (b.lastPlayedAt ?? "").localeCompare(a.lastPlayedAt ?? "")
+      || a.title.localeCompare(b.title));
+}
+
+/**
+ * Carrossel horizontal de jogos da Home ("Volte a jogar", "Favoritos"). Controle e teclado navegam
  * pelo foco (o item focado é centralizado); com o mouse, a roda sobre o carrossel rola na horizontal.
  */
-function Replay({ games, onOpen, onPreview }: { games: Game[]; onOpen: (g: Game) => void; onPreview: (g: Game | null) => void }) {
+function Replay({ title, games, onOpen, onPreview, label, meta }: {
+  title: string; games: Game[]; onOpen: (g: Game) => void; onPreview: (g: Game | null) => void;
+  /** Nome acessível de cada cartão e linha de informações abaixo do título. */
+  label: (g: Game) => string; meta: (g: Game) => string;
+}) {
   const track = useRef<HTMLDivElement>(null);
   const [edge, setEdge] = useState({ start: true, end: true });
 
@@ -241,18 +271,18 @@ function Replay({ games, onOpen, onPreview }: { games: Game[]; onOpen: (g: Game)
   };
 
   return (
-    <section className="replay" aria-label={t("Volte a jogar")} data-parallax>
+    <section className="replay" aria-label={title} data-parallax>
       <div className="replay-head">
-        <h2 className="section">{t("Volte a jogar")}</h2>
+        <h2 className="section">{title}</h2>
       </div>
       <div className={`replay-track ${edge.start ? "at-start" : ""} ${edge.end ? "at-end" : ""}`} ref={track} onScroll={measure}
         onMouseLeave={() => onPreview(focusedGame())}
         onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onPreview(null); }}>
         {games.map((g, i) => (
-          <button key={g.id} data-focus className="replay-card" style={{ "--i": i } as CSSProperties} data-game-id={g.id}
+          <button key={g.id} data-focus className="replay-card" style={{ "--i": Math.min(i, 9) } as CSSProperties /* cascata só na primeira tela */} data-game-id={g.id}
             onFocus={() => onPreview(g)} onMouseEnter={() => onPreview(g)}
             onMouseMove={cardTilt.onMouseMove} onMouseLeave={cardTilt.onMouseLeave}
-            onClick={() => onOpen(g)} aria-label={t("{title}, jogado em {v1}", { title: g.title, v1: formatDate(g.lastPlayedAt) })}>
+            onClick={() => onOpen(g)} aria-label={label(g)}>
             {/* A animação de entrada fica no elemento interno: a regra global de foco ([data-focus]:focus
                 { animation: none }) a reiniciava no botão ao perder o foco, e a capa sumia (opacidade 0). */}
             <span className="replay-inner">
@@ -261,7 +291,7 @@ function Replay({ games, onOpen, onPreview }: { games: Game[]; onOpen: (g: Game)
                 <PlatformBadge platform={g.platform} />
               </span>
               <strong>{g.title}</strong>
-              <small>{[formatDate(g.lastPlayedAt), formatPlaytime(g.playtimeSeconds)].filter(Boolean).join(" · ")}</small>
+              <small>{meta(g)}</small>
             </span>
           </button>
         ))}

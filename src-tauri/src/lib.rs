@@ -25,6 +25,8 @@ mod devident;
 mod images;
 mod retro;
 mod steam;
+mod msstore;
+mod xbox;
 mod sources;
 mod accounts;
 mod backup;
@@ -37,7 +39,7 @@ mod pad_notify;
 #[cfg(debug_assertions)]
 mod dev;
 
-use commands::{activity, backup as bk, collections, controllers, emulators, scan, gallery, games, info, launcher, profiles, retro as ra, steam as st, settings, startup, stats, storage, system, webshots};
+use commands::{activity, backup as bk, collections, controllers, emulators, scan, gallery, games, info, launcher, logos, profiles, retro as ra, steam as st, settings, startup, stats, storage, system, webshots, xbox as xb, zerei};
 use tauri::Manager;
 use tauri_plugin_global_shortcut::ShortcutState;
 
@@ -124,6 +126,11 @@ pub fn run() {
             steam::sync::spawn(app.handle().clone());
             // Steam: aviso de conquista quase em tempo real (cartão por cima do jogo).
             steam::watch::spawn(app.handle().clone());
+            // Xbox: sincronização automática (após 2 min; só com conta) e aviso de conquista na hora.
+            xbox::spawn(app.handle().clone());
+            xbox::watch::spawn(app.handle().clone());
+            // Logos automáticas da biblioteca (SteamGridDB; só jogos sem logo, primeira rodada após 45 s).
+            logos::spawn(app.handle().clone());
             // Troféus do Vita3K/RPCS3: aviso na hora do desbloqueio (só lê os arquivos dos emuladores).
             trophies::watch::spawn(app.handle().clone());
             // Janela da notificação de captura (oculta até a primeira captura).
@@ -151,7 +158,6 @@ pub fn run() {
             games::update_game,
             games::remove_game,
             games::set_favorite,
-            games::set_completed,
             emulators::list_emulators,
             emulators::save_emulator,
             emulators::delete_emulator,
@@ -243,6 +249,18 @@ pub fn run() {
             webshots::fetch_image_data,
             webshots::remove_game_screenshot,
             webshots::restore_removed_screenshots,
+            zerei::zerei_search,
+            zerei::zerei_artwork,
+            zerei::sgdb_games,
+            zerei::zerei_list,
+            zerei::zerei_save,
+            zerei::zerei_mark_game,
+            logos::auto_logos,
+            zerei::zerei_delete,
+            zerei::zerei_export_csv,
+            zerei::zerei_import_csv,
+            zerei::zerei_changes,
+            zerei::zerei_mark_synced,
             collections::list_collections,
             collections::create_collection,
             collections::rename_collection,
@@ -281,6 +299,15 @@ pub fn run() {
             ra::ra_search_games,
             ra::ra_scan_library,
             ra::ra_emulator_support,
+            xb::xbox_status,
+            xb::xbox_set_client_id,
+            xb::xbox_login,
+            xb::xbox_cancel_login,
+            xb::xbox_disconnect,
+            xb::xbox_sync,
+            xb::xbox_game,
+            xb::xbox_installed,
+            xb::xbox_import,
             st::steam_get_account,
             st::steam_login,
             st::steam_cancel_login,

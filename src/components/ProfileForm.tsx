@@ -55,8 +55,10 @@ export default function ProfileForm({ profile, onClose, onDone }: {
     <Modal title={profile ? t("Editar perfil") : t("Novo perfil")} onClose={onClose} wide>
       <div className="form-grid">
         <div className="col">
-          <ImagePicker label={t("Foto")} value={f.avatar} onChange={(v) => set("avatar", v)} maxW={512} maxH={512} shape="round" crop={{ aspectW: 1, aspectH: 1, outW: 512, outH: 512 }} />
-          <ImagePicker label={t("Banner")} value={f.banner} onChange={(v) => set("banner", v)} maxW={1600} maxH={500} shape="wide" crop={{ aspectW: 16, aspectH: 5, outW: 1600, outH: 500 }} />
+          <ImagePicker label={t("Foto")} value={f.avatar} onChange={(v) => set("avatar", v)} maxW={512} maxH={512} shape="round" crop={{ aspectW: 1, aspectH: 1, outW: 512, outH: 512 }}
+            search={{ term: "", platform: "", kind: "cover", title: t("Pesquisar foto de perfil na internet") }} />
+          <ImagePicker label={t("Banner")} value={f.banner} onChange={(v) => set("banner", v)} maxW={1600} maxH={500} shape="wide" crop={{ aspectW: 16, aspectH: 5, outW: 1600, outH: 500 }}
+            search={{ term: "", platform: "", kind: "background", title: t("Pesquisar banner na internet") }} />
         </div>
         <div className="fields">
           <label>{t("Nome de exibição")}<input value={f.displayName} maxLength={32} onChange={(e) => set("displayName", e.target.value)} />

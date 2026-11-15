@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import Modal from "./Modal";
 import Button from "./Button";
 import ImagePicker from "./ImagePicker";
+import LogoPicker from "./LogoPicker";
 import Seg from "./Seg";
 import type { Emulator } from "../types";
 import Select from "./Select";
@@ -18,8 +19,8 @@ const FILE_ARGS = '"{iso}"';
 
 /** Cria ou edita um jogo: título, plataforma, executável, argumentos e capa. Em "Adicionar jogo", recebe o
  *  arquivo já escolhido e identificado: `exePath` (jogo de PC) ou `isoPath` (ISO/ROM, iniciado por emulador). */
-export default function GameForm({ profileId, game, isoPath, exePath, platform, emulatorId, onClose, onSaved }: {
-  profileId: number; game?: Game; isoPath?: string; exePath?: string; platform?: string | null; emulatorId?: number | null;
+export default function GameForm({ profileId, game, isoPath, exePath, title, platform, emulatorId, onClose, onSaved }: {
+  profileId: number; game?: Game; isoPath?: string; exePath?: string; title?: string; platform?: string | null; emulatorId?: number | null;
   onClose: () => void; onSaved: () => void;
 }) {
   const [emus, setEmus] = useState<Emulator[]>([]);
@@ -29,7 +30,7 @@ export default function GameForm({ profileId, game, isoPath, exePath, platform, 
   const isIso = !!iso && /\.iso$/i.test(iso);
   const { toast } = useSession();
   const [f, setF] = useState<GameInput>({
-    title: game?.title ?? titleFromPath(isoPath ?? exePath ?? ""),
+    title: game?.title ?? title ?? titleFromPath(isoPath ?? exePath ?? ""),
     platform: game?.platform ?? platform ?? "PC",
     executablePath: game?.executablePath ?? exePath ?? "",
     launchArgs: game?.launchArgs ?? (isoPath ? (emulatorId != null ? "" : FILE_ARGS) : ""),
@@ -39,7 +40,9 @@ export default function GameForm({ profileId, game, isoPath, exePath, platform, 
     bgY: game?.bgY ?? 50,
     // arquivo do jogo (ISO/ROM); ao editar, pode ser trocado pelo botão "Selecionar"
     isoPath: game?.isoPath ?? game?.romPath ?? isoPath ?? null,
+    logo: game?.logo ?? null,
   });
+  const [logoOpen, setLogoOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   /** Jogo sem ISO/ROM associado a um emulador: o arquivo escolhido abaixo é passado a ele como {iso}/{rom}. */
   const viaEmu = !iso && emu !== null;
@@ -53,13 +56,16 @@ export default function GameForm({ profileId, game, isoPath, exePath, platform, 
         // com emulador e sem ISO/ROM, o "executável" é o arquivo do jogo entregue ao emulador (ex.: EBOOT.BIN, .xex)
         filters: viaEmu
           ? [{ name: t("Todos os arquivos"), extensions: ["*"] }, { name: t("Executáveis"), extensions: ["exe", "bat", "cmd"] }]
-          : [{ name: t("Executáveis"), extensions: ["exe", "bat", "cmd"] }],
+          : [{ name: t("Executáveis"), extensions: ["exe", "bat", "cmd", "lnk"] }],
       });
       if (typeof sel === "string") {
-        set("executablePath", sel);
+        // atalho (.lnk): usa o destino (jogo do app Xbox / Microsoft Store → shell:AppsFolder\…)
+        const it = /\.lnk$/i.test(sel) ? await api.inspectGameFile(profileId, sel) : null;
+        if (it?.status === "invalid") { toast(t(it.note), "err"); return; }
+        set("executablePath", it ? it.path : sel);
         if (!f.title.trim()) {
           const base = sel.split(/[\\/]/).pop() ?? "";
-          set("title", base.replace(/\.[^.]+$/, ""));
+          set("title", it ? it.name : base.replace(/\.[^.]+$/, ""));
         }
       }
     } catch (e) {
@@ -111,11 +117,12 @@ export default function GameForm({ profileId, game, isoPath, exePath, platform, 
   }
 
   return (
-    <Modal title={game ? t("Editar jogo") : t("Adicionar jogo")} onClose={onClose} wide>
-      <div className="form-grid">
+    <Modal title={game ? t("Editar jogo") : t("Adicionar jogo")} onClose={onClose} xl>
+      {/* horizontal: capa | dados do jogo | imagens (fundo e logo) — sem coluna comprida para rolar */}
+      <div className="gf-grid">
         <ImagePicker label={t("Capa")} value={f.cover} onChange={(v) => set("cover", v)} maxW={600} maxH={800} shape="tall"
           search={{ term: f.title, platform: f.platform, kind: "cover" }} />
-        <div className="fields">
+        <div className="fields" data-nav-group>
           <label>{t("Título")}<input value={f.title} maxLength={80} onChange={(e) => set("title", e.target.value)} />
           </label>
           <label>{t("Plataforma")}<Select<string> value={f.platform} width="100%" title={t("Plataforma")}
@@ -150,6 +157,8 @@ export default function GameForm({ profileId, game, isoPath, exePath, platform, 
               onChange={(e) => set("launchArgs", e.target.value)}
             />
           </label>
+        </div>
+        <div className="fields gf-art" data-nav-group>
           <div className="bg-edit">
             <span className="muted">{t("Plano de fundo da Home (opcional)")}</span>
             <ImagePicker label={t("Sem imagem personalizada: usa a arte padrão do jogo")} value={f.background}
@@ -162,12 +171,28 @@ export default function GameForm({ profileId, game, isoPath, exePath, platform, 
               </div>
             )}
           </div>
+          <div className="bg-edit">
+            <span className="muted">{t("Logo (opcional)")}</span>
+            <div className="picker">
+              <div className="picker-preview wide zr-logo-slot">
+                {f.logo ? <img src={f.logo} alt="" referrerPolicy="no-referrer" /> : <span>{t("Sem logo: mostra o nome do jogo")}</span>}
+              </div>
+              <div className="row">
+                <Button onClick={() => setLogoOpen(true)} disabled={!f.title.trim()}>{t("Logos do SteamGridDB")}</Button>
+                {f.logo && <Button variant="ghost" onClick={() => set("logo", null)}>{t("Remover")}</Button>}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div className="row end">
         <Button variant="ghost" onClick={onClose}>{t("Cancelar")}</Button>
         <Button variant="primary" onClick={save} disabled={busy}>{t("Salvar")}</Button>
       </div>
+      {logoOpen && (
+        <LogoPicker title={f.title} year={null} sgdbId={null} current={f.logo} onClose={() => setLogoOpen(false)}
+          onPick={(url) => set("logo", url)} />
+      )}
     </Modal>
   );
 }

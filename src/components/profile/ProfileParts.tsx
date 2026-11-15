@@ -54,7 +54,7 @@ export function Showcase({ games, onOpen }: { games: Game[]; onOpen: (g: Game) =
         <span className="pf2-feature-text">
           <small>{t("Favorito nº 1")}</small>
           <strong>{first.title}</strong>
-          <em>{first.platform}{first.playtimeSeconds > 0 ? ` · ${formatDuration(first.playtimeSeconds)}` : ""}{first.completed ? ` · ✓ ${t("Concluído")}` : ""}</em>
+          <em>{first.platform}{first.playtimeSeconds > 0 ? ` · ${formatDuration(first.playtimeSeconds)}` : ""}{first.completed ? ` · ✓ ${t("Zerado")}` : ""}</em>
         </span>
       </button>
       {rest.length > 0 && (
@@ -112,7 +112,7 @@ export function RecentActivity({ activity, games, onOpen }: { activity: Activity
       {activity.completed.length > 0 && (
         <div className="pf2-done">
           {activity.completed.slice(0, 6).map((c) => (
-            <span key={c.gameId} className="pf2-done-chip" title={t("Concluído em") + " " + formatDate(c.completedAt)}>✓ {c.title}</span>
+            <span key={c.gameId} className="pf2-done-chip" title={t("Zerado em") + " " + formatDate(c.completedAt)}>✓ {c.title}</span>
           ))}
         </div>
       )}
@@ -167,7 +167,7 @@ export function ProfileSidebar({ profileId, score, showScore, stats, games }: {
       <div className="pf2-card pf2-nums">
         <div><b>{(stats?.libraryCount ?? games.length).toLocaleString(undefined)}</b><span>{t("Jogos")}</span></div>
         <div><b>{formatDuration(hours)}</b><span>{t("Tempo de jogo")}</span></div>
-        <div><b>{completed}</b><span>{t("Concluídos")}</span></div>
+        <div><b>{completed}</b><span>{t("Zerados")}</span></div>
         <div><b>{(stats?.achievements.unlocked ?? 0).toLocaleString(undefined)}</b><span>{t("Conquistas")}</span></div>
         {score && <div><b>{perfect}</b><span>{t("100% / platinas")}</span></div>}
         {stats?.favoritePlatform && <div><b className="pf2-small">{stats.favoritePlatform.platform}</b><span>{t("Plataforma mais jogada")}</span></div>}

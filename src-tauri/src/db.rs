@@ -26,8 +26,22 @@ impl Db {
         // Steam: cache da conta, vínculos com a biblioteca e conquistas.
         tx.execute_batch(crate::steam::store::SCHEMA)?;
         tx.execute_batch(crate::steam::news::SCHEMA)?;
+        // Xbox: histórico de jogos e conquistas da conta.
+        tx.execute_batch(crate::xbox::store::SCHEMA)?;
         // Central de fontes de dados (IGDB, HowLongToBeat, Nexus Mods).
         tx.execute_batch(crate::sources::SCHEMA)?;
+        // Zerei!: acompanhamento de jogos (independente da biblioteca). Só cria tabelas novas.
+        tx.execute_batch(crate::commands::zerei::SCHEMA)?;
+        // Zerei! ↔ biblioteca ("Marcar como zerado"); converte as marcas antigas de "concluído" uma vez.
+        crate::commands::zerei::migrate(&tx)?;
+        // Logos automáticas (SteamGridDB): jogos já tentados.
+        tx.execute_batch(crate::commands::logos::SCHEMA)?;
+        // Esquema 2 = com Zerei!. Versões anteriores do NEXSTAGE recusam restaurar backups com esquema
+        // mais novo — sem isso, a limpeza de imagens delas apagaria as capas do Zerei! (que não conhecem).
+        let v: i64 = tx.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        if v < 2 {
+            tx.execute_batch("PRAGMA user_version = 2;")?;
+        }
         // Proteção de perfis (PIN, sequência do controle, recuperação por e-mail) foi removida do app:
         // apaga as credenciais e os dados ligados a ela que versões anteriores tenham gravado.
         // Idempotente; também roda ao restaurar backups antigos (o banco restaurado passa por `Db::open`).
@@ -237,6 +251,15 @@ fn migrate(conn: &Connection) -> AppResult<()> {
              ALTER TABLE games ADD COLUMN folder_id INTEGER REFERENCES library_folders(id) ON DELETE SET NULL;",
         )?;
     }
+    // Data em que o jogo entrou nos favoritos (ordem do carrossel Favoritos da Home). Aditiva; favoritos
+    // antigos ficam sem data (aparecem depois dos que têm).
+    if !has_column(conn, "profile_games", "favorited_at")? {
+        conn.execute_batch("ALTER TABLE profile_games ADD COLUMN favorited_at TEXT;")?;
+    }
+    // Logo do jogo (exibida no lugar do título na página do jogo). Aditiva: dados existentes intactos.
+    if !has_column(conn, "games", "logo")? {
+        conn.execute_batch("ALTER TABLE games ADD COLUMN logo TEXT;")?;
+    }
     if !has_column(conn, "emulators", "cover")? {
         conn.execute_batch("ALTER TABLE emulators ADD COLUMN cover TEXT;")?;
     }
@@ -351,8 +374,56 @@ mod tests {
         assert!(has_column(&conn, "platform_accounts", "secret").unwrap());
         assert!(has_column(&conn, "ra_links", "status").unwrap());
         assert!(has_column(&conn, "steam_links", "appid").unwrap());
+        assert!(has_column(&conn, "zerei_entries", "uid").unwrap());
+        assert!(has_column(&conn, "games", "logo").unwrap());
         let v: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
-        assert_eq!(v, 1);
+        assert_eq!(v, 2);
+    }
+
+    #[test]
+    fn adds_zerei_to_existing_database_without_touching_data() {
+        let p = tmp("zerei-upgrade");
+        drop(Db::open(&p).unwrap());
+        {
+            // banco da versão anterior (esquema 1, sem Zerei!) com perfil, jogo, tempo de jogo e emulador
+            let c = Connection::open(&p).unwrap();
+            c.execute_batch(
+                "DROP TABLE zerei_entries; DROP TABLE zerei_deleted; DROP TABLE zerei_sync; PRAGMA user_version = 1;
+                 INSERT INTO profiles(id,username,display_name) VALUES(1,'ana','Ana');
+                 INSERT INTO games(id,title,platform,executable_path,cover) VALUES(7,'Celeste','PC','C:/celeste.exe','nximg:x.png');
+                 INSERT INTO profile_games(profile_id,game_id,favorite,playtime_seconds,completed) VALUES(1,7,1,3600,1);
+                 INSERT INTO emulators(name,exe_path) VALUES('PCSX2','C:/pcsx2.exe');",
+            )
+            .unwrap();
+        }
+        let snapshot = |c: &Connection| -> (String, String, i64, i64, i64, String) {
+            c.query_row(
+                "SELECT g.title, g.cover, pg.favorite, pg.playtime_seconds, pg.completed, (SELECT name FROM emulators) FROM games g JOIN profile_games pg ON pg.game_id=g.id",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
+            )
+            .unwrap()
+        };
+        let before = snapshot(&Connection::open(&p).unwrap());
+        {
+            let db = Db::open(&p).unwrap();
+            let c = db.conn().unwrap();
+            assert_eq!(snapshot(&c), before, "biblioteca, perfil e emuladores intactos");
+            assert!(has_column(&c, "zerei_entries", "uid").unwrap());
+            let v: i64 = c.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
+            assert_eq!(v, 2);
+            // o jogo marcado como "concluído" no esquema antigo virou um registro zerado, ligado a ele
+            let (status, game): (String, i64) = c
+                .query_row("SELECT status, game_id FROM zerei_entries WHERE title_key='celeste' AND platform='PC'", [], |r| Ok((r.get(0)?, r.get(1)?)))
+                .unwrap();
+            assert_eq!((status.as_str(), game), ("completed", 7));
+        }
+        // reabrir não recria nem apaga nada
+        let db = Db::open(&p).unwrap();
+        let c = db.conn().unwrap();
+        assert_eq!(snapshot(&c), before);
+        let n: i64 = c.query_row("SELECT COUNT(*) FROM zerei_entries", [], |r| r.get(0)).unwrap();
+        assert_eq!(n, 1, "registros do Zerei! preservados, sem duplicar a conversão");
     }
 
     #[test]

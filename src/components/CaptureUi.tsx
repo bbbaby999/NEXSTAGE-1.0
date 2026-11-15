@@ -30,6 +30,7 @@ export const ICON = {
   trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
   full: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5",
   exitFull: "M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5",
+  edit: "M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4",
 };
 
 /**

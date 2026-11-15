@@ -12,7 +12,8 @@
 .chips .steam-chip-tag{border-color:rgba(var(--steam-rgb),.5);color:var(--steam)}
 
 /* ---------- importação ---------- */
-.modal.xl{width:min(1240px,100%);display:flex;flex-direction:column;max-height:94vh}
+/* janela larga padrão (Editar jogo, pesquisa de imagens, logos do SteamGridDB, importações) */
+.modal.xl{width:min(1440px,100%);display:flex;flex-direction:column;max-height:94vh}
 .steam-tools{display:flex;gap:var(--s3);align-items:center;flex-wrap:wrap}
 .steam-tools .search{width:220px}
 .steam-selrow{margin:10px 0 4px}

@@ -46,6 +46,8 @@ pub struct Runtime {
     /// Combinações de botões do controle (máscara de botões, veja input.rs).
     pub pad_overlay: AtomicU32,
     pub pad_shot: AtomicU32,
+    /// Combinação que traz o NEXSTAGE para frente em tela cheia (de qualquer janela).
+    pub pad_summon: AtomicU32,
     /// Enquanto o usuário escolhe uma combinação nas configurações.
     pub capture: AtomicBool,
     /// Perfil ativo (para guardar capturas feitas em jogo na Galeria certa) e último jogo iniciado.
@@ -66,6 +68,7 @@ impl Default for Runtime {
             shortcut_shot: Mutex::new(None),
             pad_overlay: AtomicU32::new(0),
             pad_shot: AtomicU32::new(0),
+            pad_summon: AtomicU32::new(0),
             capture: AtomicBool::new(false),
             active_profile: AtomicI64::new(0),
             last_game: AtomicI64::new(0),
@@ -144,6 +147,12 @@ pub fn set_active(app: &AppHandle, on: bool) {
 /// ainda assim falhar, simular um toque de Alt (libera a trava de primeiro plano). Repete por ~1 s
 /// porque a troca para tela cheia pode devolver a ativação ao jogo.
 fn take_foreground(app: &AppHandle) {
+    take_foreground_while(app, |a| a.state::<Runtime>().active.load(Ordering::SeqCst));
+}
+
+/// Mesmo contorno de `take_foreground`, repetido enquanto `keep` for verdadeiro (overlay aberto, ou a
+/// janela ainda sem o foco).
+fn take_foreground_while(app: &AppHandle, keep: fn(&AppHandle) -> bool) {
     #[cfg(windows)]
     {
         let app = app.clone();
@@ -152,7 +161,7 @@ fn take_foreground(app: &AppHandle) {
                 if i > 0 {
                     std::thread::sleep(std::time::Duration::from_millis(100));
                 }
-                if !app.state::<Runtime>().active.load(Ordering::SeqCst) {
+                if !keep(&app) {
                     return;
                 }
                 let a = app.clone();
@@ -220,6 +229,62 @@ mod win {
             true
         }
     }
+}
+
+/// Traz o NEXSTAGE para frente em tela cheia (combinação do controle), vindo de qualquer janela —
+/// inclusive de um jogo. Com o overlay aberto, sai do modo overlay e fica no app normal em tela cheia.
+/// A tela cheia vira a preferência salva (a mesma de Configurações → Iniciar em tela cheia).
+pub fn summon(app: &AppHandle) {
+    let rt = app.state::<Runtime>();
+    let was_overlay = rt.active.swap(false, Ordering::SeqCst);
+    if let Ok(conn) = app.state::<Db>().conn() {
+        let _ = conn.execute("INSERT INTO app_settings(key,value) VALUES('fullscreen','1') ON CONFLICT(key) DO UPDATE SET value='1'", []);
+    }
+    if let Some(w) = app.get_webview_window("main") {
+        if was_overlay {
+            let _ = w.set_always_on_top(false);
+            let _ = w.set_decorations(true);
+        }
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_fullscreen(true);
+        let _ = w.set_focus();
+    }
+    if was_overlay {
+        let _ = app.emit("overlay-changed", false);
+    }
+    let _ = app.emit("fullscreen-changed", true);
+    hold_foreground(app);
+}
+
+/// Mantém o NEXSTAGE como janela ATIVA por ~1,5 s depois de chamado pelo controle.
+///
+/// O pedido vem da leitura do controle (segundo plano), então o Windows recusa `set_focus` sem ajuda; e a
+/// troca para tela cheia pode devolver a ativação à janela anterior (jogo/outro app) logo depois. Por
+/// isso insiste a cada 100 ms — mesmo que a janela pareça focada num instante — e, no fim, repassa o
+/// foco do teclado ao WebView2 (sem isso a janela fica na frente, mas teclado/controle não navegam).
+fn hold_foreground(app: &AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        const TRIES: u32 = 15;
+        for i in 0..TRIES {
+            if i > 0 {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            let a = app.clone();
+            let _ = app.run_on_main_thread(move || {
+                let Some(w) = a.get_webview_window("main") else { return };
+                #[cfg(windows)]
+                let acted = w.hwnd().map(|h| win::force_foreground(h.0 as *mut std::ffi::c_void)).unwrap_or(false);
+                #[cfg(not(windows))]
+                let acted = false;
+                if acted || i == 0 || i == TRIES - 1 || !w.is_focused().unwrap_or(false) {
+                    let _ = w.set_focus();
+                }
+            });
+        }
+        let _ = app.emit("app-summoned", ());
+    });
 }
 
 pub fn toggle(app: &AppHandle) {

@@ -17,6 +17,7 @@ import "./profile.css";
 import "./controllers.css";
 import "./updates.css";
 import "./idle.css";
+import "./zerei.css";
 import "./focus.css"; // indicador de foco unificado: sempre por último
 
 // A janela "shot-toast" (notificação de captura por cima do jogo) usa o mesmo bundle, só com o cartão.

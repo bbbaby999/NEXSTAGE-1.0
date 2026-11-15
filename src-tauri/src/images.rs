@@ -23,7 +23,16 @@ use std::{
 const PREFIX: &str = "nximg:";
 const MAX_BYTES: usize = 15 * 1024 * 1024;
 /// Colunas que guardam imagens em arquivo.
-const COLUMNS: [(&str, &str); 3] = [("games", "cover"), ("games", "background"), ("emulators", "cover")];
+const COLUMNS: [(&str, &str); 7] = [
+    ("games", "cover"), ("games", "background"), ("games", "logo"), ("emulators", "cover"),
+    // página Zerei (jogos acompanhados, independentes da biblioteca)
+    ("zerei_entries", "cover"), ("zerei_entries", "logo"), ("zerei_entries", "background"),
+];
+/// Colunas que podem faltar em bancos de teste/antigos (antes da migração): são puladas na limpeza (sem a
+/// coluna, não há imagem nela). As demais continuam obrigatórias: erro interrompe sem apagar nada.
+fn optional(table: &str, col: &str) -> bool {
+    table == "zerei_entries" || (table, col) == ("games", "logo")
+}
 
 static DIR: OnceLock<PathBuf> = OnceLock::new();
 
@@ -184,7 +193,12 @@ pub fn migrate_and_clean(conn: &mut Connection) -> AppResult<usize> {
     let tx = conn.transaction()?;
     for (table, col) in COLUMNS {
         let rows: Vec<(i64, String)> = {
-            let mut st = tx.prepare(&format!("SELECT id,{col} FROM {table} WHERE {col} LIKE 'data:%'"))?;
+            let st = tx.prepare(&format!("SELECT id,{col} FROM {table} WHERE {col} LIKE 'data:%'"));
+            // só a tabela do Zerei! pode faltar (banco de teste); nas demais, erro interrompe como antes
+            let mut st = match st {
+                Err(_) if optional(table, col) => continue,
+                r => r?,
+            };
             let r = st.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<Result<Vec<_>, _>>()?;
             r
         };
@@ -198,7 +212,11 @@ pub fn migrate_and_clean(conn: &mut Connection) -> AppResult<usize> {
     // Arquivos em uso (lidos dentro da transação, já com as migrações acima).
     let mut used: HashSet<String> = HashSet::new();
     for (table, col) in COLUMNS {
-        let mut st = tx.prepare(&format!("SELECT {col} FROM {table} WHERE {col} LIKE 'nximg:%'"))?;
+        // Falha ao ler uma tabela da biblioteca/emuladores interrompe a limpeza (nada é apagado), como antes.
+        let mut st = match tx.prepare(&format!("SELECT {col} FROM {table} WHERE {col} LIKE 'nximg:%'")) {
+            Err(_) if optional(table, col) => continue,
+            r => r?,
+        };
         for v in st.query_map([], |r| r.get::<_, String>(0))? {
             if let Some(n) = v?.strip_prefix(PREFIX) {
                 used.insert(n.to_string());

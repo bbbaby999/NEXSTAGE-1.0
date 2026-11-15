@@ -8,6 +8,7 @@ import { raAgo } from "../lib/ra";
 import { useSession } from "../state/session";
 import { t, tk } from "../lib/i18n";
 import type { SteamOwned, SteamOwnedList, SteamPreviewItem } from "../types";
+import { ImportSourceTabs, type ImportSource } from "./ImportSource";
 
 type Filter = "all" | "installed" | "not_installed" | "recent";
 type Time = "any" | "never" | "1" | "10" | "50";
@@ -24,7 +25,11 @@ const UPDATE_LABEL: Record<string, string> = {
  * Importação da Steam: o usuário escolhe exatamente quais jogos entram, revisa a prévia e confirma.
  * Nada é importado automaticamente.
  */
-export default function SteamImport({ onClose, onImported }: { onClose: () => void; onImported?: () => void }) {
+export default function SteamImport({ onClose, onImported, onSource }: {
+  onClose: () => void; onImported?: () => void;
+  /** Biblioteca → Importar: mostra o seletor Steam/Xbox e troca de origem. */
+  onSource?: (s: ImportSource) => void;
+}) {
   const { profile, toast, setView } = useSession();
   const p = profile!;
   const [connected, setConnected] = useState<boolean | null>(null);
@@ -95,9 +100,13 @@ export default function SteamImport({ onClose, onImported }: { onClose: () => vo
     finally { setBusy(null); }
   }
 
+  const title = onSource ? t("Importar") : t("Importar da Steam");
+  const tabs = onSource && <ImportSourceTabs value="steam" onChange={onSource} />;
+
   if (connected === false) {
     return (
-      <Modal title={t("Importar da Steam")} onClose={onClose}>
+      <Modal title={title} onClose={onClose}>
+        {tabs}
         <p>{t("Conecte sua conta Steam para escolher quais jogos importar.")}</p>
         <div className="row end">
           <Button variant="ghost" onClick={onClose}>{t("Fechar")}</Button>
@@ -153,7 +162,8 @@ export default function SteamImport({ onClose, onImported }: { onClose: () => vo
   }
 
   return (
-    <Modal title={t("Importar da Steam")} onClose={onClose} xl>
+    <Modal title={title} onClose={onClose} xl>
+      {tabs}
       {local && <p className="ra-warn">{t("Mostrando só os jogos instalados neste PC (cliente Steam local). Para ver a biblioteca completa, tempo de jogo e conquistas, salve sua chave da Web API em Configurações.")}</p>}
       <div className="steam-tools">
         <input className="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Pesquisar jogo…")} aria-label={t("Pesquisar jogo")} />

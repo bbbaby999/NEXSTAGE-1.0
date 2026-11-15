@@ -26,7 +26,7 @@ pub struct Bundle {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Item {
-    /// Chave de API de uma conta de plataforma (RetroAchievements, Steam).
+    /// Segredo de uma conta de plataforma (chave de API do RetroAchievements/Steam, refresh token do Xbox).
     #[serde(rename_all = "camelCase")]
     Account { profile_id: i64, platform: String, value: String },
     /// Credenciais de uma fonte de dados (IGDB, Nexus Mods...).
@@ -44,6 +44,7 @@ fn account_unprotect(platform: &str, blob: &[u8]) -> Option<String> {
     match platform {
         crate::retro::store::PLATFORM => crate::retro::secret::unprotect(blob),
         crate::steam::store::PLATFORM => crate::steam::sync::unprotect_key(blob),
+        crate::xbox::store::PLATFORM => crate::xbox::unprotect_token(blob),
         _ => None,
     }
 }
@@ -51,6 +52,7 @@ fn account_protect(platform: &str, v: &str) -> Option<Vec<u8>> {
     match platform {
         crate::retro::store::PLATFORM => crate::retro::secret::protect(v),
         crate::steam::store::PLATFORM => crate::steam::sync::protect_key(v),
+        crate::xbox::store::PLATFORM => crate::xbox::protect_token(v),
         _ => None,
     }
 }
