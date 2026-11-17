@@ -28,6 +28,7 @@ import ControlHints from "./components/ControlHints";
 import PatchNotes from "./components/PatchNotes";
 import { APP_VERSION } from "./lib/version";
 import VirtualKeyboardHost from "./components/VirtualKeyboard";
+import FilePickerHost from "./components/FilePicker";
 import ProfileSelect from "./features/ProfileSelect";
 import Home from "./features/Home";
 import Library from "./features/Library";
@@ -269,6 +270,7 @@ function Shell() {
     <>
       <WaveBackground />
       <VirtualKeyboardHost />
+      <FilePickerHost />
       {patchOpen && <PatchNotes onClose={() => setPatchOpen(false)} />}
       {/* trocar o idioma remonta a interface (o estado da sessão fica no SessionProvider, acima) */}
       {(revealed || phase === "done") && <Fragment key={`app-${lang}`}>{app}</Fragment>}

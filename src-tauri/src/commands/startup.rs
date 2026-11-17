@@ -43,6 +43,7 @@ pub fn apply_start_mode(app: &AppHandle) {
         if !fullscreen {
             crate::window_bounds::restore(app, &w); // último tamanho/posição em modo janela
         }
+        crate::monitor_pref::place_on_start(app, &w); // monitor preferido, se estiver conectado
         let _ = w.show(); // sempre exibe: nunca deixa a janela invisível
         if fullscreen {
             let _ = w.set_fullscreen(true);

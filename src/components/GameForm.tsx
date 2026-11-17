@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { useEffect, useRef, useState } from "react";
+import { pickOpen as open } from "../lib/filePicker";
 import Modal from "./Modal";
 import Button from "./Button";
 import ImagePicker from "./ImagePicker";
@@ -12,6 +12,7 @@ import { useSession } from "../state/session";
 import { Game, GameInput, PLATFORMS } from "../types";
 import { titleFromPath } from "../lib/iso";
 import { t } from "../lib/i18n";
+import { useSaveExit } from "./ExitPrompt";
 
 /** Argumentos padrão de um arquivo importado SEM emulador (o comando escolhido recebe o caminho). Com
  *  emulador, os argumentos do jogo ficam vazios para valerem os do emulador (ex.: tela cheia). */
@@ -51,6 +52,7 @@ export default function GameForm({ profileId, game, isoPath, exePath, title, pla
   async function pickExe() {
     try {
       const sel = await open({
+        purpose: "game-exe",
         multiple: false,
         directory: false,
         // com emulador e sem ISO/ROM, o "executável" é o arquivo do jogo entregue ao emulador (ex.: EBOOT.BIN, .xex)
@@ -79,6 +81,7 @@ export default function GameForm({ profileId, game, isoPath, exePath, title, pla
       const cur = f.isoPath ?? "";
       const ext = cur.split(".").pop()?.toLowerCase();
       const sel = await open({
+        purpose: "game-file",
         multiple: false,
         directory: false,
         defaultPath: cur || undefined,
@@ -93,6 +96,13 @@ export default function GameForm({ profileId, game, isoPath, exePath, title, pla
       toast(errMsg(e), "err");
     }
   }
+
+  // Start salva; sair com alterações pergunta "Sair sem salvar / Salvar" (estado inicial = 1º desenho)
+  const root = useRef<HTMLDivElement>(null);
+  const initial = useRef<string | null>(null);
+  const snap = JSON.stringify({ f, emu });
+  initial.current ??= snap;
+  const exit = useSaveExit({ root, dirty: () => snap !== initial.current, canSave: () => !busy, save: () => { save(); }, close: onClose });
 
   async function save() {
     setBusy(true);
@@ -117,9 +127,9 @@ export default function GameForm({ profileId, game, isoPath, exePath, title, pla
   }
 
   return (
-    <Modal title={game ? t("Editar jogo") : t("Adicionar jogo")} onClose={onClose} xl>
+    <Modal title={game ? t("Editar jogo") : t("Adicionar jogo")} onClose={exit.requestClose} xl>
       {/* horizontal: capa | dados do jogo | imagens (fundo e logo) — sem coluna comprida para rolar */}
-      <div className="gf-grid">
+      <div className="gf-grid" ref={root}>
         <ImagePicker label={t("Capa")} value={f.cover} onChange={(v) => set("cover", v)} maxW={600} maxH={800} shape="tall"
           search={{ term: f.title, platform: f.platform, kind: "cover" }} />
         <div className="fields" data-nav-group>
@@ -179,16 +189,17 @@ export default function GameForm({ profileId, game, isoPath, exePath, title, pla
               </div>
               <div className="row">
                 <Button onClick={() => setLogoOpen(true)} disabled={!f.title.trim()}>{t("Logos do SteamGridDB")}</Button>
-                {f.logo && <Button variant="ghost" onClick={() => set("logo", null)}>{t("Remover")}</Button>}
+                {f.logo && <Button variant="danger" onClick={() => set("logo", null)}>{t("Remover")}</Button>}
               </div>
             </div>
           </div>
         </div>
       </div>
       <div className="row end">
-        <Button variant="ghost" onClick={onClose}>{t("Cancelar")}</Button>
+        <Button variant="ghost" onClick={exit.requestClose}>{t("Cancelar")}</Button>
         <Button variant="primary" onClick={save} disabled={busy}>{t("Salvar")}</Button>
       </div>
+      {exit.prompt}
       {logoOpen && (
         <LogoPicker title={f.title} year={null} sgdbId={null} current={f.logo} onClose={() => setLogoOpen(false)}
           onPick={(url) => set("logo", url)} />

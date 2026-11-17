@@ -7,6 +7,7 @@ import Select from "../Select";
 import Seg from "../Seg";
 import ImagePicker from "../ImagePicker";
 import LogoPicker from "../LogoPicker";
+import { useSaveExit } from "../ExitPrompt";
 import { api, errMsg } from "../../lib/api";
 import { useSession } from "../../state/session";
 import { PLATFORMS } from "../../types";
@@ -128,6 +129,15 @@ export default function ZereiForm({ entry, initial, onSaved, onOpenExisting, onC
     setSaving(false);
   }
 
+  // Start salva; sair com alterações pergunta "Sair sem salvar / Salvar" (estado inicial = 1º desenho)
+  const initialSnap = useRef<string | null>(null);
+  const snap = JSON.stringify({ f, dates, hours, rating });
+  initialSnap.current ??= snap;
+  const exit = useSaveExit({
+    root, dirty: () => snap !== initialSnap.current, close: onClose, save: () => { save(); },
+    canSave: () => !saving && !!f.title.trim() && !!f.platform.trim(),
+  });
+
   if (dup) {
     return (
       <Modal title={t("Jogo já registrado")} onClose={() => setDup(null)}>
@@ -143,7 +153,7 @@ export default function ZereiForm({ entry, initial, onSaved, onOpenExisting, onC
   }
 
   return (
-    <Modal title={entry ? t("Editar registro") : t("Adicionar ao Zerei!")} onClose={onClose} xl>
+    <Modal title={entry ? t("Editar registro") : t("Adicionar ao Zerei!")} onClose={exit.requestClose} xl>
       {/* horizontal (igual ao "Editar jogo"): capa | dados do registro | imagens (fundo e logo) */}
       <div className="gf-grid zr-edit" ref={root}>
         <ImagePicker label={t("Capa")} value={f.cover} onChange={(v) => set("cover", v)} maxW={600} maxH={900} shape="tall"
@@ -217,14 +227,14 @@ export default function ZereiForm({ entry, initial, onSaved, onOpenExisting, onC
               </div>
               <div className="row">
                 <Button onClick={() => setLogoOpen(true)} disabled={!f.title.trim()}>{t("Logos do SteamGridDB")}</Button>
-                {f.logo && <Button variant="ghost" onClick={() => set("logo", null)}>{t("Remover")}</Button>}
+                {f.logo && <Button variant="danger" onClick={() => set("logo", null)}>{t("Remover")}</Button>}
               </div>
             </div>
           </div>
         </div>
       </div>
       <div className="row end">
-        <Button variant="ghost" onClick={onClose}>{t("Cancelar")}</Button>
+        <Button variant="ghost" onClick={exit.requestClose}>{t("Cancelar")}</Button>
         <Button variant="primary" disabled={saving || !f.title.trim() || !f.platform.trim()} onClick={() => save()}>
           {saving ? t("Salvando…") : entry ? t("Salvar") : t("Adicionar")}
         </Button>
@@ -233,6 +243,7 @@ export default function ZereiForm({ entry, initial, onSaved, onOpenExisting, onC
         <LogoPicker title={f.title} year={f.year} sgdbId={f.sgdbId} current={f.logo} onClose={() => setLogoOpen(false)}
           onPick={(url, id) => setF((x) => ({ ...x, logo: url, sgdbId: x.sgdbId ?? id }))} />
       )}
+      {exit.prompt}
     </Modal>
   );
 }

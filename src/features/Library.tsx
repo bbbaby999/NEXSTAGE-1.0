@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useInputDevice } from "../lib/inputDevice";
 import { onPadButton } from "../lib/nav";
 import { takeClosedGame } from "../lib/returnFocus";
-import { open } from "@tauri-apps/plugin-dialog";
+import { pickOpen as open } from "../lib/filePicker";
 import { useSession } from "../state/session";
 import { useLibrary } from "../state/useLibrary";
 import { api, errMsg } from "../lib/api";
@@ -201,7 +201,7 @@ export default function Library() {
    *  (nunca copiado, movido ou aberto). Executável → jogo de PC; demais → arquivo iniciado por emulador. */
   async function addGame() {
     try {
-      const sel = await open({ multiple: false, directory: false, title: t("Escolha o jogo"), filters: [
+      const sel = await open({ purpose: "add-game", multiple: false, directory: false, title: t("Escolha o jogo"), filters: [
         { name: t("Jogos (todos os formatos)"), extensions: [...EXE_EXTS, ...FILE_EXTS] },
         { name: t("Executáveis"), extensions: EXE_EXTS },
         { name: t("Imagens de disco (ISO, BIN, CUE)"), extensions: ["iso", "bin", "cue"] },

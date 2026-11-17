@@ -6,6 +6,7 @@ import { api, errMsg } from "../lib/api";
 import { useSession } from "../state/session";
 import type { LogoGame, WebShot } from "../types";
 import { t } from "../lib/i18n";
+import { useSaveExit } from "./ExitPrompt";
 
 /**
  * Logos do SteamGridDB (usado pela Biblioteca e pelo Zerei!; a pesquisa de imagens não tem logos).
@@ -30,6 +31,13 @@ export default function LogoPicker({ title, current, onPick, onClose }: {
   const [focused, setFocused] = useState<string | null>(null);
   const body = useRef<HTMLDivElement>(null);
   const focusFirst = (sel: string) => requestAnimationFrame(() => body.current?.querySelector<HTMLElement>(sel)?.focus());
+  // Start aplica a logo escolhida; sair com outra logo escolhida pergunta "Sair sem salvar / Aplicar"
+  const canApply = () => !!game && !!picked && picked !== current;
+  const dirtyRef = useRef(canApply);
+  dirtyRef.current = canApply;
+  const apply = () => { if (picked && game) onPick(picked, game.id); onClose(); };
+  const exit = useSaveExit({ root: body, dirty: canApply, canSave: canApply, save: apply, close: onClose,
+    saveLabel: t("Aplicar"), message: t("Você escolheu uma imagem que ainda não foi aplicada.") });
 
   async function search(q = query) {
     if (!q.trim()) return;
@@ -78,10 +86,11 @@ export default function LogoPicker({ title, current, onPick, onClose }: {
   useEffect(() => {
     if (!game) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || document.querySelector(".kb-root, .pick-root")) return;
+      if (e.key !== "Escape" || document.querySelector(".kb-root, .pick-root") || exit.asking()) return;
       e.stopImmediatePropagation();
       e.preventDefault();
-      back();
+      // com uma imagem escolhida: pergunta "Sair sem salvar / Aplicar"; sem: volta à lista de jogos
+      if (dirtyRef.current()) exit.requestClose(); else back();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -92,7 +101,7 @@ export default function LogoPicker({ title, current, onPick, onClose }: {
   const preview = focused ?? picked ?? logos?.[0]?.url ?? null;
 
   return (
-    <Modal title={t("Escolher logo")} onClose={onClose} xl portal className="is-modal">
+    <Modal title={t("Escolher logo")} onClose={exit.requestClose} xl portal className="is-modal">
       <div className={`is-body ${game && logos && logos.length > 0 ? "picking" : ""}`} ref={body}>
         {!hasKey ? (
           <div className="is-loading">{t("Salve uma chave do SteamGridDB em Configurações → Pesquisa de imagens para escolher logos e artes.")}</div>
@@ -169,11 +178,12 @@ export default function LogoPicker({ title, current, onPick, onClose }: {
         )}
       </div>
       <div className="row end is-foot">
-        <Button variant="ghost" onClick={onClose}>{t("Cancelar")}</Button>
+        <Button variant="ghost" onClick={exit.requestClose}>{t("Cancelar")}</Button>
         {game && logos && logos.length > 0 && (
-          <Button variant="primary" disabled={!picked} onClick={() => { if (picked) onPick(picked, game.id); onClose(); }}>{t("Usar esta imagem")}</Button>
+          <Button variant="primary" disabled={!picked} onClick={apply}>{t("Usar esta imagem")}</Button>
         )}
       </div>
+      {exit.prompt}
     </Modal>
   );
 }

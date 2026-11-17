@@ -25,7 +25,7 @@ html :is(input[type=checkbox],input[type=radio]):focus{outline:2px solid var(--b
 html .seg button:focus:not(.on){background:rgba(var(--br),.14);color:var(--text,#fff)}
 
 /* Abas/seções atuais em menus laterais e barras de abas: o foco nunca fica "escondido" atrás do destaque de ativo */
-html :is(.set-nav button,.pad-cat,.dp-tabs button).on:focus{box-shadow:0 0 0 2px var(--b),0 0 22px rgba(var(--br),.45)}
+html :is(.set-nav button,.pad-cat,.dp-tabs button).on:focus{box-shadow:0 0 22px rgba(var(--br),.55)}
 
 /* O anel não é cortado pelo contêiner rolável da página em itens colados na borda */
 html .main{scroll-padding:24px}

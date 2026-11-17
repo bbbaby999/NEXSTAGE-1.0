@@ -13,8 +13,7 @@ import {
 } from "../lib/controllers";
 import ControllerArt, { BITS as ART_BITS, HAS_TOUCHPAD } from "../components/ControllerArt";
 import ControllerVisual from "../components/ControllerVisual";
-import { PHOTO_CREDITS, commonsUrl } from "../data/controllerPhotos";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { PHOTO_CREDITS } from "../data/controllerPhotos";
 import { Battery } from "../components/ControllerStatus";
 import Button from "../components/Button";
 import Modal from "../components/Modal";
@@ -555,8 +554,7 @@ function PhotoCredit({ visual }: { visual: Visual }) {
   if (!c) return <p className="muted pad-credit">{t("Ilustração do NEXSTAGE.")}</p>;
   return (
     <p className="muted pad-credit">
-      {t("Foto: {author} · {license} · Wikimedia Commons (fundo removido pelo NEXSTAGE).", { author: c.author, license: t(c.license) })}{" "}
-      <button type="button" data-focus className="pad-credit-link" onClick={() => openUrl(commonsUrl(c.file)).catch(() => {})}>{t("Ver original")}</button>
+      {t("Foto: {author} · {license} · Wikimedia Commons (fundo removido pelo NEXSTAGE).", { author: c.author, license: t(c.license) })}
     </p>
   );
 }

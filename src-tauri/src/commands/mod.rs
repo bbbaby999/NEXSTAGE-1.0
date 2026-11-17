@@ -4,6 +4,7 @@ pub mod collections;
 pub mod controllers;
 pub mod gallery;
 pub mod emulators;
+pub mod files;
 pub mod games;
 pub mod info;
 pub mod launcher;

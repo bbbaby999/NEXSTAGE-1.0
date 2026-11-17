@@ -327,9 +327,12 @@ fn row(r: &Row) -> rusqlite::Result<ZereiEntry> {
         title: r.get("title")?,
         platform: r.get("platform")?,
         run: r.get("run")?,
-        cover: crate::images::resolve(r.get("cover")?),
-        logo: crate::images::resolve(r.get("logo")?),
-        background: crate::images::resolve(r.get("background")?),
+        // Arquivo local apagado (ex.: limpeza de uma versão antiga que não conhecia o Zerei!): a capa
+        // volta para o endereço de origem (ao salvar o registro ela é baixada de novo); logo e fundo
+        // ficam vazios em vez de quebrados.
+        cover: crate::images::resolve_existing(r.get("cover")?).or(r.get("cover_url")?),
+        logo: crate::images::resolve_existing(r.get("logo")?),
+        background: crate::images::resolve_existing(r.get("background")?),
         year: r.get("year")?,
         platforms: serde_json::from_str(&plats).unwrap_or_default(),
         igdb_id: r.get("igdb_id")?,
@@ -690,6 +693,23 @@ fn sgdb(c: &reqwest::Client, key: &str, path: &str) -> reqwest::RequestBuilder {
     c.get(format!("{SGDB}{path}")).bearer_auth(key)
 }
 
+/// Jogo do SteamGridDB pelo nome: nome equivalente (preferindo o mesmo ano); senão o primeiro resultado.
+async fn sgdb_find_id(c: &reqwest::Client, key: &str, title: &str, year: Option<i32>) -> Option<i64> {
+    let v = get_json(sgdb(c, key, &format!("/search/autocomplete/{}", webshots::penc(title.trim())))).await;
+    let list: Vec<(i64, String, Option<i32>)> = v
+        .as_ref()
+        .and_then(|v| v["data"].as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|g| Some((g["id"].as_i64()?, g["name"].as_str()?.to_string(), g["release_date"].as_i64().map(webshots::unix_year))))
+        .collect();
+    list.iter()
+        .filter(|g| info::name_score(title, &g.1) >= 1.0)
+        .max_by_key(|g| (year.is_some() && g.2 == year) as u8)
+        .or(list.first())
+        .map(|g| g.0)
+}
+
 /// Capas, logos e artes do jogo escolhido no SteamGridDB (o jogo de lá é achado pelo nome e ano).
 #[tauri::command]
 pub async fn zerei_artwork(app: AppHandle, title: String, year: Option<i32>, sgdb_id: Option<i64>) -> AppResult<ZereiArt> {
@@ -697,22 +717,7 @@ pub async fn zerei_artwork(app: AppHandle, title: String, year: Option<i32>, sgd
     let c = http()?;
     let id = match sgdb_id {
         Some(id) => Some(id),
-        None => {
-            let v = get_json(sgdb(&c, &key, &format!("/search/autocomplete/{}", webshots::penc(title.trim())))).await;
-            let list: Vec<(i64, String, Option<i32>)> = v
-                .as_ref()
-                .and_then(|v| v["data"].as_array())
-                .into_iter()
-                .flatten()
-                .filter_map(|g| Some((g["id"].as_i64()?, g["name"].as_str()?.to_string(), g["release_date"].as_i64().map(webshots::unix_year))))
-                .collect();
-            // nome equivalente (preferindo o mesmo ano); senão o primeiro resultado
-            list.iter()
-                .filter(|g| info::name_score(&title, &g.1) >= 1.0)
-                .max_by_key(|g| (year.is_some() && g.2 == year) as u8)
-                .or(list.first())
-                .map(|g| g.0)
-        }
+        None => sgdb_find_id(&c, &key, &title, year).await,
     };
     let Some(id) = id else { return Ok(ZereiArt { sgdb: true, ..Default::default() }) };
     let page = Some(format!("https://www.steamgriddb.com/game/{id}"));
@@ -1739,4 +1744,204 @@ mod tests {
         // e o mesmo jogo pode ser cadastrado de novo (run 1)
         assert_eq!(write(&c, 1, None, &input("Doom", "PC"), false, None).unwrap().run, 1);
     }
+}
+
+// ============================================================================================= imagens e lote
+
+/// Primeira imagem de cada tipo encontrada para um jogo.
+#[derive(Default)]
+struct FirstArt {
+    sgdb_id: Option<i64>,
+    cover: Option<String>,
+    logo: Option<String>,
+    background: Option<String>,
+}
+
+/// Capa, logo e fundo automáticos (o PRIMEIRO resultado de cada): SteamGridDB, se houver chave; capa e
+/// fundo que faltarem vêm da pesquisa do Zerei! (IGDB/RAWG ou a pesquisa pública).
+async fn first_art(app: &AppHandle, title: &str, year: Option<i32>, sgdb_id: Option<i64>, need: [bool; 3]) -> FirstArt {
+    let mut art = FirstArt::default();
+    if let (Some(key), Ok(c)) = (crate::apikeys::get(app)("sgdb_key"), http()) {
+        let id = match sgdb_id {
+            Some(id) => Some(id),
+            None => sgdb_find_id(&c, &key, title, year).await,
+        };
+        if let Some(id) = id {
+            art.sgdb_id = Some(id);
+            let first = |v: Option<Value>| v.and_then(|v| v["data"].as_array()?.first()?["url"].as_str().map(String::from));
+            if need[0] {
+                art.cover = first(get_json(sgdb(&c, &key, &format!("/grids/game/{id}?dimensions=600x900,342x482,660x930&types=static&nsfw=false&humor=false"))).await);
+            }
+            if need[1] {
+                art.logo = first(get_json(sgdb(&c, &key, &format!("/logos/game/{id}?types=static&nsfw=false&humor=false"))).await);
+            }
+            if need[2] {
+                art.background = first(get_json(sgdb(&c, &key, &format!("/heroes/game/{id}?types=static&nsfw=false&humor=false"))).await);
+            }
+        }
+    }
+    if (need[0] && art.cover.is_none()) || (need[2] && art.background.is_none()) {
+        use tauri::Manager;
+        if let Ok(r) = zerei_search(app.clone(), app.state::<Db>(), title.to_string()).await {
+            let hit = r.hits.iter().find(|h| info::name_score(title, &h.title) >= 1.0).or(r.hits.first());
+            if let Some(h) = hit {
+                if need[0] && art.cover.is_none() {
+                    art.cover = h.cover.clone();
+                }
+                if need[2] && art.background.is_none() {
+                    art.background = h.background.clone();
+                }
+            }
+        }
+    }
+    art
+}
+
+static REFRESH_CANCEL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static REFRESH_RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshProgress {
+    pub done: usize,
+    pub total: usize,
+    pub updated: usize,
+    pub title: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshReport {
+    /// Jogos que precisavam de alguma imagem (os já completos são pulados).
+    pub total: usize,
+    /// Jogos que receberam ao menos uma imagem.
+    pub updated: usize,
+    /// Jogos em que nada foi encontrado.
+    pub not_found: usize,
+    pub canceled: bool,
+}
+
+/// "Atualizar imagens": procura capa, logo e fundo (primeiro resultado de cada) e grava como arquivo.
+/// - `ids` vazio/ausente: todos os jogos do perfil; senão só os escolhidos.
+/// - `overwrite = false`: só preenche o que falta (imagens existentes, escolhidas pelo usuário, ficam);
+///   `true` (seleção): troca as três pelas encontradas (o que não for encontrado continua como estava).
+/// Progresso no evento `zerei-images-progress`; `zerei_refresh_cancel` interrompe entre um jogo e outro.
+#[tauri::command]
+pub async fn zerei_refresh_images(app: AppHandle, db: State<'_, Db>, profile_id: i64, ids: Option<Vec<i64>>, overwrite: bool) -> AppResult<RefreshReport> {
+    use std::sync::atomic::Ordering;
+    use tauri::Emitter;
+    if REFRESH_RUNNING.swap(true, Ordering::SeqCst) {
+        return Err(AppError::Validation("A atualização de imagens já está em andamento.".into()));
+    }
+    REFRESH_CANCEL.store(false, Ordering::SeqCst);
+    struct Running;
+    impl Drop for Running {
+        fn drop(&mut self) {
+            REFRESH_RUNNING.store(false, Ordering::SeqCst);
+        }
+    }
+    let _running = Running;
+
+    type Item = (i64, String, Option<i32>, Option<i64>, Option<String>, Option<String>, Option<String>);
+    let rows: Vec<Item> = {
+        let conn = db.conn()?;
+        let mut st = conn.prepare("SELECT id, title, year, sgdb_id, cover, logo, background FROM zerei_entries WHERE profile_id=?1 ORDER BY title")?;
+        let all = st
+            .query_map([profile_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?)))?
+            .collect::<Result<Vec<Item>, _>>()?;
+        match &ids {
+            Some(ids) if !ids.is_empty() => all.into_iter().filter(|r| ids.contains(&r.0)).collect(),
+            _ => all,
+        }
+    };
+    // o que cada jogo precisa: arquivo apagado conta como "sem imagem"
+    let missing = |v: &Option<String>| crate::images::resolve_existing(v.clone()).is_none();
+    let work: Vec<(Item, [bool; 3])> = rows
+        .into_iter()
+        .map(|r| {
+            let need = if overwrite { [true; 3] } else { [missing(&r.4), missing(&r.5), missing(&r.6)] };
+            (r, need)
+        })
+        .filter(|(_, n)| n.iter().any(|x| *x))
+        .collect();
+    let total = work.len();
+    let (mut updated, mut not_found) = (0, 0);
+    for (i, ((id, title, year, sgdb_id, ..), need)) in work.into_iter().enumerate() {
+        if REFRESH_CANCEL.load(Ordering::SeqCst) {
+            return Ok(RefreshReport { total, updated, not_found, canceled: true });
+        }
+        let _ = app.emit("zerei-images-progress", RefreshProgress { done: i, total, updated, title: title.clone() });
+        let art = first_art(&app, &title, year, sgdb_id, need).await;
+        // baixa e guarda como arquivo (offline e no backup); falha no download = imagem não encontrada
+        let cover_src = art.cover.clone();
+        let cover = if need[0] { store_found(art.cover).await } else { None };
+        let logo = if need[1] { store_found(art.logo).await } else { None };
+        let background = if need[2] { store_found(art.background).await } else { None };
+        if cover.is_none() && logo.is_none() && background.is_none() {
+            not_found += 1;
+            continue;
+        }
+        let conn = db.conn()?;
+        conn.execute(
+            "UPDATE zerei_entries SET
+               cover = COALESCE(?3, cover), cover_url = CASE WHEN ?3 IS NOT NULL THEN ?4 ELSE cover_url END,
+               logo = COALESCE(?5, logo), background = COALESCE(?6, background),
+               sgdb_id = COALESCE(sgdb_id, ?7), updated_at = datetime('now')
+             WHERE id=?1 AND profile_id=?2",
+            params![id, profile_id, cover, cover_src, logo, background, art.sgdb_id],
+        )?;
+        updated += 1;
+    }
+    let _ = app.emit("zerei-images-progress", RefreshProgress { done: total, total, updated, title: String::new() });
+    Ok(RefreshReport { total, updated, not_found, canceled: false })
+}
+
+async fn store_found(u: Option<String>) -> Option<String> {
+    keep_image(Some(u?)).await.ok().flatten()
+}
+
+#[tauri::command]
+pub fn zerei_refresh_cancel() {
+    REFRESH_CANCEL.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// Exclui vários registros (como `zerei_delete`, numa transação só).
+#[tauri::command]
+pub fn zerei_bulk_delete(db: State<Db>, profile_id: i64, ids: Vec<i64>) -> AppResult<usize> {
+    let mut conn = db.conn()?;
+    let tx = conn.transaction()?;
+    let mut n = 0;
+    for id in ids {
+        let uid: Option<String> = tx.query_row("SELECT uid FROM zerei_entries WHERE id=?1 AND profile_id=?2", params![id, profile_id], |r| r.get(0)).optional()?;
+        let Some(uid) = uid else { continue };
+        tx.execute("DELETE FROM zerei_entries WHERE id=?1", [id])?;
+        tx.execute("INSERT OR REPLACE INTO zerei_deleted(uid,profile_id) VALUES(?1,?2)", params![uid, profile_id])?;
+        n += 1;
+    }
+    tx.commit()?;
+    Ok(n)
+}
+
+/// Move vários registros para outra lista (status). Ao virar "zerado", ganha tipo "Zerado" e a data de
+/// hoje se ainda não tiver; ao sair de "zerado", o tipo de conclusão é limpo (a data fica no histórico).
+#[tauri::command]
+pub fn zerei_bulk_status(db: State<Db>, profile_id: i64, ids: Vec<i64>, status: String) -> AppResult<usize> {
+    if !STATUSES.contains(&status.as_str()) {
+        return Err(AppError::Validation("Status inválido.".into()));
+    }
+    let mut conn = db.conn()?;
+    let tx = conn.transaction()?;
+    let mut n = 0;
+    for id in ids {
+        n += tx.execute(
+            "UPDATE zerei_entries SET status=?3,
+               completion_type = CASE WHEN ?3='completed' THEN COALESCE(completion_type,'campaign') ELSE NULL END,
+               completed_at = CASE WHEN ?3='completed' THEN COALESCE(completed_at, date('now','localtime')) ELSE completed_at END,
+               updated_at = datetime('now')
+             WHERE id=?1 AND profile_id=?2",
+            params![id, profile_id, status],
+        )?;
+    }
+    tx.commit()?;
+    Ok(n)
 }

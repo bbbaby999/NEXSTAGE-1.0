@@ -3,7 +3,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { currentLang, t } from "./i18n";
 import { idleBusy } from "./idle";
-import type { ScanItem, GameHit, ImageSet, SourceRef, WebShot, Emulator, FolderRow, ImportSummary, Activity, FandomLink, PadCombos, StartupInfo, ClassifyResult, Controller, Drive, GalleryItem, ImportResult, ShortcutInfo, Game, GameCollection, GameInfo, GameInput, Profile, ProfileInput, RaAccount, RaOverview, RaAchievement, RaGameDetail, RaSyncReport, RaLinkInfo, RaGame, RaScanReport, RaEmuSupport, SteamAccount, SteamOwnedList, SteamPreviewItem, SteamImportReport, SteamSyncReport, SteamAppStatus, SteamGameData, SteamClientStatus, SteamAchOverview, SteamAchEntry, SteamNewsOverview, BackupInfo, BackupTarget, BackupReport, BackupInspect, BackupVerify, BackupRestoreReport, BackupAuto, BackupAutoMode, GamerStats, StatsVisibility, MetacriticResult, StoreHit, SourceView, SourceId, IgdbResult, NexusLinkStatus, NexusGame, NexusModsPage, NexusModDetail, NexusMod, ModSort, ZereiSearch, ZereiArt, ZereiEntry, ZereiInput, ZereiImport, LogoGames } from "../types";
+import type { ScanItem, GameHit, ImageSet, SourceRef, WebShot, Emulator, FolderRow, ImportSummary, Activity, FandomLink, PadCombos, StartupInfo, ClassifyResult, Controller, Drive, GalleryItem, ImportResult, ShortcutInfo, Game, GameCollection, GameInfo, GameInput, Profile, ProfileInput, RaAccount, RaOverview, RaAchievement, RaGameDetail, RaSyncReport, RaLinkInfo, RaGame, RaScanReport, RaEmuSupport, SteamAccount, SteamOwnedList, SteamPreviewItem, SteamImportReport, SteamSyncReport, SteamAppStatus, SteamGameData, SteamClientStatus, SteamAchOverview, SteamAchEntry, SteamNewsOverview, BackupInfo, BackupTarget, BackupReport, BackupInspect, BackupVerify, BackupRestoreReport, BackupAuto, BackupAutoMode, GamerStats, StatsVisibility, MetacriticResult, StoreHit, SourceView, SourceId, IgdbResult, NexusLinkStatus, NexusGame, NexusModsPage, NexusModDetail, NexusMod, ModSort, ZereiSearch, ZereiArt, ZereiEntry, ZereiInput, ZereiImport, LogoGames, MonitorState, FsPlaces, FsListing, ZereiRefreshReport, ZereiStatus } from "../types";
 
 /**
  * Capas e fundos ficam em arquivos na pasta de dados do app (ver src-tauri/src/images.rs): o backend
@@ -104,6 +104,12 @@ export const api = {
   zereiSave: (profileId: number, id: number | null, input: ZereiInput, newRun = false) =>
     invoke<ZereiEntry>("zerei_save", { profileId, id, input, newRun }).then(withZereiImages),
   zereiDelete: (profileId: number, id: number) => invoke<void>("zerei_delete", { profileId, id }),
+  /** Capa/logo/fundo automáticos (1º resultado). ids null = todos; overwrite=false só preenche o que falta. */
+  zereiRefreshImages: (profileId: number, ids: number[] | null, overwrite: boolean) =>
+    invoke<ZereiRefreshReport>("zerei_refresh_images", { profileId, ids, overwrite }),
+  zereiRefreshCancel: () => invoke<void>("zerei_refresh_cancel"),
+  zereiBulkDelete: (profileId: number, ids: number[]) => invoke<number>("zerei_bulk_delete", { profileId, ids }),
+  zereiBulkStatus: (profileId: number, ids: number[], status: ZereiStatus) => invoke<number>("zerei_bulk_status", { profileId, ids, status }),
   zereiExportCsv: (profileId: number, path: string) => invoke<number>("zerei_export_csv", { profileId, path }),
   zereiImportCsv: (profileId: number, path: string) => invoke<ZereiImport>("zerei_import_csv", {
     profileId, path,
@@ -158,6 +164,18 @@ export const api = {
   fandomLink: (title: string) => invoke<FandomLink>("fandom_link", { title }),
   getStartupInfo: () => invoke<StartupInfo>("get_startup_info"),
   setStartupMode: (mode: string) => invoke<StartupInfo>("set_startup_mode", { mode }),
+  /** Monitores conectados + monitor preferido salvo (pode estar desconectado). */
+  // Navegador de arquivos do app (só leitura)
+  fsPlaces: () => invoke<FsPlaces>("fs_places"),
+  fsList: (path: string, exts: string[], dirsOnly: boolean, showHidden: boolean) => invoke<FsListing>("fs_list", { path, exts, dirsOnly, showHidden }),
+  fsPathInfo: (path: string) => invoke<{ exists: boolean; dir: boolean }>("fs_path_info", { path }),
+  fsThumb: (path: string, size: number) => invoke<string>("fs_thumb", { path, size }),
+  fsReadImage: (path: string) => invoke<string>("fs_read_image", { path }),
+  /** Abre o Explorador na pasta do jogo (arquivo selecionado; atalho → original; Steam → pasta de instalação). */
+  revealGameFolder: (profileId: number, gameId: number) => invoke<void>("reveal_game_folder", { profileId, gameId }),
+  getMonitors: () => invoke<MonitorState>("get_monitors"),
+  /** null: sem preferência. Com id: salva e leva a janela para ele. */
+  setPreferredMonitor: (id: string | null) => invoke<MonitorState>("set_preferred_monitor", { id }),
   getScreenshotShortcut: () => invoke<ShortcutInfo>("get_screenshot_shortcut"),
   setScreenshotShortcut: (accelerator: string) => invoke<ShortcutInfo>("set_screenshot_shortcut", { accelerator }),
   resetScreenshotShortcut: () => invoke<ShortcutInfo>("reset_screenshot_shortcut"),

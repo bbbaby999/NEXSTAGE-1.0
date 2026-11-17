@@ -1,9 +1,37 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Button from "../Button";
 import SourceCredits from "./SourceCredits";
 import type { ZereiEntry } from "../../types";
 import { COMPLETION_LABEL, DIFFICULTY_LABEL, fmtDay, fmtHours, fmtRating, statusLabel } from "../../lib/zerei";
 import { t } from "../../lib/i18n";
+
+/**
+ * Primeira imagem da lista que carrega de fato (`null` enquanto testa ou se nenhuma carregar). Imagem em
+ * CSS (`background-image`) que falha não avisa nada — sem isto, um arquivo apagado ou um link fora do ar
+ * deixava o espaço vazio em vez de usar a alternativa.
+ */
+function useFirstLoaded(srcs: (string | null)[]): string | null {
+  const key = srcs.join("\n");
+  const [ok, setOk] = useState<string | null>(null);
+  useEffect(() => {
+    let dead = false;
+    setOk(null);
+    (async () => {
+      for (const s of srcs) {
+        if (!s) continue;
+        const im = new Image();
+        im.referrerPolicy = "no-referrer";
+        im.src = s;
+        try { await im.decode(); } catch { continue; }
+        if (!dead && im.naturalWidth > 0) setOk(s);
+        return;
+      }
+    })();
+    return () => { dead = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return ok;
+}
 
 /** Página de detalhes de um registro do Zerei! (arte de fundo, logo, dados e outras conclusões do mesmo jogo). */
 export default function ZereiDetail({ entry, siblings, onEdit, onDelete, onOpen, onBack }: {
@@ -14,7 +42,10 @@ export default function ZereiDetail({ entry, siblings, onEdit, onDelete, onOpen,
 }) {
   const [confirm, setConfirm] = useState(false);
   const e = entry;
-  const art = e.background ?? e.cover;
+  // fundo: arte → capa; capa e logo: sem alternativa (letra inicial / título em texto)
+  const art = useFirstLoaded([e.background, e.cover]);
+  const cover = useFirstLoaded([e.cover]);
+  const logo = useFirstLoaded([e.logo]);
   const facts: [string, string][] = [
     [t("Status"), statusLabel(e.status)],
     [t("Tipo de conclusão"), e.completionType ? t(COMPLETION_LABEL[e.completionType]) : "—"],
@@ -29,13 +60,12 @@ export default function ZereiDetail({ entry, siblings, onEdit, onDelete, onOpen,
   return (
     <div className="zr-detail">
       <div className="zr-hero" style={art ? { backgroundImage: `url("${art}")` } : undefined}>
-        <div className="zr-hero-shade" />
         <div className="zr-hero-body">
-          <div className="cover zr-hero-cover" style={e.cover ? { backgroundImage: `url("${e.cover}")` } : undefined}>
-            {!e.cover && <span>{e.title.charAt(0).toUpperCase()}</span>}
+          <div className="cover zr-hero-cover" style={cover ? { backgroundImage: `url("${cover}")` } : undefined}>
+            {!cover && <span>{e.title.charAt(0).toUpperCase()}</span>}
           </div>
           <div className="zr-hero-text">
-            {e.logo ? <img className="zr-hero-logo" src={e.logo} alt={e.title} referrerPolicy="no-referrer" /> : <h1>{e.title}</h1>}
+            {logo ? <img className="zr-hero-logo" src={logo} alt={e.title} referrerPolicy="no-referrer" /> : <h1>{e.title}</h1>}
             <div className="zr-chips">
               <span className={`zr-chip st-${e.status}`}>{statusLabel(e.status)}</span>
               <span className="zr-chip">{e.platform}</span>
@@ -90,7 +120,6 @@ export default function ZereiDetail({ entry, siblings, onEdit, onDelete, onOpen,
         )}
       </div>
       <SourceCredits igdb={e.igdbId !== null} rawgId={e.rawgId} sgdbId={e.sgdbId} />
-      <p className="muted zr-uid">{t("Identificador")}: {e.uid}</p>
     </div>
   );
 }

@@ -165,25 +165,38 @@ function normalize(r: Partial<PadReg>): PadReg | null {
   };
 }
 
+/**
+ * Nunca grava antes de o cadastro ter sido lido: com a lista ainda vazia na memória (ex.: módulo
+ * recarregado no modo de desenvolvimento), gravar apagaria a coleção salva.
+ */
 async function persist() {
   clearTimeout(saveTimer);
+  if (!loaded) return;
   await api.setAppSetting(KEY, JSON.stringify(regs));
 }
 /** Ajustes contínuos (barras deslizantes): grava logo depois que o valor para de mudar. */
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 function persistSoon() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => { api.setAppSetting(KEY, JSON.stringify(regs)).catch(() => {}); }, 250);
+  saveTimer = setTimeout(() => { if (loaded) api.setAppSetting(KEY, JSON.stringify(regs)).catch(() => {}); }, 250);
 }
 
 /** Carrega o cadastro e aplica os ajustes (chamado na abertura do app). */
-export async function loadControllers() {
+let loading: Promise<void> | null = null;
+export function loadControllers(): Promise<void> {
+  loading ??= readControllers().finally(() => { loading = null; });
+  return loading;
+}
+async function readControllers() {
   try {
     const raw = await api.getAppSetting(KEY);
     const list = raw ? (JSON.parse(raw) as Partial<PadReg>[]) : [];
     regs = (Array.isArray(list) ? list : []).map(normalize).filter((r): r is PadReg => !!r);
   } catch {
+    // leitura falhou: continua "não carregado" (nada é gravado por cima) e tenta de novo no próximo uso
     regs = [];
+    emit();
+    return;
   }
   loaded = true;
   emit();
@@ -235,8 +248,9 @@ export function splitJoycons(pairKey: string) {
 
 export const controllersLoaded = () => loaded;
 export const listControllers = () => regs;
+/** Quem usa o cadastro antes de ele ter sido lido (ex.: módulo recarregado) dispara a leitura. */
 export const useControllers = (): PadReg[] =>
-  useSyncExternalStore((cb) => { subs.add(cb); return () => subs.delete(cb); }, () => regs);
+  useSyncExternalStore((cb) => { subs.add(cb); if (!loaded) loadControllers().catch(() => {}); return () => subs.delete(cb); }, () => regs);
 
 /** Cadastro vinculado a um dispositivo (no máximo um por dispositivo). */
 export const regForDevice = (key: string | null | undefined) => (key ? regs.find((r) => r.deviceKey === key) ?? null : null);

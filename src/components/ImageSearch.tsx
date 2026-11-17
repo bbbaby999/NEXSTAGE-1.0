@@ -5,6 +5,7 @@ import { api, errMsg } from "../lib/api";
 import { useSession } from "../state/session";
 import type { GameHit, ImageSet, WebShot } from "../types";
 import { t, tk } from "../lib/i18n";
+import { useSaveExit } from "./ExitPrompt";
 
 export type SearchMode = "screenshots" | "cover" | "background";
 
@@ -39,6 +40,12 @@ export default function ImageSearch({ mode, term, platform, onConfirm, onClose, 
   const [saving, setSaving] = useState(false);
   const body = useRef<HTMLDivElement>(null);
   const multi = mode === "screenshots";
+  // Start aplica a imagem escolhida; sair com uma escolhida pergunta "Sair sem salvar / Aplicar"
+  const canApply = () => !!game && !!images && picked.length > 0 && !saving;
+  const dirtyRef = useRef(canApply);
+  dirtyRef.current = canApply;
+  const exit = useSaveExit({ root: body, dirty: canApply, canSave: canApply, save: () => { confirm(); }, close: onClose,
+    saveLabel: t("Aplicar"), message: t("Você escolheu uma imagem que ainda não foi aplicada.") });
 
   const focusFirst = (sel: string) => requestAnimationFrame(() => body.current?.querySelector<HTMLElement>(sel)?.focus());
 
@@ -85,10 +92,11 @@ export default function ImageSearch({ mode, term, platform, onConfirm, onClose, 
   useEffect(() => {
     if (!game) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || document.querySelector(".kb-root, .pick-root")) return;
+      if (e.key !== "Escape" || document.querySelector(".kb-root, .pick-root") || exit.asking()) return;
       e.stopImmediatePropagation();
       e.preventDefault();
-      back();
+      // com uma imagem escolhida: pergunta "Sair sem salvar / Aplicar"; sem: volta à lista de jogos
+      if (dirtyRef.current()) exit.requestClose(); else back();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -134,7 +142,7 @@ export default function ImageSearch({ mode, term, platform, onConfirm, onClose, 
   const sources = (h: GameHit) => [...new Set(h.sources.map((s) => SOURCE[s.source] ?? s.source))].join(" · ");
 
   return (
-    <Modal title={title ?? t(TITLE[mode])} onClose={onClose} xl portal className="is-modal">
+    <Modal title={title ?? t(TITLE[mode])} onClose={exit.requestClose} xl portal className="is-modal">
       <div className={`is-body ${game && images ? "picking" : ""}`} ref={body}>
         {!game ? (
           <>
@@ -215,13 +223,14 @@ export default function ImageSearch({ mode, term, platform, onConfirm, onClose, 
         <small className="muted">
           {game && images ? (multi ? t("{length} selecionada(s)", { length: picked.length }) : picked.length ? t("1 imagem escolhida") : t("Escolha uma imagem")) : ""}
         </small>
-        <Button variant="ghost" onClick={onClose}>{t("Cancelar")}</Button>
+        <Button variant="ghost" onClick={exit.requestClose}>{t("Cancelar")}</Button>
         {game && images && (
           <Button variant="primary" disabled={!picked.length || saving} onClick={confirm}>
             {saving ? t("Aplicando…") : multi ? (picked.length ? t("Adicionar {n} à galeria", { n: picked.length }) : t("Adicionar à galeria")) : t("Usar esta imagem")}
           </Button>
         )}
       </div>
+      {exit.prompt}
     </Modal>
   );
 }

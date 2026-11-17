@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { pickOpen as open } from "../lib/filePicker";
 import Modal from "./Modal";
 import Button from "./Button";
 import FolderImport from "./FolderImport";
@@ -21,7 +21,7 @@ export default function FoldersPanel({ profileId, onClose, onChanged }: { profil
   useEffect(() => { load(); }, [load]);
 
   async function add() {
-    const sel = await open({ directory: true, multiple: false, title: t("Escolha a pasta de jogos") }).catch(() => null);
+    const sel = await open({ purpose: "folders", directory: true, multiple: false, title: t("Escolha a pasta de jogos") }).catch(() => null);
     if (typeof sel === "string") setScan({ path: sel, id: null });
   }
 

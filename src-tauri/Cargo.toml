@@ -31,6 +31,8 @@ base64 = "0.22"
 hidapi = "2"
 sha2 = "0.10"
 png = "0.17"
+# Navegador de arquivos do app: miniaturas das imagens (só decodificação + JPEG/PNG da miniatura).
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "bmp", "gif"] }
 sysinfo = { version = "0.32", default-features = false, features = ["disk"] }
 # Espera entre requisições ao RetroAchievements (o tokio já vem com o Tauri; só ativa o timer).
 tokio = { version = "1", features = ["time"] }
@@ -42,7 +44,7 @@ ring = "0.17"
 
 # Bateria dos controles Xbox (inclusive por Bluetooth, onde o XInput não informa): Windows.Gaming.Input.
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62", features = ["Foundation", "Foundation_Collections", "Gaming_Input", "Devices_Power", "System_Power", "Win32_System_Registry"] }
+windows = { version = "0.62", features = ["Foundation", "Foundation_Collections", "Gaming_Input", "Devices_Power", "System_Power", "Win32_System_Registry", "Win32_Devices_Display", "Win32_Foundation", "Win32_Graphics_Gdi"] }
 
 # Compilação de distribuição: binário menor e um pouco mais rápido, sem mudar comportamento.
 # - lto + codegen-units=1: otimização entre crates (remove código não usado das dependências);

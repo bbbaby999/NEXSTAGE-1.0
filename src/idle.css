@@ -17,24 +17,34 @@
   to{transform:translate(var(--kb-x1,0),var(--kb-y1,0)) scale(var(--kb-s1,1.05))}
 }
 
-/* Capa (jogo sem plano de fundo) e capturas: imagem inteira sobre um fundo desfocado dela mesma. */
-.idle-backdrop{position:absolute;inset:-8%;width:116%;height:116%;object-fit:cover;filter:blur(48px) saturate(1.2) brightness(.42)}
-/* Classes com prefixo próprio: ".shot"/".cover" genéricas colidem com a Galeria/Biblioteca (styles.css). */
-.idle-layer.idle-shot .idle-img{object-fit:contain}
-.idle-layer.idle-cover .idle-img{inset:auto;left:50%;top:50%;width:auto;height:72cqh;max-width:80cqw;margin:0;
-  translate:-50% -54%;object-fit:contain;border-radius:1.4cqh;box-shadow:0 3cqh 9cqh rgba(0,0,0,.6)}
+/* Todos os tipos (arte, capa, captura) preenchem a tela inteira (object-fit:cover acima). */
 
 .idle-vignette{position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(to top,rgba(0,0,0,.62) 0%,rgba(0,0,0,0) 34%),radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.45) 100%)}
+  /* base mais escura e um reforço no canto inferior esquerdo, onde fica a legenda (legível em artes claras) */
+  background:radial-gradient(ellipse 70% 55% at 0% 100%,rgba(0,0,0,.62) 0%,rgba(0,0,0,0) 100%),
+    linear-gradient(to top,rgba(0,0,0,.72) 0%,rgba(0,0,0,.25) 22%,rgba(0,0,0,0) 40%),
+    radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.45) 100%)}
 
 .idle-caption{position:absolute;left:5cqw;bottom:6.5cqh;z-index:2;max-width:60cqw;display:flex;flex-direction:column;gap:.6cqh;
-  color:#fff;text-shadow:0 .3cqh 2cqh rgba(0,0,0,.7);animation:idle-caption 1.2s ease .9s both}
-.idle-caption strong{font-size:clamp(11px,4.4cqh,52px);font-weight:300;letter-spacing:.01em;line-height:1.1;
+  color:#fff;text-shadow:0 0 .3cqh rgba(0,0,0,.9),0 .4cqh 2cqh rgba(0,0,0,.8);animation:idle-caption 1.2s ease .9s both;gap:1.2cqh}
+.idle-caption strong{font-size:clamp(11px,4.4cqh,52px);font-weight:500;letter-spacing:.01em;line-height:1.1;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* logo do jogo no lugar do título: alinhado à esquerda e embaixo, como na Home */
 .idle-logo{display:block;align-self:flex-start;max-width:min(42cqw,620px);max-height:18cqh;width:auto;height:auto;object-fit:contain;object-position:left bottom;
-  filter:drop-shadow(0 .6cqh 2.4cqh rgba(0,0,0,.75))}
-.idle-caption small{font-size:clamp(9px,2cqh,22px);opacity:.72;letter-spacing:.04em}
+  /* contorno escuro fino + sombra: o logo se destaca até sobre áreas claras da arte */
+  filter:drop-shadow(0 0 .15cqh rgba(0,0,0,.95)) drop-shadow(0 .5cqh 1.4cqh rgba(0,0,0,.85)) drop-shadow(0 0 3cqh rgba(0,0,0,.45))}
+/* Selos: um dado por selo (conclusão, data, tempo de jogo, plataforma) — vidro escuro, borda clara,
+   sombra e ícone na cor do tema; entram um após o outro */
+.idle-tags{display:flex;flex-wrap:wrap;gap:1cqh}
+.idle-tag{display:inline-flex;align-items:center;gap:.8cqh;font-size:clamp(9px,1.9cqh,21px);font-weight:600;letter-spacing:.03em;white-space:nowrap;
+  color:rgba(255,255,255,.95);padding:.7cqh 1.5cqh .7cqh 1.1cqh;border-radius:999px;background:rgba(8,10,18,.72);border:1px solid rgba(255,255,255,.22);
+  box-shadow:0 .6cqh 2cqh rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.1);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);text-shadow:none;
+  animation:idle-caption .8s ease both}
+.idle-tag svg{width:2.1cqh;height:2.1cqh;min-width:10px;min-height:10px;fill:none;stroke:var(--b);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  filter:drop-shadow(0 0 .6cqh rgba(var(--br),.6))}
+/* Platinado: selo dourado */
+.idle-tag.gold{color:#1a1200;background:linear-gradient(135deg,#ffe08a,#ffb703);border-color:rgba(255,255,255,.55)}
+.idle-tag.gold svg{stroke:#1a1200;filter:none}
 @keyframes idle-caption{from{opacity:0;transform:translateY(1.5cqh)}to{opacity:1;transform:none}}
 
 .idle-empty{position:absolute;inset:0;display:grid;place-items:center;padding:0 8cqw;text-align:center;

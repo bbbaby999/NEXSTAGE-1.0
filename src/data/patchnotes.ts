@@ -19,6 +19,38 @@ export const NOTE_LABEL: Record<NoteType, string> = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "1.3.0",
+    date: "2026-11-17",
+    summary: "Navegador de arquivos próprio com controle, monitor preferido, ações em lote e imagens automáticas no Zerei!, Modo Ocioso com os jogos zerados e uma navegação pelo controle mais previsível.",
+    sections: [
+      { type: "new", items: [
+        "Navegador de arquivos do NEXSTAGE: escolher jogos, imagens, pastas e arquivos agora funciona com o controle, com acesso rápido, unidades, pastas recentes, miniaturas das imagens e favoritos (▢/X favorita a pasta). Cada tela lembra a última pasta aberta, e atalhos de pasta da Área de trabalho funcionam. O seletor do Windows continua disponível em Configurações → Controles e atalhos.",
+        "Monitor preferido (Configurações → Janela e inicialização): com mais de um monitor, o NEXSTAGE abre sempre no escolhido; se ele estiver desligado, abre no monitor ligado e volta para o preferido quando ele for religado.",
+        "Zerei! → Atualizar imagens: procura capa, logo e plano de fundo automaticamente (primeiro resultado), com aviso das fontes configuradas e barra de progresso. Por padrão não altera as imagens que você já escolheu; marque “Substituir imagens existentes” para trocá-las.",
+        "Zerei! → seleção de vários jogos: excluir, mover para outra lista (zerado, jogando, pausado, lista de desejos, não iniciado) e atualizar imagens de uma vez. Segure Ⓐ ou o botão do mouse sobre um jogo para começar a seleção com ele marcado; com itens selecionados, ☰ abre as ações e ▢ abre “Mover para…”.",
+        "Galeria: com capturas selecionadas, ☰ abre as ações da seleção.",
+        "Modo Ocioso → Zerados: apresentação com os planos de fundo dos jogos zerados no Zerei!, com selos de conclusão, data, tempo de jogo e plataforma.",
+        "“Abrir pasta de arquivos” em Mais opções do jogo: abre a pasta onde o jogo está (atalhos levam ao arquivo original; jogos da Steam, à pasta de instalação).",
+        "Start salva: nos formulários de jogo, no registro do Zerei!, na escolha de capa, fundo e logo e no editor de enquadramento. Sair com alterações pergunta “Sair sem salvar” ou “Salvar”.",
+      ] },
+      { type: "improve", items: [
+        "Navegação pelo controle: o foco sempre vai para o item mais próximo na direção apertada.",
+        "Overlay em jogo: toma o foco do jogo de forma mais confiável, para o controle passar a navegar no overlay.",
+        "Biblioteca e Zerei!: rolagem mais fluida ao segurar o direcional (as capas carregam em segundo plano).",
+        "Modo Ocioso: as imagens sempre preenchem a tela com um leve zoom, e as informações ficam mais legíveis sobre qualquer imagem.",
+      ] },
+      { type: "fix", items: [
+        "Zerei!: capas, logos e fundos que não apareciam (arquivos apagados por uma versão antiga) agora usam uma alternativa em vez de ficar em branco.",
+        "Central de Controles: a coleção nunca é gravada por cima antes de ter sido carregada.",
+      ] },
+      { type: "ui", items: [
+        "Botões com vidro neutro; a cor do tema aparece no botão em foco ou com o mouse por cima, e Remover/Excluir ficam vermelhos. O foco perdeu a borda: agora é um brilho por trás com um leve aumento.",
+        "Página do jogo no Zerei!: arte de fundo sem película escura, botões legíveis e créditos das fontes só como texto.",
+        "Pesquisa de imagens: borda clara na miniatura e no jogo em foco.",
+      ] },
+    ],
+  },
+  {
     version: "1.2.0",
     date: "2026-11-14",
     summary: "Integração com o Xbox e a Microsoft Store, a nova página Zerei! para registrar os jogos que você zerou, logos dos jogos e uma página do jogo redesenhada.",

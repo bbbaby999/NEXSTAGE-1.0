@@ -18,6 +18,8 @@ import "./controllers.css";
 import "./updates.css";
 import "./idle.css";
 import "./zerei.css";
+import "./filepicker.css";
+import "./buttons.css"; // cor de destaque só em Jogar/Instalar, Remover e estados; aumento no foco
 import "./focus.css"; // indicador de foco unificado: sempre por último
 
 // A janela "shot-toast" (notificação de captura por cima do jogo) usa o mesmo bundle, só com o cartão.

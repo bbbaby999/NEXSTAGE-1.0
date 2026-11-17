@@ -182,6 +182,8 @@ export interface Activity {
   month: { sessions: number; seconds: number; games: number };
 }
 
+export interface MonitorInfo { id: string; name: string; width: number; height: number; primary: boolean; current: boolean }
+export interface MonitorState { monitors: MonitorInfo[]; preferred: string | null; preferredName: string | null }
 export interface StartupInfo { mode: "none" | "minimized" | "window" | "fullscreen"; autostartEnabled: boolean; devBuild: boolean }
 export interface PadCombos { overlay: number; screenshot: number; summon: number; overlayDefault: number; screenshotDefault: number; summonDefault: number }
 export interface FandomLink { url: string; direct: boolean }
@@ -441,3 +443,12 @@ export interface XboxGameData {
   fetchedAt: string | null; achievements: XboxAch[]; error: string | null;
 }
 export interface XboxInstalled { aumid: string; name: string; image: string | null; inLibrary: boolean }
+
+// ---------- Navegador de arquivos do app ----------
+export interface FsPlace { id: "desktop" | "documents" | "downloads" | "pictures" | "videos" | "music" | "home"; path: string }
+export interface FsDrive { mount: string; label: string; removable: boolean; totalBytes: number; freeBytes: number }
+export interface FsPlaces { places: FsPlace[]; drives: FsDrive[] }
+export interface FsEntry { name: string; path: string; dir: boolean; size: number; modified: number; ext: string; link: boolean }
+export interface FsListing { path: string; parent: string | null; entries: FsEntry[]; truncated: number }
+export interface ZereiRefreshReport { total: number; updated: number; notFound: number; canceled: boolean }
+export interface ZereiRefreshProgress { done: number; total: number; updated: number; title: string }

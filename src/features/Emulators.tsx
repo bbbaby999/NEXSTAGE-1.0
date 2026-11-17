@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { pickOpen as open } from "../lib/filePicker";
 import { useSession } from "../state/session";
 import { api, errMsg } from "../lib/api";
 import { ALL_FORMATS, EMULATOR_PRESETS } from "../data/emulatorPresets";
@@ -38,7 +38,7 @@ export default function Emulators() {
   const toggle = (arr: string[], v: string) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
 
   async function pickExe() {
-    const sel = await open({ multiple: false, directory: false, filters: [{ name: t("Executável"), extensions: ["exe", "bat", "cmd"] }] }).catch(() => null);
+    const sel = await open({ purpose: "emulator", multiple: false, directory: false, filters: [{ name: t("Executável"), extensions: ["exe", "bat", "cmd"] }] }).catch(() => null);
     if (typeof sel === "string" && draft) setDraft({ ...draft, exePath: sel });
   }
   async function save() {

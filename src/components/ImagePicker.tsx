@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Button from "./Button";
 import ImageCropper from "./ImageCropper";
 import ImageSearch from "./ImageSearch";
@@ -7,6 +7,7 @@ import { api, errMsg } from "../lib/api";
 import type { WebShot } from "../types";
 import { useSession } from "../state/session";
 import { t } from "../lib/i18n";
+import { pickImageFile } from "../lib/filePicker";
 
 export interface CropSpec { aspectW: number; aspectH: number; outW: number; outH: number }
 
@@ -21,7 +22,6 @@ export default function ImagePicker({ label, value, onChange, maxW, maxH, shape,
   /** Pesquisa na internet: `term` vazio abre a janela com a caixa de busca para digitar o nome do jogo. */
   search?: { term: string; platform: string; kind: "cover" | "background"; title?: string };
 }) {
-  const ref = useRef<HTMLInputElement>(null);
   const { toast } = useSession();
   const [editing, setEditing] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
@@ -50,13 +50,11 @@ export default function ImagePicker({ label, value, onChange, maxW, maxH, shape,
         {!value && <span>{label}</span>}
       </div>
       <div className="row">
-        <Button onClick={() => ref.current?.click()}>{value ? t("Trocar") : t("Escolher")} imagem</Button>
+        <Button onClick={() => pickImageFile(label, `image-${search?.kind ?? shape}`).then((f) => pick(f ?? undefined), (e) => toast(errMsg(e), "err"))}>{value ? t("Trocar") : t("Escolher")} imagem</Button>
         {search && <Button onClick={() => setSearching(true)}>{t("Pesquisar na internet")}</Button>}
         {crop && value && <Button onClick={() => setEditing(value)}>{t("Ajustar")}</Button>}
-        {value && <Button variant="ghost" onClick={() => onChange(null)}>{t("Remover")}</Button>}
+        {value && <Button variant="danger" onClick={() => onChange(null)}>{t("Remover")}</Button>}
       </div>
-      <input ref={ref} type="file" accept="image/*" hidden
-        onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />
       {search && searching && (
         <ImageSearch mode={search.kind} term={search.term} platform={search.platform} title={search.title} onConfirm={fromWeb} onClose={() => setSearching(false)} />
       )}

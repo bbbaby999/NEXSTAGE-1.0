@@ -42,10 +42,15 @@ export default function ImageCropper({ src, aspectW, aspectH, outW, outH, round,
   const [crop, setCrop] = useState<Crop>({ zoom: 1, ox: 0, oy: 0 });
   const [error, setError] = useState(false);
   const drag = useRef<{ x: number; y: number } | null>(null);
+  /** Pergunta ao sair (Esc / Ⓑ / Cancelar): "Sair sem salvar" ou "Salvar". */
+  const [askExit, setAskExit] = useState(false);
+  // ref: o Modal registra o Esc uma vez só (na abertura) e guardaria a 1ª versão desta função
+  const loadedRef = useRef(false);
+  const requestClose = () => { if (loadedRef.current) setAskExit(true); else onClose(); };
 
   useEffect(() => {
     const i = new Image();
-    i.onload = () => { setImg(i); setCrop(centerCrop(i.naturalWidth, i.naturalHeight, vw, vh)); };
+    i.onload = () => { loadedRef.current = true; setImg(i); setCrop(centerCrop(i.naturalWidth, i.naturalHeight, vw, vh)); };
     i.onerror = () => setError(true);
     i.src = src;
   }, [src, vw, vh]);
@@ -99,9 +104,12 @@ export default function ImageCropper({ src, aspectW, aspectH, outW, outH, round,
     return () => window.removeEventListener("nexstage:direction", onDir);
   });
 
-  // Gatilhos/ombros = zoom; □/X centraliza; △/Y redefine (antes do comportamento padrão, ex.: trocar de aba)
+  // Gatilhos/ombros = zoom; □/X centraliza; △/Y redefine; Start salva (antes do comportamento padrão, ex.: trocar de aba)
   useEffect(() => onPadButton((b, e) => {
-    if (!img || !isTop()) return;
+    if (!img) return;
+    // Start salva — também com a pergunta de saída aberta
+    if (b === "menu" && (isTop() || askExit)) { e.preventDefault(); apply(); return; }
+    if (!isTop()) return;
     if (b === "l1" || b === "l2") zoom(crop.zoom - ZOOM_STEP);
     else if (b === "r1" || b === "r2") zoom(crop.zoom + ZOOM_STEP);
     else if (b === "x") center();
@@ -122,7 +130,7 @@ export default function ImageCropper({ src, aspectW, aspectH, outW, outH, round,
   const pad = device !== "keyboard"; // controle (o mouse conta como teclado)
 
   return (
-    <Modal title={title} onClose={onClose} wide portal className="crop-modal">
+    <Modal title={title} onClose={requestClose} wide portal className="crop-modal">
       {error ? <div className="empty"><p>{t("Não foi possível abrir essa imagem.")}</p></div> : (
         <div className="crop">
           <div ref={view} className={`crop-view ${round ? "round" : ""}`} style={{ width: vw, height: vh }}
@@ -142,6 +150,7 @@ export default function ImageCropper({ src, aspectW, aspectH, outW, outH, round,
                 <span><Glyph k="l1" /><Glyph k="r1" /> {t("Zoom")}</span>
                 <span><Glyph k="x" /> {t("Centralizar")}</span>
                 <span><Glyph k="confirm" /> {t("Aplicar")}</span>
+                <span><Glyph k="menu" /> {t("Salvar")}</span>
               </p>
             ) : (
               <p className="muted">{t("Arraste a imagem, role o mouse ou use os botões. A prévia mostra o resultado final.")}</p>
@@ -166,9 +175,19 @@ export default function ImageCropper({ src, aspectW, aspectH, outW, outH, round,
         </div>
       )}
       <div className="row end">
-        <Button variant="ghost" onClick={onClose}>{t("Cancelar")}</Button>
+        <Button variant="ghost" onClick={requestClose}>{t("Cancelar")}</Button>
         <Button variant="primary" onClick={apply} disabled={!img}>{t("Aplicar")}</Button>
       </div>
+      {askExit && (
+        // Esc / Ⓑ aqui fecham só a pergunta (volta a editar)
+        <Modal title={t("Salvar as alterações?")} onClose={() => setAskExit(false)} portal>
+          <p className="muted">{t("Você está saindo do editor de imagem. Deseja salvar o enquadramento antes de sair?")}</p>
+          <div className="row end">
+            <Button variant="danger" onClick={() => { setAskExit(false); onClose(); }}>{t("Sair sem salvar")}</Button>
+            <Button variant="primary" data-autofocus onClick={() => { setAskExit(false); apply(); }}>{t("Salvar")}</Button>
+          </div>
+        </Modal>
+      )}
     </Modal>
   );
 }

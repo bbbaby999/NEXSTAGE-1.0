@@ -26,18 +26,27 @@ export default function ControlHints() {
       // camadas com dicas próprias (ou sem navegação): nada aqui
       if (document.querySelector(".kb-root, .sm-root:not(.leaving), .gb-root, .viewer-full, .igdb-fs")) return null;
       if (document.querySelector(".pick-root, .ctx-root")) return [[["dpad"], tk("Mover")], [["confirm"], tk("Selecionar")], [["back"], tk("Fechar")]];
+      // navegador de arquivos (pode abrir por cima de outra janela): Ⓑ sobe uma pasta (fecha em "Este computador"); ☰ confirma
+      if (document.querySelector(".overlay:not(.leaving) .fp")) return [[["confirm"], tk("Abrir")], [["back"], tk("Pasta acima")], [["x"], tk("Favoritar pasta")], [["l1", "r1"], tk("Áreas")], [["l2", "r2"], tk("Página")], [["menu"], tk("Confirmar")]];
       const layer = document.querySelector<HTMLElement>(".overlay:not(.leaving)");
       if (layer) {
         if (layer.matches("[data-viewer]")) return [[["dpad"], tk("Anterior / próxima")], [["back"], tk("Fechar")]];
         // Zerei!: formulário (L2/R2 ajustam o campo em foco ou mudam o status)
-        if (layer.querySelector(".zr-edit")) {
+        if (layer.querySelector(".zr-edit") && !document.querySelector(".overlay:not(.leaving) .is-body")) {
           const adj = (document.activeElement as HTMLElement | null)?.dataset?.zrAdjust;
-          return [[["dpad"], tk("Mover")], [["confirm"], tk("Selecionar")], [["l2", "r2"], adj ? tk("Ajustar") : tk("Status")], [["back"], tk("Fechar")]];
+          return [[["dpad"], tk("Mover")], [["confirm"], tk("Selecionar")], [["l2", "r2"], adj ? tk("Ajustar") : tk("Status")], [["menu"], tk("Salvar")], [["back"], tk("Fechar")]];
         }
+        // janela de cima: escolher capa/fundo/logo (☰ aplica) ou "Editar jogo" (☰ salva)
+        const all = document.querySelectorAll<HTMLElement>(".overlay:not(.leaving)");
+        const top = all[all.length - 1];
+        if (top?.querySelector(".is-modal, .is-body")) return [[["dpad"], tk("Mover")], [["confirm"], tk("Selecionar")], [["menu"], tk("Aplicar")], [["back"], tk("Voltar")]];
+        if (top?.querySelector(".gf-grid")) return [[["dpad"], tk("Mover")], [["confirm"], tk("Selecionar")], [["menu"], tk("Salvar")], [["back"], tk("Fechar")]];
         if (layer.querySelector(".cp")) return [[["dpad"], tk("Ajustar")], [["confirm"], tk("Selecionar")], [["menu"], tk("Aplicar")], [["back"], tk("Cancelar")]];
         return [[["dpad"], tk("Mover")], [["confirm"], tk("Selecionar")], [["back"], tk("Fechar")]];
       }
       const pages: Hint = [["l1", "r1"], tk("Páginas")];
+      // Galeria selecionando: ☰ abre as ações da seleção
+      if (view === "gallery" && document.querySelector(".selbar")) return [[["confirm"], tk("Marcar / desmarcar")], [["menu"], tk("Ações")], [["back"], tk("Sair da seleção")]];
       const act = document.activeElement;
       if (act instanceof HTMLInputElement && act.type === "range") return [[["dpad"], tk("Ajustar")], pages, [["back"], tk("Voltar")]];
       if (!profile) return [[["dpad"], tk("Mover")], [["confirm"], tk("Selecionar")]];
@@ -47,6 +56,7 @@ export default function ControlHints() {
         case "stats": return [[["confirm"], tk("Selecionar")], [["l2", "r2"], tk("Abas")], pages, [["back"], tk("Voltar")]];
         case "achievements": return [[["confirm"], tk("Selecionar")], [["l2", "r2"], tk("RetroAchievements / Steam")], pages, [["back"], tk("Voltar")]];
         case "zerei":
+          if (document.querySelector(".zr-selbar")) return [[["confirm"], tk("Marcar / desmarcar")], [["x"], tk("Mover para")], [["menu"], tk("Ações")], [["back"], tk("Sair da seleção")]];
           if (document.querySelector(".zr-detail")) return [[["confirm"], tk("Selecionar")], [["l2", "r2"], tk("Registro anterior / próximo")], pages, [["back"], tk("Voltar")]];
           if (document.querySelector(".zr-stats")) return [[["confirm"], tk("Selecionar")], [["menu"], tk("Coleção")], pages, [["back"], tk("Voltar")]];
           if (!document.querySelector(".zr-grid, .zr-filters")) return [[["confirm"], tk("Selecionar")], [["menu"], tk("Estatísticas")], pages, [["back"], tk("Voltar")]];

@@ -27,7 +27,10 @@ export default function GameCard({ game, onOpen, onSelect, active, index = 0, me
       onMouseMove={tilt.onMouseMove}
       onMouseLeave={tilt.onMouseLeave}
     >
-      <div className="cover" style={game.cover ? { backgroundImage: `url(${game.cover})` } : undefined}>
+      <div className="cover">
+        {/* <img> assíncrona e sob demanda (não fundo CSS): capas grandes não travam a rolagem pela lista */}
+        {game.cover && <img className="cover-img" src={game.cover} alt="" loading="lazy" decoding="async" draggable={false}
+          onError={(e) => { e.currentTarget.style.display = "none"; }} />}
         {!game.cover && <span>{game.title.charAt(0).toUpperCase()}</span>}
         {game.favorite && <i className="fav" aria-label={t("Favorito")}>★</i>}
         <PlatformBadge platform={game.platform} />

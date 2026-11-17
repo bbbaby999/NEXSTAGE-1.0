@@ -1,7 +1,7 @@
 /**
  * Modo Ocioso (protetor de tela no estilo dos consoles): estado compartilhado, sem dependências de UI.
  *
- * - Preferências (app): `idle_mode` = "library" | "captures" | "off" e `idle_minutes` = 0 (desligado) | 2 | 10 | …
+ * - Preferências (app): `idle_mode` = "library" | "completed" | "captures" | "off" e `idle_minutes` = 0 (desligado) | 2 | 10 | …
  * - "Ocupado": operações importantes (importação, varredura, sincronização, instalação de atualização)
  *   seguram o Modo Ocioso enquanto rodam (`idleBusy`, `setIdleBusyFlag`, `bumpIdleBusy`).
  * - Entrada: quando a apresentação está ativa, o primeiro comando só a encerra; `idleSwallow()` diz à
@@ -9,7 +9,7 @@
  */
 import { useSyncExternalStore } from "react";
 
-export type IdleMode = "library" | "captures" | "off";
+export type IdleMode = "library" | "completed" | "captures" | "off";
 export const IDLE_MINUTES = [0, 2, 10, 20, 30, 45, 60] as const;
 export interface IdleConfig { mode: IdleMode; minutes: number }
 
@@ -25,7 +25,7 @@ const notify = () => subs.forEach((f) => f());
 const subscribe = (cb: () => void) => { subs.add(cb); return () => { subs.delete(cb); }; };
 
 export function parseIdleConfig(mode: string | null, minutes: string | null): IdleConfig {
-  const m: IdleMode = mode === "captures" || mode === "off" ? mode : "library";
+  const m: IdleMode = mode === "completed" || mode === "captures" || mode === "off" ? mode : "library";
   const n = Number(minutes ?? 0);
   return { mode: m, minutes: (IDLE_MINUTES as readonly number[]).includes(n) ? n : 0 };
 }

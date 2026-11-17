@@ -152,7 +152,7 @@ export default function SteamSettings() {
             <input className="search" style={{ width: 300 }} type="password" value={key} onChange={(e) => setKey(e.target.value)}
               placeholder={acc.hasKey ? t("Nova chave (substitui a atual)") : t("Chave da Web API")} aria-label={t("Chave da Web API da Steam")} autoComplete="off" spellCheck={false} />
             <Button disabled={!key.trim() || busy !== null} onClick={() => saveKey(key.trim())}>{busy === "key" ? t("Verificando…") : t("Verificar e salvar")}</Button>
-            {acc.hasKey && <Button variant="ghost" disabled={busy !== null} onClick={() => saveKey(null)}>{t("Remover chave")}</Button>}
+            {acc.hasKey && <Button variant="danger" disabled={busy !== null} onClick={() => saveKey(null)}>{t("Remover chave")}</Button>}
             <Button variant="ghost" onClick={() => openUrl("https://steamcommunity.com/dev/apikey").catch(() => {})}>{t("Gerar chave")}</Button>
           </div>
         </div>

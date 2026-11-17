@@ -12,6 +12,17 @@ import {
 } from "../lib/idle";
 import { t } from "../lib/i18n";
 import { steamHero } from "../lib/steam";
+import { COMPLETION_LABEL, fmtDay, fmtHours } from "../lib/zerei";
+
+/** Selo da legenda: um dado por selo (conclusão, data, tempo de jogo, plataforma), com ícone. */
+type TagIcon = "trophy" | "calendar" | "clock" | "platform";
+interface Tag { icon: TagIcon; text: string; gold?: boolean }
+const TAG_ICON: Record<TagIcon, string> = {
+  trophy: "M8 4h8v3a4 4 0 0 1-8 0V4ZM8 5H5v1.5A2.5 2.5 0 0 0 7.5 9H8M16 5h3v1.5A2.5 2.5 0 0 1 16.5 9H16M12 11v4M9 20h6M10 15h4v5h-4z",
+  calendar: "M4 6h16v14H4V6ZM4 10h16M8 3v4M16 3v4",
+  clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5l3 2",
+  platform: "M7 8h10a4 4 0 0 1 4 4v1.5a3.5 3.5 0 0 1-6.3 2.1L14 14.5h-4l-.7 1.1A3.5 3.5 0 0 1 3 13.5V12a4 4 0 0 1 4-4ZM7.5 10.5v3M6 12h3",
+};
 
 /* =====================================================================================
  * Apresentação (usada em tela cheia e na pré-visualização das Configurações)
@@ -19,12 +30,12 @@ import { steamHero } from "../lib/steam";
 
 type Kind = "art" | "cover" | "shot";
 /** `logo`: logo do jogo (no lugar do título; nas capturas, o do jogo da captura). */
-interface Item { src: string; fallback: string | null; kind: Kind; x: number; y: number; title: string | null; sub: string | null; logo: string | null }
+interface Item { src: string; fallback: string | null; kind: Kind; x: number; y: number; title: string | null; tags: Tag[]; logo: string | null }
 /** `logo`: o do item, se carregou (senão o título aparece em texto). */
 interface Layer { k: number; src: string; kind: Kind; item: Item; kb: CSSProperties; logo: string | null }
 
 /** Tempo de cada imagem e duração do crossfade (ms). */
-const HOLD: Record<"library" | "captures", number> = { library: 9000, captures: 7000 };
+const HOLD: Record<Exclude<IdleMode, "off">, number> = { library: 9000, completed: 9000, captures: 7000 };
 const FADE = 1800;
 
 /**
@@ -53,16 +64,16 @@ async function preload(src: string): Promise<boolean> {
   try { await im.decode(); return im.naturalWidth > 0; } catch { return false; }
 }
 
-/** Movimento lento de câmera (Ken Burns) sorteado por imagem. */
-function kenBurns(kind: Kind, ms: number): CSSProperties {
+/**
+ * Movimento lento de câmera: sempre um leve zoom in (a imagem preenche a tela o tempo todo), com um
+ * pequeno deslocamento sorteado por imagem — abaixo da folga que a escala inicial dá nas bordas.
+ */
+function kenBurns(ms: number): CSSProperties {
   if (reducedMotion()) return { animation: "none" };
   const r = (a: number) => (Math.random() * 2 - 1) * a;
-  const zoomIn = Math.random() < 0.6;
-  // Zoom sutil; o deslocamento máximo (pan, em %) fica abaixo da folga que a escala mínima dá nas bordas.
-  const big = kind === "art" ? 1.05 : 1.025, small = kind === "art" ? 1.015 : 1.0;
-  const pan = kind === "art" ? 0.7 : 0.3;
+  const small = 1.02, big = 1.08, pan = 0.7;
   return {
-    "--kb-s0": zoomIn ? small : big, "--kb-s1": zoomIn ? big : small,
+    "--kb-s0": small, "--kb-s1": big,
     "--kb-x0": `${r(pan)}%`, "--kb-y0": `${r(pan)}%`, "--kb-x1": `${r(pan)}%`, "--kb-y1": `${r(pan)}%`,
     animationDuration: `${ms}ms`,
   } as CSSProperties;
@@ -87,9 +98,28 @@ export function IdleShow({ mode, profileId, hint = false }: { mode: Exclude<Idle
           const hero = g.steamId ? steamHero(g.steamId) : null;
           return {
             src: (g.background ?? hero)!, fallback: g.background ? hero : null, kind: "art",
-            x: g.background ? g.bgX : 50, y: g.background ? g.bgY : 50, title: g.title, sub: null, logo: g.logo,
+            x: g.background ? g.bgX : 50, y: g.background ? g.bgY : 50, title: g.title, tags: [], logo: g.logo,
           };
         }))
+      // Zerados (Zerei!): só jogos com plano de fundo (sem ele, o jogo fica fora — capa não entra); legenda "Zerado/Platinado · data · plataforma".
+      // Várias jogatinas do mesmo jogo/plataforma entram uma vez só (a mais recente).
+      : mode === "completed"
+      ? api.zereiList(profileId).then((list) => {
+        const seen = new Set<string>();
+        return list
+          .filter((e) => e.status === "completed" && !!e.background)
+          .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? "") || b.run - a.run)
+          .filter((e) => { const k = `${e.title.toLowerCase()}|${e.platform}`; if (seen.has(k)) return false; seen.add(k); return true; })
+          .map((e): Item => ({
+            src: e.background!, fallback: null, kind: "art", x: 50, y: 50, title: e.title, logo: e.logo,
+            tags: [
+              { icon: "trophy", text: t(COMPLETION_LABEL[e.completionType ?? "campaign"]), gold: e.completionType === "full" },
+              ...(e.completedAt ? [{ icon: "calendar", text: fmtDay(e.completedAt) } as Tag] : []),
+              ...(e.hours !== null ? [{ icon: "clock", text: fmtHours(e.hours) } as Tag] : []),
+              ...(e.platform ? [{ icon: "platform", text: e.platform } as Tag] : []),
+            ],
+          }));
+      })
       // Capturas: o logo é o do jogo da captura (biblioteca do perfil); sem jogo ou sem logo, o nome.
       : Promise.all([api.listGallery(profileId), api.listLibrary(profileId).catch(() => [])]).then(([list, games]) => {
         const byId = new Map(games.map((g) => [g.id, g]));
@@ -99,7 +129,7 @@ export function IdleShow({ mode, profileId, hint = false }: { mode: Exclude<Idle
             const g = i.gameId !== null ? byId.get(i.gameId) : undefined;
             return {
               src: itemSrc(i), fallback: null, kind: "shot", x: 50, y: 50,
-              title: i.gameTitle ?? g?.title ?? null, sub: formatDate(i.takenAt ?? i.addedAt), logo: g?.logo ?? null,
+              title: i.gameTitle ?? g?.title ?? null, tags: [{ icon: "calendar", text: formatDate(i.takenAt ?? i.addedAt) }], logo: g?.logo ?? null,
             };
           });
       });
@@ -127,7 +157,7 @@ export function IdleShow({ mode, profileId, hint = false }: { mode: Exclude<Idle
         const logo = item.logo && (await preload(item.logo)) ? item.logo : null;
         if (dead) return;
         const k = ++counter.current;
-        setLayers((l) => [...l.slice(-1), { k, src, kind, item, kb: kenBurns(kind, hold + FADE * 2), logo }]);
+        setLayers((l) => [...l.slice(-1), { k, src, kind, item, kb: kenBurns(hold + FADE * 2), logo }]);
         setTimeout(() => { if (!dead) setLayers((l) => l.filter((v) => v.k >= k)); }, FADE + 100);
         break;
       }
@@ -144,15 +174,22 @@ export function IdleShow({ mode, profileId, hint = false }: { mode: Exclude<Idle
     <div className="idle-show">
       {layers.map((l) => (
         <div key={l.k} className={`idle-layer idle-${l.kind}`} style={{ animationDuration: `${FADE}ms` }}>
-          {l.kind !== "art" && <img className="idle-backdrop" src={l.src} alt="" draggable={false} />}
           <img className="idle-img" src={l.src} alt="" draggable={false}
             style={{ ...l.kb, objectPosition: `${l.item.x}% ${l.item.y}%` }} />
-          {(l.logo || l.item.title || l.item.sub) && (
+          {(l.logo || l.item.title || (l.item.tags?.length ?? 0) > 0) && (
             <div className="idle-caption">
               {l.logo
                 ? <img className="idle-logo" src={l.logo} alt={l.item.title ?? ""} draggable={false} referrerPolicy="no-referrer" />
                 : l.item.title && <strong>{l.item.title}</strong>}
-              {l.item.sub && <small>{l.item.sub}</small>}
+              {(l.item.tags?.length ?? 0) > 0 && (
+                <div className="idle-tags">
+                  {(l.item.tags ?? []).map((g, n) => (
+                    <span key={n} className={`idle-tag ${g.gold ? "gold" : ""}`} style={{ animationDelay: `${1.05 + n * 0.12}s` }}>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d={TAG_ICON[g.icon]} /></svg>{g.text}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -160,7 +197,9 @@ export function IdleShow({ mode, profileId, hint = false }: { mode: Exclude<Idle
       <div className="idle-vignette" />
       {empty && (
         <div className="idle-empty">
-          {mode === "captures" ? t("Nenhuma captura salva neste perfil.") : t("Nenhum jogo com imagens na biblioteca.")}
+          {mode === "captures" ? t("Nenhuma captura salva neste perfil.")
+            : mode === "completed" ? t("Nenhum jogo zerado com plano de fundo no Zerei!.")
+            : t("Nenhum jogo com imagens na biblioteca.")}
         </div>
       )}
       {hint && <div className="idle-hint">{t("Pressione qualquer botão para voltar")}</div>}

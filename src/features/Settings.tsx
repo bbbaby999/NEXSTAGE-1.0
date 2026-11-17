@@ -19,12 +19,13 @@ import { setSoundConfig, play } from "../lib/sound";
 import { LayoutOverride, setLayoutOverride } from "../lib/inputDevice";
 import { MotionMode, setMotion } from "../lib/motion";
 import { listen } from "@tauri-apps/api/event";
-import type { GalleryItem, PadCombos, ShortcutInfo, StartupInfo, WebShot } from "../types";
+import type { GalleryItem, MonitorState, PadCombos, ShortcutInfo, StartupInfo, WebShot } from "../types";
 import { comboLabel, combosConflict, popcount, validateCombo } from "../lib/padCombo";
 import PatchNotes from "../components/PatchNotes";
 import { VERSION_LABEL } from "../lib/version";
 import FeedbackPanel from "../components/FeedbackPanel";
 import { setGamebootEnabled } from "../lib/gameboot";
+import { pickImageFile, type PickerKind } from "../lib/filePicker";
 import { IdleMode, setIdleConfig, startIdlePreview, useIdleActive, useIdleConfig } from "../lib/idle";
 import { IdleShow } from "../components/IdleScreen";
 import { HomeBgMode, setHomeBg, useHomeBg } from "../lib/homeBg";
@@ -204,6 +205,58 @@ function StartupSection() {
   );
 }
 
+/**
+ * Monitor preferido: o backend identifica cada monitor (EDID) e, com o preferido conectado, abre nele;
+ * sem ele, abre no monitor ligado e volta ao preferido quando ele for religado. A lista se atualiza
+ * sozinha quando monitores são ligados/desligados (evento "monitors-changed").
+ */
+function MonitorSection() {
+  const { toast } = useSession();
+  const [st, setSt] = useState<MonitorState | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let cancelled = false, un: (() => void) | undefined;
+    const load = () => api.getMonitors().then((s) => { if (!cancelled) setSt(s); }).catch(() => {});
+    load();
+    listen("monitors-changed", load).then((f) => (cancelled ? f() : (un = f)));
+    return () => { cancelled = true; un?.(); };
+  }, []);
+  async function choose(id: string | null) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      setSt(await api.setPreferredMonitor(id));
+      toast(id ? t("Monitor preferido salvo.") : t("Monitor preferido removido."));
+    } catch (e) { toast(errMsg(e), "err"); }
+    finally { setBusy(false); }
+  }
+  const mons = st?.monitors ?? [];
+  const current = mons.find((m) => m.current);
+  const connected = !!st?.preferred && mons.some((m) => m.id === st.preferred);
+  const opts: [string, string][] = [[t("Automático"), ""], ...mons.map((m): [string, string] => [
+    [m.name, `${m.width}×${m.height}`, m.primary ? t("principal") : null, m.current ? t("atual") : null].filter(Boolean).join(" · "), m.id,
+  ])];
+  if (st?.preferred && !connected) opts.push([t("{name} (desconectado)", { name: st.preferredName ?? "Monitor" }), st.preferred]);
+  return (
+    <div className="setting">
+      <div>
+        <strong>{t("Monitor preferido")}</strong>
+        <small>
+          {t("Com mais de um monitor, o NEXSTAGE abre sempre no escolhido. Se ele estiver desligado, abre no monitor ligado e volta para o preferido assim que ele for religado.")}
+          {" "}{t("Monitores detectados: {n}", { n: mons.length })}
+        </small>
+      </div>
+      <div className="row">
+        <Select<string> value={st?.preferred ?? ""} width={300} title={t("Monitor preferido")} disabled={!st || busy}
+          onChange={(v) => { if (v !== (st?.preferred ?? "")) choose(v || null); }} options={opts} />
+        <Button disabled={!current || busy || current.id === st?.preferred} onClick={() => current && choose(current.id)}>
+          {t("Usar o monitor atual")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /** Seções da aba Geral (o id é o do <h2> correspondente). */
 const SECTIONS: [id: string, label: string, icon: string][] = [
   ["set-aparencia", tk("Aparência"), "M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-.5-.2-.8-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-4.1-4-7.4-9-7.4ZM7.5 12.5h0M9.5 8h0M14.5 8h0"],
@@ -357,7 +410,6 @@ type StartPage = "profiles" | "home" | "library" | "gallery" | "last";
 function HomeBgSetting({ profileId }: { profileId: number }) {
   const { toast } = useSession();
   const bg = useHomeBg();
-  const file = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [fromGallery, setFromGallery] = useState(false);
   const [webSearch, setWebSearch] = useState(false);
@@ -437,11 +489,11 @@ function HomeBgSetting({ profileId }: { profileId: number }) {
           <div className="row">
             {showCustom
               ? <>
-                  <Button disabled={busy} onClick={() => file.current?.click()}>{own ? t("Trocar imagem") : t("Escolher imagem")}</Button>
+                  <Button disabled={busy} onClick={() => pickImageFile(t("Escolha o plano de fundo da Home"), "home-bg").then((f) => pick(f ?? undefined), (e) => toast(errMsg(e), "err"))}>{own ? t("Trocar imagem") : t("Escolher imagem")}</Button>
                   <Button disabled={busy} onClick={() => setWebSearch(true)}>{t("Pesquisar na internet")}</Button>
                 </>
               : <Button disabled={busy} onClick={() => setFromGallery(true)}>{own ? t("Trocar captura") : t("Escolher captura")}</Button>}
-            {own && <Button variant="ghost" disabled={busy} onClick={remove}>{t("Remover")}</Button>}
+            {own && <Button variant="danger" disabled={busy} onClick={remove}>{t("Remover")}</Button>}
           </div>
         </div>
       )}
@@ -450,8 +502,6 @@ function HomeBgSetting({ profileId }: { profileId: number }) {
         <ImageSearch mode="background" term="" platform="" title={t("Pesquisar plano de fundo na internet")}
           onConfirm={fromWeb} onClose={() => setWebSearch(false)} />
       )}
-      <input ref={file} type="file" accept="image/png,image/jpeg,image/webp,image/bmp,image/gif,image/avif" hidden
-        onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />
     </div>
   );
 }
@@ -502,9 +552,9 @@ function IdleSection({ profileId, save }: { profileId: number; save: (k: string,
   return (
     <div className="settings">
       <div className="setting">
-        <div><strong>{t("Conteúdo")}</strong><small>{t("O que aparece quando o NEXSTAGE fica sem uso: artes dos jogos da biblioteca em ordem aleatória ou as capturas do perfil ativo.")}</small></div>
+        <div><strong>{t("Conteúdo")}</strong><small>{t("O que aparece quando o NEXSTAGE fica sem uso: artes dos jogos da biblioteca ou dos jogos zerados no Zerei!, ou as capturas do perfil ativo, em ordem aleatória.")}</small></div>
         <Seg<IdleMode> value={cfg.mode} onChange={setMode}
-          opts={[[t("Biblioteca"), "library"], [t("Capturas"), "captures"], [t("Desligado"), "off"]]} />
+          opts={[[t("Biblioteca"), "library"], [t("Zerados"), "completed"], [t("Capturas"), "captures"], [t("Desligado"), "off"]]} />
       </div>
       <div className="setting">
         <div><strong>{t("Tempo para ativação")}</strong><small>{t("Tempo sem mouse, teclado ou controle. Não ativa durante jogos, importações, sincronizações ou janelas abertas; qualquer comando volta para onde você estava.")}</small></div>
@@ -544,6 +594,7 @@ export default function Settings() {
   const [motion, setMotionState] = useState<MotionMode>("auto");
   const [boot, setBoot] = useState(true);
   const [gameboot, setGameboot] = useState(true);
+  const [picker, setPicker] = useState<PickerKind>("app");
   const [shotSound, setShotSound] = useState(true);
   const [shotNotify, setShotNotify] = useState(true);
   const [achToast, setAchToast] = useState(true);
@@ -566,6 +617,7 @@ export default function Settings() {
       setFull((await g("fullscreen")) === "1");
       setBoot((await g("boot_animation")) !== "0");
       setGameboot((await g("gameboot")) !== "0");
+      setPicker((await g("file_picker")) === "system" ? "system" : "app");
       setShotSound((await g("shot_sound")) !== "0");
       setShotNotify((await g("shot_notify")) !== "0");
       setAchToast((await g("ach_toast")) !== "0");
@@ -738,6 +790,7 @@ export default function Settings() {
               <div><strong>{t("Modo de tela")}</strong><small>{t("Alterna entre janela e tela cheia. A escolha é lembrada.")}</small></div>
               <Button variant={full ? "primary" : "default"} onClick={toggleFull}>{full ? t("Tela cheia") : t("Janela")}</Button>
             </div>
+            <MonitorSection />
             <div className="setting">
               <div><strong>{t("Página inicial")}</strong><small>{t("Aberta após escolher o perfil (a seleção de perfil sempre vem primeiro). Notícias: em breve.")}</small></div>
               <Select<StartPage> value={start} width={260} title={t("Página inicial")}
@@ -822,6 +875,11 @@ export default function Settings() {
                 options={[[t("Automático"), "auto"], [t("Xbox"), "xbox"], [t("PlayStation"), "playstation"], [t("Nintendo"), "nintendo"], [t("Controle genérico"), "generic"], [t("Teclado e mouse"), "keyboard"]]} />
             </div>
             <div className="setting">
+              <div><strong>{t("Navegador de arquivos")}</strong><small>{t("Usado para escolher jogos, imagens, pastas e arquivos do PC. O do NEXSTAGE funciona com o controle; o do Windows é o seletor padrão do sistema.")}</small></div>
+              <Seg<PickerKind> value={picker} onChange={(v) => { setPicker(v); saveApp("file_picker", v); }}
+                opts={[[t("NEXSTAGE"), "app"], [t("Windows"), "system"]]} />
+            </div>
+            <div className="setting">
               <div><strong>{t("LED dos controles PlayStation")}</strong><small>{t("DualSense e DualShock 4 acompanham a cor de destaque do tema. Desligado, o NEXSTAGE não altera a iluminação do controle (a cor já aplicada volta ao padrão quando o controle é reconectado).")}{" "}{t("Um controle cadastrado na Central de Controles usa o próprio ajuste.")}</small></div>
               <Button variant={ledSync ? "primary" : "default"} onClick={() => { const v = !ledSync; setLedSyncState(v); setLedSync(v); saveApp("pad_led_sync", v ? "1" : "0"); }}>{ledSync ? t("Sincronizado") : t("Desligado")}</Button>
             </div>
@@ -886,7 +944,7 @@ export default function Settings() {
               <div className="row">
                 <input className="search" type="password" style={{ width: 240 }} value={sgdbKey} onChange={(e) => setSgdbKey(e.target.value)} placeholder={sgdbSet ? t("Chave salva (oculta)") : t("Chave da API")} aria-label={t("Chave da API do SteamGridDB")} />
                 <Button disabled={!sgdbKey.trim()} onClick={async () => { await saveApp("sgdb_key", sgdbKey.trim()); setSgdbKey(""); setSgdbSet(true); toast(t("SteamGridDB ativado na pesquisa.")); }}>{t("Salvar")}</Button>
-                {sgdbSet && <Button variant="ghost" onClick={async () => { await saveApp("sgdb_key", ""); setSgdbKey(""); setSgdbSet(false); toast(t("SteamGridDB desativado.")); }}>{t("Remover")}</Button>}
+                {sgdbSet && <Button variant="danger" onClick={async () => { await saveApp("sgdb_key", ""); setSgdbKey(""); setSgdbSet(false); toast(t("SteamGridDB desativado.")); }}>{t("Remover")}</Button>}
               </div>
             </div>
             <AutoLogosSetting hasKey={sgdbSet} />

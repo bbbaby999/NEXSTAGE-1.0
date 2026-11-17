@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { pickOpen as open } from "../lib/filePicker";
 import { listen } from "@tauri-apps/api/event";
 import { useSession } from "../state/session";
 import { useLibrary } from "../state/useLibrary";
@@ -36,6 +36,8 @@ export default function Gallery() {
   const [about, setAbout] = useState<GalleryItem | null>(null);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  /** Ações da seleção pelo controle (☰), sem subir até a barra. */
+  const [selMenu, setSelMenu] = useState(false);
   const [confirmIds, setConfirmIds] = useState<number[] | null>(null);
   const [pendingOpen, setPendingOpen] = useState<number | null>(null);
 
@@ -102,10 +104,11 @@ export default function Gallery() {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [selecting]);
 
-  // Botão Menu/Options do controle: menu de contexto da captura em foco.
+  // Botão Menu/Options do controle: menu de contexto da captura em foco (selecionando: ações da seleção).
   useEffect(() => {
     const onCtx = () => {
-      if (viewer !== null || menu || about || confirmIds) return;
+      if (viewer !== null || menu || about || confirmIds || selMenu) return;
+      if (selecting) { setSelMenu(true); return; }
       const el = document.activeElement as HTMLElement | null;
       const id = Number(el?.closest<HTMLElement>("[data-capture-id]")?.dataset.captureId);
       const item = items.find((i) => i.id === id);
@@ -113,11 +116,11 @@ export default function Gallery() {
     };
     window.addEventListener("nexstage:context", onCtx);
     return () => window.removeEventListener("nexstage:context", onCtx);
-  }, [viewer, menu, about, confirmIds, items]);
+  }, [viewer, menu, about, confirmIds, items, selecting, selMenu]);
 
   async function importFiles() {
     try {
-      const sel = await open({ multiple: true, filters: [{ name: "Imagens", extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif"] }] });
+      const sel = await open({ purpose: "gallery-import", multiple: true, filters: [{ name: "Imagens", extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif"] }] });
       const paths = Array.isArray(sel) ? sel : typeof sel === "string" ? [sel] : [];
       if (!paths.length) return;
       const r = await api.importScreenshots(p.id, target === "" ? null : target, paths);
@@ -210,6 +213,14 @@ export default function Gallery() {
       {viewer !== null && list[viewer] && (
         <Viewer items={list} index={viewer} onIndex={setViewer} onClose={() => setViewer(null)} onFavorite={fav}
           onDelete={(i) => removeIds([i.id])} />
+      )}
+      {selMenu && (
+        <CaptureMenu onClose={() => setSelMenu(false)} actions={[
+          ...(selected.size ? [{ label: t("Excluir selecionadas"), icon: ICON.trash, danger: true, run: () => setConfirmIds([...selected]) }] : []),
+          { label: t("Selecionar todas"), icon: ICON.select, run: () => setSelected(new Set(list.map((i) => i.id))) },
+          ...(selected.size ? [{ label: t("Limpar seleção"), icon: ICON.back, run: () => setSelected(new Set()) }] : []),
+          { label: t("Sair da seleção"), icon: ICON.back, run: () => { setSelecting(false); setSelected(new Set()); } },
+        ]} />
       )}
       {menu && <CaptureMenu actions={menuActions(menu.item)} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />}
       {about && <AboutCapture item={about} onClose={() => setAbout(null)} />}

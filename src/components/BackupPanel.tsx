@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { pickOpen as open } from "../lib/filePicker";
 import { listen } from "@tauri-apps/api/event";
 import Modal from "./Modal";
 import Button from "./Button";
@@ -178,7 +178,7 @@ export default function BackupPanel() {
     setDlg({ t: "error", title, msg: errMsg(e) });
   };
   const pickDir = async (title: string) => {
-    const sel = await open({ directory: true, multiple: false, title }).catch(() => null);
+    const sel = await open({ purpose: "backup", directory: true, multiple: false, title }).catch(() => null);
     return typeof sel === "string" ? sel : null;
   };
 
@@ -296,7 +296,7 @@ export default function BackupPanel() {
               ? t("Protegidos por senha (guardada com a proteção do Windows neste computador). Inclui as credenciais.")
               : t("Sem senha: os backups automáticos não incluem chaves de API nem credenciais.")}</small></div>
             <div className="row">
-              {auto.hasPassword && <Button variant="ghost" onClick={() => api.backupAutoPassword(null).then((v) => { setAuto(v); toast(t("Senha removida.")); }).catch((e) => toast(errMsg(e), "err"))}>{t("Remover")}</Button>}
+              {auto.hasPassword && <Button variant="danger" onClick={() => api.backupAutoPassword(null).then((v) => { setAuto(v); toast(t("Senha removida.")); }).catch((e) => toast(errMsg(e), "err"))}>{t("Remover")}</Button>}
               <Button onClick={() => { setApw(""); setApw2(""); setDlg({ t: "auto-password" }); }}>{auto.hasPassword ? t("Alterar") : t("Definir senha")}</Button>
             </div>
           </div>

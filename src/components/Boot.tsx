@@ -26,7 +26,8 @@ export default function Boot({ onReveal, onDone }: { onReveal: () => void; onDon
     window.addEventListener("mousedown", skip);
     let un: (() => void) | undefined;
     let cancelled = false;
-    listen("pad-input", skip).then((f) => (cancelled ? f() : (un = f)));
+    // soltar/segurar o confirmar não conta como "pular" (só apertar um botão)
+    listen<{ action: string }>("pad-input", (e) => { if (!e.payload.action.startsWith("confirm_")) skip(); }).then((f) => (cancelled ? f() : (un = f)));
     return () => {
       clearTimeout(t);
       cancelled = true;

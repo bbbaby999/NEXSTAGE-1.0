@@ -55,16 +55,6 @@ const OPPOSITE: Record<Dir, Dir> = { left: "right", right: "left", up: "down", d
 /** Último movimento: voltar na direção oposta retorna ao elemento de origem (caminho previsível). */
 let lastHop: { from: HTMLElement; to: HTMLElement; dir: Dir } | null = null;
 
-/** `b` está na direção `dir` a partir de `a` (centro adiante e borda de trás não fica atrás da de `a`). */
-function ahead(a: Box, b: Box, dir: Dir) {
-  switch (dir) {
-    case "right": return b.cx > a.cx + Math.max(2, (a.right - a.left) / 4) && b.right > a.right - 2;
-    case "left": return b.cx < a.cx - Math.max(2, (a.right - a.left) / 4) && b.left < a.left + 2;
-    case "down": return b.cy > a.cy + Math.max(2, (a.bottom - a.top) / 4) && b.bottom > a.bottom - 2;
-    case "up": return b.cy < a.cy - Math.max(2, (a.bottom - a.top) / 4) && b.top < a.top + 2;
-  }
-}
-
 /** Raiz de navegação: o menu lateral / modal mais recente isola os comandos do que está atrás. */
 export function navRoot(): ParentNode {
   const layers = document.querySelectorAll<HTMLElement>(LAYER_SEL);
@@ -75,16 +65,11 @@ export function navRoot(): ParentNode {
 export const candidates = (root: ParentNode = navRoot()) => Array.from(root.querySelectorAll<HTMLElement>(SEL)).filter(visible);
 
 /* ------------------------------------------------------------------------------------------------
- * Memória de foco
- *  - por camada: último elemento focado em cada camada (página, modal, menu...). Se o foco some
- *    (elemento removido, clique no vazio), a navegação recomeça perto dele, nunca do 1º item da tela;
- *  - por grupo ([data-nav-group]): ao voltar para um painel, o foco volta ao item onde estava.
+ * Memória de foco por camada: último elemento focado em cada camada (página, modal, menu...). Se o foco some
+ *    (elemento removido, clique no vazio), a navegação recomeça perto dele, nunca do 1º item da tela.
  * ---------------------------------------------------------------------------------------------- */
 type Spot = { el: HTMLElement; x: number; y: number };
 const lastIn = new WeakMap<object, Spot>();
-const groupMem = new WeakMap<Element, HTMLElement>();
-/** Grupos: [data-nav-group] e todo controle segmentado (.seg), inclusive os montados à mão. */
-export const GROUP = "[data-nav-group], .seg";
 /** Esquece o último foco da camada (ex.: troca de página: a posição antiga não vale para a nova). */
 export const forgetLayerFocus = (root: ParentNode = document) => { lastIn.delete(root); };
 
@@ -131,131 +116,90 @@ function onFocusIn(e: FocusEvent) {
   }
   const b = el.getBoundingClientRect();
   lastIn.set(root, { el, x: b.left + b.width / 2, y: b.top + b.height / 2 });
-  for (let g = el.parentElement?.closest(GROUP); g; g = g.parentElement?.closest(GROUP) ?? null) groupMem.set(g, el);
 }
 
-const inViewport = (el: HTMLElement) => {
-  const r = el.getBoundingClientRect();
-  return r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
-};
-
-/**
- * Entrada em um grupo vindo de fora: prefere o item marcado ([data-nav-entry], aba/seção atual,
- * opção escolhida) e, senão, o último item focado nele, desde que esteja à vista e na direção pedida.
- * Vale do grupo mais externo para o mais interno (ex.: conteúdo das Configurações → seletor da linha).
- * Seletores em linha (.seg) só usam a opção escolhida ao chegar de cima/baixo; pelos lados, entra no vizinho.
- */
-const ENTRY_SEL = '[data-nav-entry], [aria-current]:not([aria-current="false"]), [aria-selected="true"], .seg > button.on';
-function groupEntry(cur: HTMLElement, hit: HTMLElement, els: HTMLElement[], dir: Dir): HTMLElement {
-  const chain: Element[] = []; // grupos do alvo que não contêm a origem, de dentro para fora
-  for (let p = hit.parentElement?.closest(GROUP); p && !p.contains(cur); p = p.parentElement?.closest(GROUP) ?? null) chain.push(p);
-  const a = boxOf(cur);
-  const horiz = dir === "left" || dir === "right";
-  for (const grp of chain.reverse()) {
-    if (horiz && grp.matches(".seg")) continue;
-    const ok = (el: HTMLElement | null | undefined): el is HTMLElement =>
-      !!el && el.isConnected && grp.contains(el) && els.includes(el) && inViewport(el) && ahead(a, boxOf(el), dir);
-    // só os marcados deste nível (não os de um seletor qualquer lá dentro)
-    const marked = Array.from(grp.querySelectorAll<HTMLElement>(ENTRY_SEL))
-      .find((el) => els.includes(el) && el.parentElement?.closest(GROUP) === grp);
-    if (ok(marked)) return marked;
-    const mem = groupMem.get(grp);
-    if (ok(mem)) return mem;
-  }
-  return hit;
-}
-
-/**
- * Próximo foco respeitando os grupos ([data-nav-group]: painel lateral, coluna, barra de abas, seletor):
- *  1. procura do grupo mais interno para o mais externo (seletor → conteúdo → tela inteira), então o
- *     foco só sai de uma área quando ela não tem mais nada naquela direção;
- *  2. por cima/baixo, um item de OUTRO painel só vale se estiver alinhado na mesma coluna: nunca um
- *     salto diagonal (ex.: descer no fim do conteúdo não cai no menu lateral, nem vice-versa);
- *  3. ao entrar em outro grupo, `groupEntry` escolhe o item de entrada.
- */
+/* ------------------------------------------------------------------------------------------------
+ * Próximo foco: o item MAIS PRÓXIMO na direção pedida (mesmo critério do Android/TV, FocusFinder).
+ *
+ *  1. Só valem itens realmente naquela direção (`isCandidate`): a borda de trás não fica atrás da
+ *     do item atual e a borda da frente passa dela.
+ *  2. Quem está no "feixe" (alinhado: se sobrepõe na mesma linha para ←/→ ou na mesma coluna para
+ *     ↑/↓) vence quem não está. Exceção, só em ↑/↓: um item fora do feixe que fica INTEIRO antes do
+ *     alinhado (ex.: a linha logo abaixo, levemente deslocada) é o mais próximo e vence.
+ *  3. Empate de categoria: menor 13·avanço² + desvio² — avançar pouco pesa mais que estar centralizado,
+ *     então o vizinho imediato ganha de um item distante só "mais centralizado".
+ *
+ * Única restrição por área: ↑/↓ não salta para OUTRO painel ([data-nav-group]) na diagonal — só se
+ * estiver alinhado na mesma coluna (descer no fim do conteúdo não cai no menu lateral).
+ * ---------------------------------------------------------------------------------------------- */
 const PANEL = "[data-nav-group]:not(.seg)";
-function overlapX(a: Box, b: Box) {
-  const ov = Math.min(a.right, b.right) - Math.max(a.left, b.left);
-  return ov > 0 && ov >= Math.min(a.right - a.left, b.right - b.left) * 0.25;
-}
-function overlapY(a: Box, b: Box) {
-  const ov = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
-  return ov > 0 && ov >= Math.min(a.bottom - a.top, b.bottom - b.top) * 0.25;
-}
-/** Mesma linha (←/→) ou mesma coluna (↑/↓): a mesma regra de alinhamento de `pickNext`. */
-const aligned = (a: Box, b: Box, dir: Dir) => (dir === "left" || dir === "right" ? overlapY(a, b) : overlapX(a, b));
-/** Distância entre as bordas na direção do movimento. */
-const gapOf = (a: Box, b: Box, dir: Dir) =>
-  Math.max(0, dir === "right" ? b.left - a.right : dir === "left" ? a.left - b.right : dir === "down" ? b.top - a.bottom : a.top - b.bottom);
-function pickGrouped(cur: HTMLElement, els: HTMLElement[], dir: Dir): HTMLElement | null {
-  const vertical = dir === "up" || dir === "down";
-  const a = boxOf(cur);
-  const allowed = vertical
-    ? els.filter((el) => { const p = el.closest(PANEL); return !p || p.contains(cur) || overlapX(a, boxOf(el)); })
-    : els;
-  for (let g = cur.closest(GROUP); g; g = g.parentElement?.closest(GROUP) ?? null) {
-    const scope = g;
-    const b = pickNext(cur, allowed.filter((el) => scope.contains(el)), dir);
-    if (!b) continue;
-    // Dentro do grupo só havia algo "na diagonal" e lá fora há um vizinho alinhado mais perto
-    // (ex.: → na coluna principal da página do jogo vai para a coluna lateral, não para um item lá embaixo).
-    // Pelos lados: um item do grupo muito acima/abaixo não é "à esquerda"; vale a área vizinha
-    // (ex.: ← numa linha larga das Configurações vai para o menu de seções, não para um botão lá em cima).
-    const bb = boxOf(b);
-    if (!aligned(a, bb, dir)) {
-      const rest = allowed.filter((el) => !scope.contains(el));
-      if (vertical) {
-        const o = pickNext(cur, rest, dir, true);
-        if (o && gapOf(a, boxOf(o), dir) < gapOf(a, bb, dir)) return groupEntry(cur, o, els, dir);
-      } else {
-        const o = pickNext(cur, rest, dir);
-        const far = Math.max(0, bb.top - a.bottom, a.top - bb.bottom) > Math.max(60, a.bottom - a.top);
-        if (o && (aligned(a, boxOf(o), dir) || far)) return groupEntry(cur, o, els, dir);
-      }
-    }
-    return groupEntry(cur, b, els, dir);
+const EPS = 1;
+
+function isCandidate(s: Box, d: Box, dir: Dir) {
+  switch (dir) {
+    case "left": return (s.right - EPS > d.right || s.left + EPS >= d.right) && s.left - EPS > d.left;
+    case "right": return (s.left + EPS < d.left || s.right - EPS <= d.left) && s.right + EPS < d.right;
+    case "up": return (s.bottom - EPS > d.bottom || s.top + EPS >= d.bottom) && s.top - EPS > d.top;
+    case "down": return (s.top + EPS < d.top || s.bottom - EPS <= d.top) && s.bottom + EPS < d.bottom;
   }
-  const hit = pickNext(cur, allowed, dir);
-  return hit ? groupEntry(cur, hit, els, dir) : null;
+}
+const horizontal = (dir: Dir) => dir === "left" || dir === "right";
+/** Sobreposição no eixo perpendicular (mesma linha para ←/→, mesma coluna para ↑/↓). */
+function inBeam(s: Box, d: Box, dir: Dir) {
+  return horizontal(dir)
+    ? Math.min(s.bottom, d.bottom) - Math.max(s.top, d.top) > EPS
+    : Math.min(s.right, d.right) - Math.max(s.left, d.left) > EPS;
+}
+/** `d` está inteiramente adiante de `s` (sem sobreposição no eixo do movimento). */
+function fullyAhead(s: Box, d: Box, dir: Dir) {
+  switch (dir) {
+    case "left": return s.left >= d.right - EPS;
+    case "right": return s.right <= d.left + EPS;
+    case "up": return s.top >= d.bottom - EPS;
+    case "down": return s.bottom <= d.top + EPS;
+  }
+}
+/** Distância da borda de `s` até a borda mais próxima de `d`, no eixo do movimento. */
+function major(s: Box, d: Box, dir: Dir) {
+  return Math.max(0, dir === "right" ? d.left - s.right : dir === "left" ? s.left - d.right : dir === "down" ? d.top - s.bottom : s.top - d.bottom);
+}
+/** Distância até a borda MAIS DISTANTE de `d` (mín. 1). */
+function majorFar(s: Box, d: Box, dir: Dir) {
+  return Math.max(1, dir === "right" ? d.right - s.right : dir === "left" ? s.left - d.left : dir === "down" ? d.bottom - s.bottom : s.top - d.top);
+}
+const minor = (s: Box, d: Box, dir: Dir) => Math.abs(horizontal(dir) ? d.cy - s.cy : d.cx - s.cx);
+const score = (s: Box, d: Box, dir: Dir) => { const m = major(s, d, dir), n = minor(s, d, dir); return 13 * m * m + n * n; };
+
+/** `r1` (no feixe) ganha de `r2` (fora dele)? */
+function beamBeats(s: Box, r1: Box, r2: Box, dir: Dir) {
+  if (inBeam(s, r2, dir) || !inBeam(s, r1, dir)) return false;
+  if (!fullyAhead(s, r2, dir)) return true;
+  if (horizontal(dir)) return true;
+  return major(s, r1, dir) < majorFar(s, r2, dir);
+}
+function better(s: Box, r1: Box, r2: Box | null, dir: Dir) {
+  if (!r2) return true;
+  if (beamBeats(s, r1, r2, dir)) return true;
+  if (beamBeats(s, r2, r1, dir)) return false;
+  return score(s, r1, dir) < score(s, r2, dir);
 }
 
-/**
- * Escolhe o próximo elemento na direção pedida, como numa grade de console:
- *  1. só entram candidatos realmente naquela direção (`ahead`);
- *  2. quem está ALINHADO (mesma linha para ←/→, mesma coluna para ↑/↓) sempre vence quem não está —
- *     ex.: descer numa lista não "escapa" para o menu lateral só porque ele está um pouco mais perto;
- *  3. entre os alinhados, o mais próximo (distância entre bordas) e, no empate, o de centro mais alinhado;
- *  4. sem nenhum alinhado, pontua distância + desvio lateral (o desvio pesa mais que o avanço).
- */
-export function pickNext(cur: HTMLElement, els: HTMLElement[], dir: Dir, alignedOnly = false): HTMLElement | null {
-  const a = boxOf(cur);
-  const horiz = dir === "left" || dir === "right";
-  let bestAligned: { el: HTMLElement; s: number; gap: number } | null = null;
-  let bestOther: { el: HTMLElement; s: number; gap: number } | null = null;
+/** Item mais próximo de `cur` na direção `dir` entre `els` (ou null se não houver nada para lá). */
+export function pickNext(cur: HTMLElement, els: HTMLElement[], dir: Dir): HTMLElement | null {
+  const s = boxOf(cur);
+  const vertical = !horizontal(dir);
+  let best: HTMLElement | null = null, bb: Box | null = null;
   for (const el of els) {
     if (el === cur) continue;
-    const b = boxOf(el);
-    if (!ahead(a, b, dir)) continue;
-    // distância entre as bordas na direção do movimento (0 se encostados ou sobrepostos)
-    const gap = Math.max(0, dir === "right" ? b.left - a.right : dir === "left" ? a.left - b.right : dir === "down" ? b.top - a.bottom : a.top - b.bottom);
-    // sobreposição no eixo perpendicular, relativa ao menor dos dois (mín. 25% conta como alinhado)
-    const ov = horiz ? Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) : Math.min(a.right, b.right) - Math.max(a.left, b.left);
-    const minSize = horiz ? Math.min(a.bottom - a.top, b.bottom - b.top) : Math.min(a.right - a.left, b.right - b.left);
-    const centerOff = Math.abs(horiz ? b.cy - a.cy : b.cx - a.cx);
-    if (ov > 0 && ov >= minSize * 0.25) {
-      const s = gap * 1000 + centerOff; // mais perto primeiro; empate → mais centralizado
-      if (!bestAligned || s < bestAligned.s) bestAligned = { el, s, gap };
-    } else if (!alignedOnly) {
-      const side = horiz ? Math.max(0, b.top - a.bottom, a.top - b.bottom) : Math.max(0, b.left - a.right, a.left - b.right);
-      const s = gap + side * 2.5 + centerOff * 0.25;
-      if (!bestOther || s < bestOther.s) bestOther = { el, s, gap };
+    const d = boxOf(el);
+    if (!isCandidate(s, d, dir)) continue;
+    if (vertical) {
+      const p = el.closest(PANEL);
+      if (p && !p.contains(cur) && !inBeam(s, d, dir)) continue;
     }
+    if (better(s, d, bb, dir)) { best = el; bb = d; }
   }
-  // O alinhado vence, a menos que esteja bem mais longe que o próximo "degrau" (ex.: da última pílula de
-  // tema, descer vai para a linha logo abaixo, não para uma lista larga lá no fim da seção).
-  const reach = Math.max(80, (horiz ? a.right - a.left : a.bottom - a.top) * 2);
-  if (!horiz && bestAligned && bestOther && bestAligned.gap > bestOther.gap + reach) return bestOther.el;
-  return (bestAligned ?? bestOther)?.el ?? null;
+  return best;
 }
 
 /**
@@ -323,8 +267,8 @@ export function moveFocus(dir: Dir, source: "pad" | "key" = "key") {
   // Voltar pelo mesmo caminho: → depois ← retorna exatamente ao elemento de onde saiu.
   let best: HTMLElement | null = null;
   if (lastHop && lastHop.to === cur && lastHop.dir === OPPOSITE[dir] && els.includes(lastHop.from) &&
-      ahead(boxOf(cur), boxOf(lastHop.from), dir)) best = lastHop.from;
-  best ??= pickGrouped(cur, els, dir);
+      isCandidate(boxOf(cur), boxOf(lastHop.from), dir)) best = lastHop.from;
+  best ??= pickNext(cur, els, dir);
   if (best) {
     lastHop = { from: cur, to: best, dir };
     best.focus();
@@ -362,7 +306,9 @@ const CONFIRM_FALLBACK = () => {
   else recoverFocusTarget(root)?.focus();
 };
 
-export type PadAction = "left" | "right" | "up" | "down" | "confirm" | "back" | "x" | "y" | "l1" | "r1" | "l2" | "r2" | "menu";
+export type PadAction = "left" | "right" | "up" | "down" | "confirm" | "back" | "x" | "y" | "l1" | "r1" | "l2" | "r2" | "menu"
+  /** Confirmar segurado (0,5 s) e solto: só para itens com [data-hold] (ver `handle`). */
+  | "confirm_hold" | "confirm_up";
 /** Botões que uma tela pode tomar para si (teclado virtual, filtros da biblioteca...). */
 export type PadButton = "x" | "y" | "l1" | "r1" | "l2" | "r2" | "menu";
 
@@ -414,7 +360,21 @@ function firstOfPair(action: PadAction): boolean {
   return true;
 }
 
+/**
+ * Itens com [data-hold] aceitam "tocar" e "segurar" Ⓐ: ao apertar, o clique espera — soltar antes de
+ * 0,5 s clica normalmente; segurar dispara `nexstage:hold` no item (ex.: abrir a seleção de vários no Zerei!).
+ */
+let holdPending: HTMLElement | null = null;
+
 function handle(action: PadAction) {
+  if (action === "confirm_hold" || action === "confirm_up") {
+    const el = holdPending;
+    holdPending = null;
+    if (!el || !el.isConnected || document.activeElement !== el) return;
+    if (action === "confirm_hold") el.dispatchEvent(new CustomEvent("nexstage:hold", { bubbles: true }));
+    else el.click();
+    return;
+  }
   // Modo Ocioso ativo (ou acabou de ser encerrado por este comando): o comando só o encerra.
   if (idleSwallow()) return;
   if (!firstOfPair(action)) return;
@@ -424,7 +384,12 @@ function handle(action: PadAction) {
     if (ev.defaultPrevented) return;
   }
   if (action === "left" || action === "right" || action === "up" || action === "down") moveFocus(action, "pad");
-  else if (action === "confirm") CONFIRM_FALLBACK();
+  else if (action === "confirm") {
+    const cur = document.activeElement;
+    const root = navRoot();
+    if (cur instanceof HTMLElement && cur.hasAttribute("data-hold") && (root === document || root.contains(cur))) { holdPending = cur; return; }
+    CONFIRM_FALLBACK();
+  }
   else if (action === "back") {
     // Igual a um ESC de verdade: nasce no elemento em foco e percorre captura → alvo → borbulha. Disparado
     // direto na janela, os ouvintes de captura das páginas (ex.: página de um controle → volta à coleção)
@@ -503,6 +468,7 @@ export function useSpatialNav() {
     const held: Record<Dir, boolean> = { left: false, right: false, up: false, down: false };
     const nextAt: Record<Dir, number> = { left: 0, right: 0, up: 0, down: 0 };
     const btn: boolean[] = [];
+    let holdAt = 0;
     const btnNext: number[] = [];
     /**
      * Eixos que já passaram pelo centro, por controle. Um eixo só navega depois de ter sido visto em
@@ -591,6 +557,12 @@ export function useSpatialNav() {
         const ACTS: PadAction[] = ["confirm", "back", "x", "y", "l1", "r1", "l2", "r2", "menu"];
         ACTS.forEach((action, ai) => {
           const on = pads.some((p) => p.buttons[Math.log2(cfg.get(p)!.map[ai])]?.pressed);
+          // confirmar: segurou 0,5 s → "confirm_hold"; soltou → "confirm_up" (fora do teclado virtual)
+          if (ai === 0 && buttonRepeat === 0) {
+            if (on && btn[0] && holdAt > 0 && t >= holdAt) { holdAt = 0; handle("confirm_hold"); }
+            else if (!on && btn[0]) { holdAt = 0; handle("confirm_up"); }
+            else if (on && !btn[0]) holdAt = t + 500;
+          }
           let fire = on && !btn[ai];
           if (fire) btnNext[ai] = t + 380;
           else if (on && buttonRepeat > 0 && REPEATABLE.has(action) && t >= (btnNext[ai] ?? Infinity)) {

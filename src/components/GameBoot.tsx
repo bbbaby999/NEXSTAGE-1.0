@@ -92,7 +92,8 @@ function Run({ req, phase, setPhase, onEnd }: { req: GamebootRequest; phase: Pha
     window.addEventListener("keydown", skip, true);
     let un: (() => void) | undefined;
     let cancelled = false;
-    listen("pad-input", () => skip()).then((f) => (cancelled ? f() : (un = f)));
+    // soltar o Ⓐ que iniciou o jogo (ou segurá-lo) não pula a animação: só um botão apertado agora
+    listen<{ action: string }>("pad-input", (e) => { if (!e.payload.action.startsWith("confirm_")) skip(); }).then((f) => (cancelled ? f() : (un = f)));
 
     const stopDraw = draw(canvas.current!, start);
     return () => {

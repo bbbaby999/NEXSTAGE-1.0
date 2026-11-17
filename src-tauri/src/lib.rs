@@ -19,6 +19,8 @@ mod overlay;
 mod screenshot;
 mod shot_toast;
 mod window_bounds;
+mod lnk;
+mod monitor_pref;
 mod pad_led;
 mod hidpads;
 mod devident;
@@ -39,7 +41,7 @@ mod pad_notify;
 #[cfg(debug_assertions)]
 mod dev;
 
-use commands::{activity, backup as bk, collections, controllers, emulators, scan, gallery, games, info, launcher, logos, profiles, retro as ra, steam as st, settings, startup, stats, storage, system, webshots, xbox as xb, zerei};
+use commands::{activity, backup as bk, collections, controllers, emulators, files, scan, gallery, games, info, launcher, logos, profiles, retro as ra, steam as st, settings, startup, stats, storage, system, webshots, xbox as xb, zerei};
 use tauri::Manager;
 use tauri_plugin_global_shortcut::ShortcutState;
 
@@ -139,6 +141,8 @@ pub fn run() {
             pad_notify::spawn(app.handle().clone());
             // Backup automático semanal (verificação 2 min após abrir e depois a cada 30 min).
             backup::auto::spawn(app.handle().clone());
+            // Monitor preferido: leva a janela de volta quando ele é religado.
+            monitor_pref::spawn(app.handle().clone());
             // Por último: aplica minimizado/janela/tela cheia e exibe a janela.
             startup::apply_start_mode(app.handle());
             Ok(())
@@ -178,6 +182,18 @@ pub fn run() {
             info::fandom_link,
             startup::get_startup_info,
             startup::set_startup_mode,
+            monitor_pref::get_monitors,
+            monitor_pref::set_preferred_monitor,
+            files::fs_places,
+            files::fs_list,
+            files::fs_path_info,
+            files::fs_thumb,
+            files::fs_read_image,
+            games::reveal_game_folder,
+            zerei::zerei_refresh_images,
+            zerei::zerei_refresh_cancel,
+            zerei::zerei_bulk_delete,
+            zerei::zerei_bulk_status,
             launcher::launch_game,
             launcher::check_launch,
             launcher::gameboot_window,

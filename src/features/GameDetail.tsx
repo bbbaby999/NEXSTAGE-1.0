@@ -1,6 +1,6 @@
 import { CSSProperties, useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { pickOpen as openDialog } from "../lib/filePicker";
 import { useSession } from "../state/session";
 import { useLibrary } from "../state/useLibrary";
 import { api, errMsg } from "../lib/api";
@@ -157,7 +157,7 @@ export default function GameDetail({ gameId }: { gameId: number }) {
   const genreList = (info?.genres ?? []).filter((g) => g !== game.platform);
   // capturas próprias (arquivos do PC) para a galeria deste jogo
   const importCaps = () => run(async () => {
-    const sel = await openDialog({ multiple: true, filters: [{ name: "Imagens", extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif"] }] });
+    const sel = await openDialog({ purpose: "game-captures", multiple: true, filters: [{ name: "Imagens", extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif"] }] });
     const paths = Array.isArray(sel) ? sel : typeof sel === "string" ? [sel] : [];
     if (!paths.length) return;
     const r = await api.importScreenshots(p.id, game.id, paths);
@@ -174,6 +174,8 @@ export default function GameDetail({ gameId }: { gameId: number }) {
     { label: t("Capturas de tela{v0}", { v0: caps.length ? ` (${caps.length})` : "" }), icon: ICON.open,
       run: () => { setGalleryIntent({ gameId: game.id }); setView("gallery"); } },
     { label: t("Coleções"), icon: ICON.folder, run: () => setDlg("collections") },
+    // pasta onde o jogo está (atalho → arquivo original; Steam → pasta de instalação)
+    { label: t("Abrir pasta de arquivos"), icon: ICON.folder, run: () => { api.revealGameFolder(p.id, game.id).catch((e) => toast(errMsg(e), "err")); } },
     { label: t("Editar jogo"), icon: ICON.edit, run: () => setDlg("edit") },
     { label: t("Remover"), icon: ICON.trash, danger: true, run: () => setConfirm(true) },
   ];
@@ -264,7 +266,7 @@ export default function GameDetail({ gameId }: { gameId: number }) {
                 <Button variant="ghost" onClick={() => { setDesc(info?.description ?? ""); setGenres((info?.genres ?? []).join(", ")); setDlg("notes"); }}>{t("Editar descrição e gêneros")}</Button>
                 {info?.externalId && <Button variant="ghost" onClick={() => run(async () => { await api.applySteamCover(p.id, game.id); reload(); }, "Capa atualizada.")}>{t("Usar capa da Steam")}</Button>}
                 {info && (shots.length > 0 || web.length > 0 || (info.removedScreenshots?.length ?? 0) > 0) && (
-                  <Button variant="ghost" className="shots-manage" onClick={() => setDlg("shots")}>{t("Remover screenshots…")}</Button>
+                  <Button variant="danger" className="shots-manage" onClick={() => setDlg("shots")}>{t("Remover screenshots…")}</Button>
                 )}
               </div>
             </div>
@@ -306,7 +308,6 @@ export default function GameDetail({ gameId }: { gameId: number }) {
                   ))}
                 </div>
                 <div className="row">
-                  {cur!.page && <Button variant="ghost" onClick={() => link(cur!.page!)}>{t("Ver fonte da imagem")}</Button>}
                   <Button variant="ghost" onClick={() => link(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(`${term || game.title} ${game.platform} screenshot`)}`)}>{t("Ver mais no navegador")}</Button>
                 </div>
               </div>

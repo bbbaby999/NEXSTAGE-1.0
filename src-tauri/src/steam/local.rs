@@ -181,6 +181,18 @@ pub fn parse_manifest(text: &str) -> Option<LocalApp> {
     })
 }
 
+/// Pasta de instalação de um jogo da Steam (`<biblioteca>\steamapps\common\<installdir>`), se existir.
+pub fn install_dir(appid: i64) -> Option<PathBuf> {
+    let root = steam_root()?;
+    library_dirs(&root).into_iter().find_map(|lib| {
+        let text = std::fs::read_to_string(lib.join("steamapps").join(format!("appmanifest_{appid}.acf"))).ok()?;
+        let v = vdf::parse(&text);
+        let dir = v.get("AppState")?.str("installdir")?.trim().to_string();
+        let p = lib.join("steamapps").join("common").join(dir);
+        p.is_dir().then_some(p)
+    })
+}
+
 /// Todos os apps com manifesto nas bibliotecas locais (instalados ou em instalação).
 pub fn local_apps() -> HashMap<i64, LocalApp> {
     let mut out = HashMap::new();

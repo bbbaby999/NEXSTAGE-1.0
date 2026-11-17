@@ -144,7 +144,7 @@ pub fn set_active(app: &AppHandle, on: bool) {
 /// interação com o próprio app — é o caso do combo do controle (lido numa thread em segundo plano)
 /// e, às vezes, do atalho global. Aí o overlay aparece, mas o jogo continua com o foco e recebendo
 /// os comandos. Contorno: anexar a fila de entrada à da janela em primeiro plano (o jogo) e, se
-/// ainda assim falhar, simular um toque de Alt (libera a trava de primeiro plano). Repete por ~1 s
+/// ainda assim falhar, simular um toque de Alt (libera a trava de primeiro plano). Repete por ~4 s
 /// porque a troca para tela cheia pode devolver a ativação ao jogo.
 fn take_foreground(app: &AppHandle) {
     take_foreground_while(app, |a| a.state::<Runtime>().active.load(Ordering::SeqCst));
@@ -157,7 +157,9 @@ fn take_foreground_while(app: &AppHandle, keep: fn(&AppHandle) -> bool) {
     {
         let app = app.clone();
         std::thread::spawn(move || {
-            for i in 0..10 {
+            // ~4 s: jogos em tela cheia costumam retomar a ativação depois da troca de modo de vídeo.
+            // Só age quando o foco não está no NEXSTAGE (force_foreground não faz nada se já estiver).
+            for i in 0..40 {
                 if i > 0 {
                     std::thread::sleep(std::time::Duration::from_millis(100));
                 }
@@ -201,6 +203,44 @@ mod win {
         fn GetCurrentThreadId() -> u32;
     }
 
+    /// INPUT (tipo mouse) do SendInput: 40 bytes no x64, 28 no x86 (o alinhamento do usize cuida do recheio).
+    #[repr(C)]
+    struct MouseInput { dx: i32, dy: i32, data: u32, flags: u32, time: u32, extra: usize }
+    #[repr(C)]
+    struct Input { kind: u32, mi: MouseInput }
+    #[link(name = "user32")]
+    extern "system" {
+        fn SendInput(n: u32, inputs: *const Input, size: i32) -> u32;
+        fn SetFocus(h: Hwnd) -> Hwnd;
+        fn IsIconic(h: Hwnd) -> i32;
+        fn ShowWindow(h: Hwnd, cmd: i32) -> i32;
+    }
+
+    /// Entrada sintética "vazia" (mouse sem movimento nem clique): o Windows só libera a troca de
+    /// primeiro plano para o processo que recebeu a última entrada — o combo veio do controle, que o
+    /// Windows não conta. Não chega ao jogo como comando (mesmo truque do PowerToys Run).
+    unsafe fn unlock_foreground() {
+        let i = Input { kind: 0, mi: MouseInput { dx: 0, dy: 0, data: 0, flags: 0, time: 0, extra: 0 } };
+        SendInput(1, &i, std::mem::size_of::<Input>() as i32);
+    }
+
+    unsafe fn activate(h: Hwnd, fg: Hwnd) {
+        let me = GetCurrentThreadId();
+        let other = if fg.is_null() { 0 } else { GetWindowThreadProcessId(fg, std::ptr::null_mut()) };
+        // Fila de entrada compartilhada com a do jogo: SetForegroundWindow/SetFocus passam a valer.
+        let attached = other != 0 && other != me && AttachThreadInput(me, other, 1) != 0;
+        if IsIconic(h) != 0 {
+            ShowWindow(h, 9); // SW_RESTORE
+        }
+        BringWindowToTop(h);
+        SetForegroundWindow(h);
+        SetActiveWindow(h);
+        SetFocus(h);
+        if attached {
+            AttachThreadInput(me, other, 0);
+        }
+    }
+
     /// Traz `h` para o primeiro plano. Retorna `true` se precisou agir (o foco estava em outra janela).
     pub fn force_foreground(h: Hwnd) -> bool {
         unsafe {
@@ -208,23 +248,17 @@ mod win {
             if fg == h {
                 return false;
             }
-            let me = GetCurrentThreadId();
-            let other = if fg.is_null() { 0 } else { GetWindowThreadProcessId(fg, std::ptr::null_mut()) };
-            let attached = other != 0 && other != me && AttachThreadInput(me, other, 1) != 0;
-            BringWindowToTop(h);
-            SetForegroundWindow(h);
-            SetActiveWindow(h);
-            if attached {
-                AttachThreadInput(me, other, 0);
-            }
+            unlock_foreground();
+            activate(h, fg);
             if GetForegroundWindow() != h {
-                // Toque de Alt: o Windows passa a aceitar a troca de primeiro plano deste processo.
+                // Último recurso: toque de Alt (libera a trava de primeiro plano mesmo quando a entrada
+                // vazia não basta) e nova tentativa.
                 const VK_MENU: u8 = 0x12;
                 const KEYEVENTF_EXTENDEDKEY: u32 = 0x1;
                 const KEYEVENTF_KEYUP: u32 = 0x2;
                 keybd_event(VK_MENU, 0, KEYEVENTF_EXTENDEDKEY, 0);
                 keybd_event(VK_MENU, 0, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0);
-                SetForegroundWindow(h);
+                activate(h, GetForegroundWindow());
             }
             true
         }

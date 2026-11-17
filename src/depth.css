@@ -60,7 +60,7 @@ html .setting:not(.col-set):focus-within{--lift:-2px}
 /* o anel de foco continua por cima das sombras */
 html :is(.setting,.stat,.thumb,.theme,.emu,.folder-list li,.radio,.note,.pf-list li,.opt,.stage-shot,.mini-shot,.sm-user,.kb-key,
   .chip,.select-btn,.coll-row,.rate-row,.hltb,.legend,.btn,.stage-more):focus{
-  box-shadow:0 0 0 2px var(--b),var(--elev-2),var(--bevel-hi);
+  box-shadow:var(--elev-2),var(--bevel-hi);
 }
 /* conteúdo dentro do painel um pouco "à frente" do fundo dele */
 html .thumb img,html .theme i{box-shadow:0 6px 14px -6px rgba(0,0,0,.7)}

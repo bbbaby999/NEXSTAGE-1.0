@@ -29,7 +29,6 @@ html .pad-card:focus{outline:none;transform:translateY(-4px) scale(1.035);border
 /* foto real: mesma caixa 20:13 da ilustração, sem distorcer */
 img.ctl-photo{object-fit:contain;aspect-ratio:20/13;user-select:none;pointer-events:none}
 .pad-credit{font-size:.78rem;margin-top:var(--s1)}
-.pad-credit-link{background:none;border:none;padding:0 2px;color:var(--lab);font:inherit;cursor:pointer;text-decoration:underline;border-radius:4px}
 .pad-art .ctl-art{max-height:170px;transition:transform var(--dur-slow) var(--ease);filter:drop-shadow(0 10px 16px rgba(0,0,0,.45))}
 .pad-card:is(:hover,:focus) .pad-art .ctl-art{transform:translateY(-4px) scale(1.05) rotate(-1.5deg)}
 

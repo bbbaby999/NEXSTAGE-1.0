@@ -272,7 +272,13 @@ pub struct Tracker {
     prev: u16,
     /// Próxima repetição de cada ação (com `BUTTON_REPEAT`).
     bnext: [Option<Instant>; 9],
+    /// Confirmar segurado: quando vira "confirm_hold" (uma vez por toque) — ver `HOLD_CONFIRM`.
+    hold_at: Option<Instant>,
 }
+
+/// Segurar "confirmar" por este tempo dispara `confirm_hold` (ex.: abrir a seleção de vários no Zerei!).
+/// Soltar dispara `confirm_up`: a interface decide entre clique e "segurar" nos itens que aceitam os dois.
+const HOLD_CONFIRM: Duration = Duration::from_millis(500);
 
 const DIRS: [&str; 4] = ["left", "right", "up", "down"];
 const REPEAT_DELAY: Duration = Duration::from_millis(380);
@@ -311,9 +317,22 @@ impl Tracker {
         }
         for (i, (bit, action)) in map.iter().zip(ACTIONS).enumerate() {
             let down = raw.mask & bit != 0;
+            // confirmar (fora do teclado virtual, que repete): segurou → "confirm_hold"; soltou → "confirm_up"
+            if i == 0 && !repeat {
+                if down && self.prev & bit != 0 && self.hold_at.is_some_and(|t| now >= t) {
+                    out.push("confirm_hold");
+                    self.hold_at = None;
+                } else if !down && self.prev & bit != 0 {
+                    out.push("confirm_up");
+                    self.hold_at = None;
+                }
+            }
             if down && self.prev & bit == 0 {
                 out.push(action);
                 self.bnext[i] = Some(now + REPEAT_DELAY);
+                if i == 0 {
+                    self.hold_at = Some(now + HOLD_CONFIRM);
+                }
             } else if down && repeat && REPEATABLE.contains(&i) && self.bnext[i].is_some_and(|t| now >= t) {
                 out.push(action);
                 self.bnext[i] = Some(now + REPEAT_RATE);
@@ -1099,7 +1118,14 @@ mod tests {
         // sem repetição (resto do app): um disparo por toque
         let mut t = Tracker::default();
         assert_eq!(t.update_with(&a, &DEFAULT_MAP, at(0), false), ["confirm"]);
-        assert!(t.update_with(&a, &DEFAULT_MAP, at(2000), false).is_empty());
+        assert!(t.update_with(&a, &DEFAULT_MAP, at(300), false).is_empty());
+        // segurou: avisa uma vez ("confirm_hold"); soltou: "confirm_up"
+        assert_eq!(t.update_with(&a, &DEFAULT_MAP, at(2000), false), ["confirm_hold"]);
+        assert!(t.update_with(&a, &DEFAULT_MAP, at(2500), false).is_empty());
+        assert_eq!(t.update_with(&RawPad::default(), &DEFAULT_MAP, at(2600), false), ["confirm_up"]);
+        // toque curto: só "confirm" e "confirm_up"
+        assert_eq!(t.update_with(&a, &DEFAULT_MAP, at(3000), false), ["confirm"]);
+        assert_eq!(t.update_with(&RawPad::default(), &DEFAULT_MAP, at(3100), false), ["confirm_up"]);
     }
 
     #[test]
@@ -1251,7 +1277,7 @@ mod tests {
         let mut t = Tracker::default();
         let t0 = Instant::now();
         assert_eq!(t.update_mapped(&RawPad { mask: btn::B, ..Default::default() }, &map, t0), vec!["confirm"]);
-        assert_eq!(t.update_mapped(&RawPad { mask: btn::A, ..Default::default() }, &map, t0 + Duration::from_millis(50)), vec!["back"]);
+        assert_eq!(t.update_mapped(&RawPad { mask: btn::A, ..Default::default() }, &map, t0 + Duration::from_millis(50)), vec!["confirm_up", "back"]); // soltou B (confirmar) e apertou A (voltar)
     }
 
     #[test]

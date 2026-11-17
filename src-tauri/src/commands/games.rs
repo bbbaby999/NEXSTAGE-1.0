@@ -659,3 +659,70 @@ mod add_tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
+
+/// Onde o jogo está no disco: o arquivo do jogo (ISO/ROM) ou o executável; atalho (.lnk) → o arquivo
+/// original; jogo da Steam sem executável → a pasta de instalação da Steam.
+fn game_location(conn: &Connection, game_id: i64) -> AppResult<std::path::PathBuf> {
+    use std::path::PathBuf;
+    let (exe, file): (String, Option<String>) = conn
+        .query_row("SELECT executable_path, COALESCE(NULLIF(trim(iso_path),''), NULLIF(trim(rom_path),'')) FROM games WHERE id=?1", [game_id], |r| Ok((r.get(0)?, r.get(1)?)))
+        .map_err(|_| AppError::NotFound("Jogo não encontrado.".into()))?;
+    let raw = file.unwrap_or(exe).trim().to_string();
+    if raw.is_empty() || raw.to_lowercase().starts_with("steam://") {
+        if let Some(appid) = crate::steam::store::appid_of(conn, game_id)? {
+            if let Some(dir) = crate::steam::local::install_dir(appid) {
+                return Ok(dir);
+            }
+            return Err(AppError::NotFound("Este jogo da Steam não está instalado neste PC.".into()));
+        }
+        return Err(AppError::NotFound("Este jogo não tem um arquivo ou pasta cadastrado.".into()));
+    }
+    if let Some(aumid) = crate::msstore::aumid(&raw) {
+        return crate::msstore::package_root(aumid)
+            .ok_or_else(|| AppError::NotFound("Este jogo da Microsoft Store / Xbox não está instalado neste PC.".into()));
+    }
+    let mut p = PathBuf::from(&raw);
+    if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("lnk")) {
+        // atalho: o arquivo original (leitura nativa; o Shell do Windows como alternativa)
+        p = match crate::lnk::read(&p) {
+            Some(t) => t.path,
+            None => match crate::msstore::resolve_lnk(&p) {
+                Ok(s) if crate::msstore::aumid(&s.target).is_some() => {
+                    return crate::msstore::package_root(crate::msstore::aumid(&s.target).unwrap_or_default())
+                        .ok_or_else(|| AppError::NotFound("Este jogo da Microsoft Store / Xbox não está instalado neste PC.".into()));
+                }
+                Ok(s) => PathBuf::from(s.target),
+                Err(_) => p, // mostra o próprio atalho
+            },
+        };
+    }
+    if p.exists() {
+        Ok(p)
+    } else {
+        Err(AppError::NotFound("O arquivo deste jogo não foi encontrado no disco. Ele pode ter sido movido ou apagado.".into()))
+    }
+}
+
+/// "Abrir pasta de arquivos": abre o Explorador na pasta do jogo, com o arquivo selecionado.
+#[tauri::command]
+pub fn reveal_game_folder(db: State<Db>, profile_id: i64, game_id: i64) -> AppResult<()> {
+    let p = {
+        let conn = db.conn()?;
+        ensure_owned(&conn, profile_id, game_id)?;
+        game_location(&conn, game_id)?
+    };
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let s = p.to_string_lossy().replace('/', "\\");
+        let mut cmd = std::process::Command::new("explorer");
+        if p.is_dir() { cmd.arg(&s); } else { cmd.raw_arg(format!("/select,\"{s}\"")); }
+        cmd.spawn().map_err(|e| AppError::Other(format!("Não foi possível abrir o Explorador de Arquivos: {e}")))?;
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = p;
+        Err(AppError::Other("Disponível só no Windows.".into()))
+    }
+}

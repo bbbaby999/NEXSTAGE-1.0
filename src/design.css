@@ -97,13 +97,14 @@ h1{font-weight:300;letter-spacing:-.02em}
 .seg button{transition:background var(--dur-fast),color var(--dur-fast)}
 
 /* ---------- 5. Foco: anel estático + halo que "respira" só em opacity (compositor) ---------- */
-[data-focus]:focus{animation:none;box-shadow:0 0 0 2px var(--b),var(--elev-2)}
+/* Sem anel em volta: o destaque é o brilho que vem de trás (::after colado à borda) + leve aumento (focus.css). */
+[data-focus]:focus{animation:none;box-shadow:var(--elev-2);isolation:isolate}
 :where([data-focus]:focus){position:relative}
 [data-focus]:focus::after{
-  content:"";position:absolute;inset:-6px;border-radius:inherit;pointer-events:none;
-  box-shadow:0 0 28px 2px rgba(var(--br),.6);opacity:.5;animation:halo 3.2s ease-in-out infinite;
+  content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;
+  box-shadow:0 0 26px 3px rgba(var(--br),.7);opacity:.5;animation:halo 3.2s ease-in-out infinite;
 }
-@keyframes halo{0%,100%{opacity:.3}50%{opacity:.95}}
+@keyframes halo{0%,100%{opacity:.45}50%{opacity:1}}
 input:focus,select:focus,textarea:focus{box-shadow:0 0 0 2px rgba(var(--br),.45)}
 
 /* LED da aba ativa: barra luminosa que respira lentamente */
@@ -125,8 +126,10 @@ input:focus,select:focus,textarea:focus{box-shadow:0 0 0 2px rgba(var(--br),.45)
   transition:transform var(--dur) var(--ease),border-color var(--dur),box-shadow var(--dur);
   border:1px solid var(--glass-line);box-shadow:var(--elev-2);overflow:hidden;
 }
+/* Capa dos cartões como <img> (decodificação assíncrona e sob demanda): preenche a caixa; o brilho fica por cima */
+.card .cover-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;pointer-events:none;user-select:none}
 .card .cover::before{
-  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity var(--dur);
+  content:"";position:absolute;inset:0;z-index:1;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity var(--dur);
   background:radial-gradient(circle at var(--mx,50%) var(--my,0%),rgba(255,255,255,.2),transparent 55%);
 }
 .card:hover .cover,.card:focus .cover,.card.active .cover{will-change:transform;--ty:-4px;--s:1.05;box-shadow:var(--elev-3)}

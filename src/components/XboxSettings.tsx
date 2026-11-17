@@ -101,7 +101,7 @@ export default function XboxSettings() {
             <input className="search" style={{ width: 320 }} value={cid} onChange={(e) => setCid(e.target.value)}
               placeholder="00000000-0000-0000-0000-000000000000" aria-label={t("Client ID do aplicativo do Azure")} autoComplete="off" spellCheck={false} />
             <Button disabled={!cid.trim()} onClick={() => saveCid(cid.trim())}>{t("Salvar")}</Button>
-            {st.clientId && <Button variant="ghost" onClick={() => saveCid(null)}>{t("Remover")}</Button>}
+            {st.clientId && <Button variant="danger" onClick={() => saveCid(null)}>{t("Remover")}</Button>}
             <Button variant="ghost" onClick={() => openUrl(AZURE_APPS).catch(() => {})}>{t("Abrir o portal do Azure")}</Button>
           </div>
         </div>

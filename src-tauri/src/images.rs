@@ -166,6 +166,13 @@ pub fn resolve(value: Option<String>) -> Option<String> {
     }
 }
 
+/// Como `resolve`, mas `None` quando o arquivo local não existe mais (a interface mostra a alternativa
+/// em vez de uma imagem quebrada). Endereços da internet passam sem verificação.
+pub fn resolve_existing(value: Option<String>) -> Option<String> {
+    let local = value.as_deref().is_some_and(|v| v.starts_with(PREFIX));
+    resolve(value).filter(|p| !local || Path::new(p).is_file())
+}
+
 /// Grava como arquivo uma imagem já em bytes (ex.: capa baixada da Steam).
 pub fn store_bytes(bytes: &[u8], mime: &str) -> AppResult<String> {
     let ext = ext_for_mime(mime).ok_or_else(|| AppError::Validation("Formato de imagem não suportado.".into()))?;
