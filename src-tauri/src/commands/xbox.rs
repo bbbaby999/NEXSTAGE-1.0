@@ -164,7 +164,7 @@ fn family_key(exe: &str) -> Option<String> {
 }
 
 /// Famílias de pacote já presentes na biblioteca do perfil.
-fn library_families(conn: &Connection, profile_id: i64) -> AppResult<std::collections::HashSet<String>> {
+pub(crate) fn library_families(conn: &Connection, profile_id: i64) -> AppResult<std::collections::HashSet<String>> {
     let mut st = conn.prepare("SELECT g.executable_path FROM profile_games pg JOIN games g ON g.id=pg.game_id WHERE pg.profile_id=?1")?;
     let rows = st.query_map([profile_id], |r| r.get::<_, String>(0))?;
     Ok(rows.filter_map(Result::ok).filter_map(|p| family_key(&p)).collect())
@@ -226,4 +226,63 @@ pub fn xbox_import(db: State<Db>, profile_id: i64, aumids: Vec<String>) -> AppRe
     }
     tx.commit()?;
     Ok(rep)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotInstalledList {
+    pub connected: bool,
+    pub items: Vec<store::NotInstalled>,
+    /// Títulos do cache sem os aparelhos informados (cache antigo): a próxima sincronização completa.
+    pub pending: usize,
+}
+
+/// Jogos de PC já jogados nesta conta Xbox que não estão instalados neste PC (só cache local; sem rede).
+/// O Xbox não informa jogos comprados e nunca abertos: só o histórico de jogos.
+#[tauri::command(async)]
+pub fn xbox_not_installed(db: State<Db>, profile_id: i64) -> AppResult<NotInstalledList> {
+    let conn = db.conn()?;
+    if crate::accounts::get(&conn, profile_id, store::PLATFORM)?.is_none() {
+        return Ok(NotInstalledList { connected: false, items: vec![], pending: 0 });
+    }
+    let installed = crate::msstore::installed_families();
+    let (items, pending) = store::not_installed(&conn, profile_id, &installed)?;
+    Ok(NotInstalledList { connected: true, items, pending })
+}
+
+/// Família de pacote válida ("Nome.Do.Pacote_<13 caracteres do editor>").
+fn valid_pfn(pfn: &str) -> bool {
+    let Some((name, publisher)) = pfn.rsplit_once('_') else { return false };
+    !name.is_empty()
+        && name.len() <= 100
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+        && publisher.len() == 13
+        && publisher.chars().all(|c| c.is_ascii_alphanumeric())
+}
+
+/// Abre a página do jogo na Microsoft Store (protocolo oficial `ms-windows-store://pdp/?PFN=`). A instalação,
+/// a licença e o Game Pass continuam com a Microsoft; o NEXSTAGE não baixa nada.
+#[tauri::command]
+pub fn xbox_open_store(app: AppHandle, pfn: String) -> AppResult<()> {
+    let pfn = pfn.trim();
+    if !valid_pfn(pfn) {
+        return Err(AppError::Validation("Pacote da Microsoft Store inválido.".into()));
+    }
+    app.opener()
+        .open_url(format!("ms-windows-store://pdp/?PFN={pfn}"), None::<&str>)
+        .map_err(|_| AppError::Other("Não foi possível abrir a Microsoft Store.".into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn package_family_validation() {
+        assert!(valid_pfn("Microsoft.ForteBaseGame_8wekyb3d8bbwe"));
+        assert!(valid_pfn("BethesdaSoftworks.Starfield-PC_3275kfvn8vcwc"));
+        for bad in ["", "SemEditor", "Nome_curto", "Nome com espaço_8wekyb3d8bbwe", "x&y_8wekyb3d8bbwe", "_8wekyb3d8bbwe", "a/b_8wekyb3d8bbwe"] {
+            assert!(!valid_pfn(bad), "{bad}");
+        }
+    }
 }

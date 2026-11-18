@@ -12,3 +12,17 @@ export function takeClosedGame(): number | null {
   last = null;
   return v;
 }
+
+/**
+ * Mesmo esquema para a página de um jogo do Game Pass aberta pela Home: ao voltar, o carrossel devolve o
+ * foco ao cartão que abriu a página (e na mesma aba).
+ */
+let lastGamePass: { key: string; at: number } | null = null;
+
+export function rememberGamePass(key: string) { lastGamePass = { key, at: Date.now() }; }
+
+export function takeGamePass(): string | null {
+  const v = lastGamePass && Date.now() - lastGamePass.at < 60_000 ? lastGamePass.key : null;
+  lastGamePass = null;
+  return v;
+}

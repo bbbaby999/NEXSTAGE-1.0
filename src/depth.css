@@ -110,13 +110,13 @@ html .stage-title{text-shadow:0 2px 0 rgba(0,0,0,.35),0 8px 30px rgba(0,0,0,.7)}
 /* ---------- Home: primeiro plano em parallax contra a arte do fundo ---------- */
 /* `translate` (não `transform`): convive com as animações de entrada que usam transform */
 .stage-hero[data-parallax]{translate:calc(var(--px,0) * 7px) calc(var(--py,0) * 4px);transition:translate .7s var(--ease)}
-.replay[data-parallax]{translate:calc(var(--px,0) * 3px) calc(var(--py,0) * 2px);transition:translate .7s var(--ease)}
+:is(.replay,.gp)[data-parallax]{translate:calc(var(--px,0) * 3px) calc(var(--py,0) * 2px);transition:translate .7s var(--ease)}
 html .stage-tags span{box-shadow:0 4px 10px -4px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.08)}
 
 /* ---------- Movimento reduzido: só a luz e as sombras (sem inclinação, erguer ou parallax) ---------- */
 html[data-motion="reduced"] :is(.setting,.stat,.thumb,.theme,.emu,.folder-list li,.radio,.note,.pf-list li,.opt,.stage-shot,.mini-shot,
   .sm-user,.kb-key,.chip,.btn,.stage-more,.select-btn,.coll-row,.rate-row,.hltb,.legend,.seg){transform:none!important}
-html[data-motion="reduced"] :is(.stage-hero,.replay)[data-parallax]{translate:none}
+html[data-motion="reduced"] :is(.stage-hero,.replay,.gp)[data-parallax]{translate:none}
 @media (prefers-reduced-motion:reduce){
   html:not([data-motion="full"]) :is(.setting,.stat,.thumb,.theme,.emu,.folder-list li,.radio,.note,.pf-list li,.opt,.stage-shot,.mini-shot,
     .sm-user,.kb-key,.chip,.btn,.stage-more,.select-btn,.coll-row,.rate-row,.hltb,.legend,.seg){transform:none!important}

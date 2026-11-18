@@ -193,6 +193,24 @@ pub fn install_dir(appid: i64) -> Option<PathBuf> {
     })
 }
 
+/// DLCs com conteúdo baixado declaradas num appmanifest (`InstalledDepots` → `dlcappid`).
+/// DLCs que só desbloqueiam algo (sem arquivos próprios) não aparecem aqui.
+pub fn dlc_from_manifest(text: &str) -> std::collections::HashSet<i64> {
+    let v = vdf::parse(text);
+    let Some(depots) = v.get("AppState").and_then(|s| s.get("InstalledDepots")) else { return Default::default() };
+    depots.entries().into_iter().filter_map(|(_, d)| d.str("dlcappid")?.trim().parse().ok()).filter(|id: &i64| *id > 0).collect()
+}
+
+/// DLCs instaladas de um jogo neste PC (lê só o appmanifest do jogo).
+pub fn installed_dlc(appid: i64) -> std::collections::HashSet<i64> {
+    let Some(root) = steam_root() else { return Default::default() };
+    library_dirs(&root)
+        .into_iter()
+        .find_map(|lib| std::fs::read_to_string(lib.join("steamapps").join(format!("appmanifest_{appid}.acf"))).ok())
+        .map(|t| dlc_from_manifest(&t))
+        .unwrap_or_default()
+}
+
 /// Todos os apps com manifesto nas bibliotecas locais (instalados ou em instalação).
 pub fn local_apps() -> HashMap<i64, LocalApp> {
     let mut out = HashMap::new();
@@ -250,6 +268,20 @@ mod tests {
         let b = parse_manifest(&m("1026")).unwrap();
         assert!(!b.installed && b.state == "installing");
         assert!(parse_manifest("lixo").is_none());
+    }
+
+    #[test]
+    fn installed_dlc_from_depots() {
+        let m = r#""AppState" { "appid" "1091500" "InstalledDepots" {
+            "1091501" { "manifest" "1" "size" "2" }
+            "2138330" { "manifest" "3" "size" "4" "dlcappid" "2138330" }
+            "2138338" { "manifest" "5" "size" "6" "dlcappid" "2138330" }
+            "9" { "manifest" "7" "dlcappid" "777" } } }"#;
+        let d = dlc_from_manifest(m);
+        assert_eq!(d.len(), 2, "depósitos da mesma DLC contam uma vez");
+        assert!(d.contains(&2138330) && d.contains(&777));
+        assert!(dlc_from_manifest("\"AppState\" { \"appid\" \"1\" }").is_empty());
+        assert!(dlc_from_manifest("lixo").is_empty());
     }
 
     /// Mostra o que foi detectado neste PC: cargo test steam_local_live -- --ignored --nocapture

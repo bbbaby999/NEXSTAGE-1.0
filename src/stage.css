@@ -675,3 +675,16 @@ html[data-motion="reduced"] .mod-card:hover{transform:none}
 .stage-title.stage-logo{line-height:0;text-shadow:none}
 .stage-logo img{display:block;max-width:min(520px,72vw);max-height:clamp(90px,16vh,170px);object-fit:contain;object-position:left bottom;
   filter:drop-shadow(0 6px 22px rgba(0,0,0,.7));animation:fade .35s ease both}
+
+/* Tela cheia de vídeo (trailer do Game Pass e vídeos do IGDB): linha do tempo + pílula com ← → □ ○ */
+.vhud-line{position:absolute;left:24px;right:24px;bottom:72px;z-index:3;display:flex;align-items:center;gap:12px;color:#fff;font-size:.78rem;
+  font-variant-numeric:tabular-nums;text-shadow:0 1px 3px rgba(0,0,0,.9);opacity:0;transition:opacity .6s ease;pointer-events:none}
+.vhud-track{flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.25);overflow:hidden}
+.vhud-track>i{display:block;height:100%;background:var(--b);border-radius:2px;transition:width .25s linear}
+.igdb-fs.awake .vhud-line,.trl-full.awake .vhud-line{opacity:1;transition-duration:.15s}
+.trl-full{outline:none;cursor:none}
+.trl-full.awake{cursor:default}
+.trl-full .trl-stage{position:absolute;inset:0;aspect-ratio:auto;border-radius:0}
+.trl-full.awake .igdb-hud{opacity:1;transform:none;transition-duration:.15s;pointer-events:auto}
+html.has-hints .trl-full .igdb-hud,html.has-hints .igdb-fs .igdb-hud{bottom:22px}
+@media (prefers-reduced-motion: reduce){.vhud-line,.vhud-track>i{transition:none}}

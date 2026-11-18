@@ -19,7 +19,8 @@ export function parseBBCode(src: string): Node {
   const text = src.replace(/\\\[/g, ESC).replace(/\{STEAM_CLAN_IMAGE\}[^\s[\]]*/g, "").replace(/\r/g, "");
   const root: Node = { tag: "root", kids: [] };
   const stack: Node[] = [root];
-  const re = /\[(\/?)([a-z*0-9]+)(?:=([^\]]*))?\]/gi;
+  // [tag], [tag=valor] ou [tag atributo="..."] (formato novo da Steam: [p align="start"], [url href="..."])
+  const re = /\[(\/?)([a-z*0-9]+)(?:=([^\]]*)|(\s[^\]]*))?\]/gi;
   let last = 0;
   let m: RegExpExecArray | null;
   const push = (s: string) => { if (s) stack[stack.length - 1].kids.push(s.replace(new RegExp(ESC, "g"), "[")); };
@@ -40,7 +41,9 @@ export function parseBBCode(src: string): Node {
       const i = stack.map((n) => n.tag).lastIndexOf("*");
       if (i > 0 && stack.slice(i).every((n) => n.tag !== "list" && n.tag !== "olist")) stack.length = i;
     }
-    const n: Node = { tag, arg: m[3], kids: [] };
+    // com atributos, só o endereço do link interessa (alinhamento e afins são ignorados)
+    const arg = m[3] ?? (m[4] ? /\bhref\s*=\s*["']?([^"'\s]+)/i.exec(m[4])?.[1] : undefined);
+    const n: Node = { tag, arg, kids: [] };
     stack[stack.length - 1].kids.push(n);
     stack.push(n);
   }

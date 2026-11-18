@@ -280,6 +280,18 @@ export const api = {
     invoke<import("../types").XboxGameData | null>("xbox_game", { profileId, gameId, refresh, lang: currentLang() }),
   xboxInstalled: (profileId: number) => invoke<import("../types").XboxInstalled[]>("xbox_installed", { profileId }),
   xboxImport: (profileId: number, aumids: string[]) => invoke<{ added: number; skipped: number }>("xbox_import", { profileId, aumids }),
+  xboxNotInstalled: (profileId: number) => invoke<import("../types").XboxNotInstalledList>("xbox_not_installed", { profileId }),
+  xboxOpenStore: (pfn: string) => invoke<void>("xbox_open_store", { pfn }),
+  // Catálogo do PC Game Pass (Home, experimental; só cache, atualização em segundo plano)
+  gamePassOverview: () => invoke<import("../types").GamePassOverview>("gamepass_overview"),
+  gamePassRefresh: (manual: boolean) => invoke<boolean>("gamepass_refresh", { lang: currentLang(), manual }),
+  /** Abre no app Xbox ("xbox"); sem ele, na Microsoft Store ("store"). */
+  gamePassOpen: (id: string) => invoke<"xbox" | "store">("gamepass_open", { id }),
+  gamePassAddToLibrary: (profileId: number, id: string) => invoke<number>("gamepass_add_to_library", { profileId, id }),
+  /** Trailers do YouTube pelo IGDB (identificação exata pelo código da Microsoft Store). */
+  gamePassVideos: (id: string) => invoke<{ available: boolean; videos: { id: string; name: string }[] }>("gamepass_videos", { id }),
+  gamePassDetail: (profileId: number, id: string, refresh = false) =>
+    invoke<import("../types").GamePassDetailView>("gamepass_detail", { profileId, id, lang: currentLang(), refresh }),
   steamSetKey: (profileId: number, key: string | null) => invoke<SteamAccount>("steam_set_key", { profileId, key }),
   steamDisconnect: (profileId: number, clearCache: boolean) => invoke<void>("steam_disconnect", { profileId, clearCache }),
   steamSync: (profileId: number) => idleBusy(invoke<SteamSyncReport>("steam_sync", { profileId, lang: currentLang() })),
@@ -306,6 +318,13 @@ export const api = {
     invoke<SteamNewsOverview>("steam_news_overview", { profileId }).then((o) => ({ ...o, items: o.items.map((i) => ({ ...i, cover: imgUrl(i.cover) })) })),
   steamNewsRefresh: (profileId: number, manual: boolean) => invoke<boolean>("steam_news_refresh", { profileId, manual }),
   steamNewsSeen: (profileId: number, gid: string) => invoke<void>("steam_news_seen", { profileId, gid }),
+  steamGameNews: (appid: number, refresh = false) => invoke<import("../types").SteamGameNews>("steam_game_news", { appid, refresh }),
+  // DLCs da Steam (lista pública da loja; instaladas pelo manifesto local)
+  steamDlc: (appid: number, refresh = false) => invoke<import("../types").SteamDlcView>("steam_dlc", { appid, refresh, lang: currentLang() }),
+  steamDlcRefresh: (profileId: number) => invoke<boolean>("steam_dlc_refresh", { profileId, lang: currentLang() }),
+  steamDlcNew: (profileId: number) =>
+    invoke<import("../types").SteamNewDlc[]>("steam_dlc_new", { profileId }).then((l) => l.map((d) => ({ ...d, cover: imgUrl(d.cover) }))),
+  steamOpenStore: (appid: number) => invoke<void>("steam_open_store", { appid }),
   steamAchOverview: (profileId: number) => invoke<SteamAchOverview>("steam_ach_overview", { profileId }),
   steamAchList: (profileId: number, tab: "recent" | "earned" | "pending" | "rare", query: string) =>
     invoke<SteamAchEntry[]>("steam_ach_list", { profileId, tab, query }),

@@ -14,8 +14,8 @@ import type { Game, GameInfo, IgdbCandidate } from "../types";
  * Dados do IGDB na página do jogo (API oficial). Busca sozinho uma vez por jogo se a fonte estiver
  * ativa; depois usa o cache. Só exibe: as imagens do IGDB nunca alteram a capa ou o fundo do jogo.
  */
-export default function IgdbPanel({ game, info, loaded, term, onInfo, onGameChanged }: {
-  game: Game; info: GameInfo | null; loaded: boolean; term: string; onInfo: (i: GameInfo) => void; onGameChanged: () => void;
+export default function IgdbPanel({ game, info, loaded, term, onInfo }: {
+  game: Game; info: GameInfo | null; loaded: boolean; term: string; onInfo: (i: GameInfo) => void;
 }) {
   const { profile, toast, setView } = useSession();
   const p = profile!;

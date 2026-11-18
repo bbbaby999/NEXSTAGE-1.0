@@ -70,3 +70,74 @@
 @media (max-width:760px){.upd-hero{grid-template-columns:1fr}.upd-cover{width:110px}}
 html[data-motion="reduced"] :is(.upd-spin,.upd-skel){animation:none}
 @media (prefers-reduced-motion:reduce){html:not([data-motion="full"]) :is(.upd-spin,.upd-skel){animation:none}}
+
+/* =====================================================================
+   Home → "Novas DLCs" (Steam) e catálogo do PC Game Pass (experimental)
+   ===================================================================== */
+.ndlc-thumb{flex:none;width:96px;aspect-ratio:460/215;border-radius:8px;background:#0d1018 center/cover no-repeat}
+.gp{position:relative;z-index:1;padding:0 0 var(--s7)}
+.gp .section-head{margin-top:var(--s3)}
+.gp .section{display:flex;align-items:center;gap:var(--s2)}
+.gp-exp{font-size:.6rem;letter-spacing:.1em}
+.gp .seg{margin:var(--s2) 0 0}
+.gp-track{margin-top:var(--s1)}
+.gp-card .replay-cover{aspect-ratio:2/3;position:relative}
+.gp-card .replay-cover b{font-size:1.6rem}
+.gp-flag{position:absolute;left:7px;bottom:7px;font-style:normal;font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  padding:3px 8px;border-radius:999px;color:#fff;background:rgba(220,38,38,.85)}
+.gp-skel{min-height:120px;margin-top:var(--s3)}
+.gp-none{margin-top:var(--s3)}
+.gp-detail{display:grid;grid-template-columns:auto 1fr;gap:var(--s4);align-items:start}
+.gp-poster{width:150px;aspect-ratio:2/3;object-fit:cover;border-radius:var(--r-md);border:1px solid var(--glass-line)}
+.gp-info{display:flex;flex-direction:column;gap:var(--s2);min-width:0}
+.gp-when{font-weight:600}
+.gp-desc{line-height:1.5}
+@media (max-width:760px){.gp-detail{grid-template-columns:1fr}.gp-poster{width:110px}}
+
+/* Página do jogo → "Última atualização" (Steam) */
+.gnews{display:flex;flex-direction:column;gap:var(--s2);min-width:0}
+.gnews .upd-title{font-size:1.05rem}
+.gnews-skel{min-height:110px}
+
+/* Página de um jogo do PC Game Pass (mesmo desenho da página da Biblioteca) */
+.gpd .dp-meta>.gpd-status{color:#e8fff1;border-color:rgba(52,211,153,.55);background:rgba(16,124,16,.55)}
+.gpd .dp-meta>.gpd-status.leaving{color:#fff;border-color:rgba(248,113,113,.6);background:rgba(220,38,38,.6)}
+.gpd .dp-meta>.gpd-status.coming{color:#eaf2ff;border-color:rgba(96,165,250,.6);background:rgba(37,99,235,.55)}
+.gpd-desc{white-space:pre-line;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:12;overflow:hidden}
+.gpd-desc.open{display:block;-webkit-line-clamp:unset;overflow:visible}
+.gpd-more{margin-top:var(--s2)}
+.gpd-when{font-weight:600}
+.gpd-feats{display:flex;flex-wrap:wrap;gap:6px}
+.gpd-feats>span{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:7px;font-size:.78rem;border:1px solid var(--glass-line);background:var(--glass)}
+.gpd-src{margin-top:var(--s3)}
+
+/* Página do jogo do Game Pass → Trailers (Xbox no player do app; YouTube incorporado) */
+.trl{display:flex;flex-direction:column;gap:var(--s3)}
+.trl-stage{position:relative;aspect-ratio:16/9;border-radius:var(--r-md);overflow:hidden;background:#000}
+.trl-cover{position:absolute;inset:0;width:100%;height:100%;padding:0;border:none;cursor:pointer;background:#05060a center/cover no-repeat;display:grid;place-items:center;color:#fff}
+.trl-cover::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 55%,rgba(0,0,0,.75))}
+.trl-play{position:relative;z-index:1;width:78px;height:78px;border-radius:50%;display:grid;place-items:center;background:rgba(10,14,22,.62);
+  border:2px solid rgba(255,255,255,.75);backdrop-filter:blur(6px);transition:transform var(--dur) var(--ease),background var(--dur)}
+.trl-play svg{margin-left:4px}
+.trl-cover:hover .trl-play,.trl-cover:focus .trl-play{transform:scale(1.08);background:rgba(var(--ar),.55)}
+.trl-cap{position:absolute;left:16px;right:16px;bottom:12px;z-index:1;text-align:left;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trl-video{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+.trl-msg{position:absolute;inset:0;display:grid;place-items:center;color:var(--text-dim);text-align:center;padding:var(--s4)}
+.trl-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:var(--s2)}
+.trl-item{display:flex;gap:var(--s2);align-items:center;padding:6px;text-align:left;cursor:pointer;color:var(--text);font:inherit;
+  border-radius:var(--r-md);border:1px solid var(--glass-line);background:var(--glass)}
+.trl-item.on{border-color:rgba(var(--br),.6);background:rgba(var(--ar),.16)}
+.trl-thumb{flex:none;width:84px;aspect-ratio:16/9;border-radius:6px;background:#0d1018 center/cover no-repeat}
+.trl-item-text{display:flex;flex-direction:column;min-width:0}
+.trl-item-text strong,.trl-item-text small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trl-item-text strong{font-size:.85rem}
+.trl-item-text small{color:var(--text-dim);font-size:.72rem}
+
+/* trailer: barra de controles do app (alcançável pelo controle) e tela cheia do app */
+.trl-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border-radius:var(--r-md);background:rgba(5,7,12,.72);border:1px solid var(--glass-line)}
+.trl-btn{display:grid;place-items:center;width:40px;height:40px;border-radius:10px;border:1px solid var(--glass-line);background:var(--glass);color:var(--text);cursor:pointer;padding:0}
+.trl-btn:hover{background:rgba(var(--ar),.2)}
+.trl-seek{flex:1 1 160px;min-width:120px;accent-color:var(--b)}
+.trl-time{font-size:.8rem;color:var(--text-dim);font-variant-numeric:tabular-nums;min-width:86px;text-align:center}
+.trl-video{cursor:pointer}
+.trl-full{position:fixed;inset:0;z-index:120;background:#000;animation:fade .2s ease both}

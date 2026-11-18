@@ -3,7 +3,7 @@
  * de perfil é sempre exibida (ASK) e "Trocar usuário" limpa a sessão (EXIT).
  */
 import { Context, createContext, ReactNode, useCallback, useContext, useRef, useState } from "react";
-import type { Profile, StatsTab, View } from "../types";
+import type { GamePassItem, GamePassList, Profile, StatsTab, View } from "../types";
 import { api } from "../lib/api";
 
 interface Toast { id: number; msg: string; kind: "ok" | "err" }
@@ -19,6 +19,9 @@ interface Ctx {
   /** Página individual de um jogo (sobrepõe a aba atual). */
   openGameId: number | null;
   setOpenGameId: (id: number | null) => void;
+  /** Página de um jogo do catálogo do PC Game Pass (aberta pela Home; sobrepõe a aba atual). */
+  openGamePass: { item: GamePassItem; list: GamePassList } | null;
+  setOpenGamePass: (v: { item: GamePassItem; list: GamePassList } | null) => void;
   /** Pedido para abrir a Galeria já filtrada por um jogo (e, opcionalmente, uma captura). */
   galleryIntent: { gameId: number; itemId?: number } | null;
   setGalleryIntent: (i: { gameId: number; itemId?: number } | null) => void;
@@ -45,6 +48,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [view, setViewState] = useState<View>("home");
   const [returnTo, setReturnTo] = useState<ReturnTo | null>(null);
   const [openGameId, setOpenGameId] = useState<number | null>(null);
+  const [openGamePass, setOpenGamePass] = useState<Ctx["openGamePass"]>(null);
   const [galleryIntent, setGalleryIntent] = useState<Ctx["galleryIntent"]>(null);
   const [startManage, setStartManage] = useState(false);
   const [statsIntent, setStatsIntent] = useState<StatsTab | null>(null);
@@ -61,6 +65,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const setView = useCallback((v: View, opts?: { returnTo?: ReturnTo }) => {
     setOpenGameId(null);
+    setOpenGamePass(null);
     setViewState(v);
     setReturnTo(opts?.returnTo ?? null);
   }, []);
@@ -68,13 +73,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const setProfile = useCallback((p: Profile | null) => {
     setProfileState(p);
     setOpenGameId(null);
+    setOpenGamePass(null);
     setViewState("home");
     setReturnTo(null);
   }, []);
 
   return (
     <SessionCtx.Provider
-      value={{ profile, setProfile, replaceProfile: setProfileState, view, setView, returnTo, openGameId, setOpenGameId, galleryIntent, setGalleryIntent, statsIntent, setStatsIntent, startManage, setStartManage, toast }}
+      value={{ profile, setProfile, replaceProfile: setProfileState, view, setView, returnTo, openGameId, setOpenGameId, openGamePass, setOpenGamePass, galleryIntent, setGalleryIntent, statsIntent, setStatsIntent, startManage, setStartManage, toast }}
     >
       {children}
       <div className="toasts" role="status" aria-live="polite">

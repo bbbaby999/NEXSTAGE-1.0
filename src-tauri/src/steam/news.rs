@@ -119,7 +119,7 @@ fn save(conn: &Connection, appid: i64, p: Option<&Picked>) -> AppResult<()> {
 }
 
 /// Jogos Steam da biblioteca do perfil (vinculados), os mais jogados recentemente primeiro.
-fn candidates(conn: &Connection, profile_id: i64) -> AppResult<Vec<i64>> {
+pub(crate) fn candidates(conn: &Connection, profile_id: i64) -> AppResult<Vec<i64>> {
     let mut st = conn.prepare(
         "SELECT sl.appid FROM steam_links sl
            JOIN profile_games pg ON pg.game_id = sl.game_id AND pg.profile_id = ?1
@@ -328,9 +328,102 @@ pub fn overview(conn: &Connection, profile_id: i64, limit: usize) -> AppResult<O
     })
 }
 
+// ---------- página do jogo (um jogo só) ----------
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameNewsItem {
+    pub gid: String,
+    pub title: String,
+    pub author: String,
+    pub date: i64,
+    pub contents: String,
+    pub official: bool,
+    pub url: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameNews {
+    pub appid: i64,
+    /// Última consulta à Steam (None = nunca consultado).
+    pub checked_at: Option<i64>,
+    /// Nota de atualização mais recente (None = nenhuma nos anúncios recentes).
+    pub item: Option<GameNewsItem>,
+    /// Quando a cópia instalada neste PC foi atualizada pela Steam (manifesto local), se houver.
+    pub local_updated: Option<i64>,
+    /// Falha na última consulta (o que aparece é do cache).
+    pub error: Option<String>,
+}
+
+/// Nota de atualização de um jogo a partir do cache (o mesmo da Home).
+pub fn game_view(conn: &Connection, appid: i64, error: Option<String>) -> AppResult<GameNews> {
+    let row = conn
+        .query_row("SELECT checked_at, gid, title, author, date, contents, official FROM steam_news WHERE appid=?1", [appid], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, Option<String>>(1)?,
+                r.get::<_, Option<String>>(2)?,
+                r.get::<_, Option<String>>(3)?,
+                r.get::<_, Option<i64>>(4)?,
+                r.get::<_, Option<String>>(5)?,
+                r.get::<_, bool>(6)?,
+            ))
+        })
+        .optional()?;
+    let (checked_at, item) = match row {
+        Some((at, Some(gid), title, author, Some(date), contents, official)) => (
+            Some(at),
+            Some(GameNewsItem {
+                url: news_url(appid, &gid),
+                gid,
+                title: title.unwrap_or_default(),
+                author: author.unwrap_or_default(),
+                date,
+                contents: contents.unwrap_or_default(),
+                official,
+            }),
+        ),
+        Some((at, ..)) => (Some(at), None),
+        None => (None, None),
+    };
+    let local_updated = super::local::app(appid).map(|a| a.last_updated).filter(|t| *t > 0);
+    Ok(GameNews { appid, checked_at, item, local_updated, error })
+}
+
+/// Página do jogo: usa o cache (6 h) e consulta a Steam se ele estiver vencido (`refresh`: 15 min).
+/// API oficial sem chave: não depende de conta Steam conectada.
+pub async fn game_news(db: &Db, appid: i64, refresh: bool) -> AppResult<GameNews> {
+    let at: Option<i64> = db.conn()?.query_row("SELECT checked_at FROM steam_news WHERE appid=?1", [appid], |r| r.get(0)).optional()?;
+    let ttl = if refresh { MANUAL_TTL } else { TTL };
+    let mut error = None;
+    if at.map_or(true, |t| now() - t > ttl) {
+        match client::news_for_app(appid, PER_APP).await {
+            Ok(items) => save(&*db.conn()?, appid, pick(&items).as_ref())?,
+            Err(e) => error = Some(e.message()),
+        }
+    }
+    game_view(&*db.conn()?, appid, error)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn game_view_from_cache() {
+        let c = Connection::open_in_memory().unwrap();
+        c.execute_batch(SCHEMA).unwrap();
+        assert!(game_view(&c, 730, None).unwrap().checked_at.is_none(), "nunca consultado");
+        save(&c, 570, None).unwrap();
+        let v = game_view(&c, 570, None).unwrap();
+        assert!(v.checked_at.is_some() && v.item.is_none(), "consultado, sem nota");
+        let p = Picked { gid: String::from("9"), title: String::from("Patch 1.2"), author: String::new(), date: 50, contents: String::from("[list][*]a[/list]"), official: true };
+        save(&c, 730, Some(&p)).unwrap();
+        let v = game_view(&c, 730, None).unwrap();
+        let it = v.item.unwrap();
+        assert_eq!((it.gid.as_str(), it.official, it.url.as_str()), ("9", true, "https://store.steampowered.com/news/app/730/view/9"));
+    }
 
     #[test]
     fn titles_that_look_like_updates() {

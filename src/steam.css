@@ -63,3 +63,28 @@ html[data-motion="reduced"] .steam-card:hover{transform:none}
 .steam-cover-badge{position:absolute;top:8px;left:8px;z-index:1;width:24px;height:24px;border-radius:8px;display:grid;place-items:center;font-style:normal;pointer-events:none;
   color:#e8f4fd;background:linear-gradient(160deg,#1b2838,#2a475e);border:1px solid rgba(var(--steam-rgb),.55);box-shadow:0 2px 8px rgba(0,0,0,.55)}
 .steam-cover-badge.off{color:rgba(232,244,253,.55);border-color:rgba(255,255,255,.18);background:rgba(10,14,22,.82)}
+
+/* ---------- Página do jogo → aba DLCs ---------- */
+.dlc .section-head{margin-top:var(--s5)}
+.dlc-tools{display:flex;align-items:center;gap:var(--s3)}
+.dlc-summary{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);flex-wrap:wrap;margin:var(--s2) 0 var(--s3);color:var(--text-dim)}
+.dlc-summary b{color:var(--text)}
+.dlc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.dlc-card{display:flex;flex-direction:column;gap:4px;padding:8px;border-radius:var(--r-md);cursor:pointer;text-align:left;color:inherit;font:inherit;
+  border:1px solid var(--glass-line);background:linear-gradient(180deg,var(--glass-hi),var(--glass));transition:transform var(--dur) var(--ease)}
+.dlc-card:hover{transform:translateY(-2px)}
+.dlc-img{position:relative;aspect-ratio:460/215;border-radius:10px;overflow:hidden;background:rgba(0,0,0,.35)}
+.dlc-img img{width:100%;height:100%;object-fit:cover;display:block}
+.dlc-badges{position:absolute;left:6px;top:6px;display:flex;gap:4px;flex-wrap:wrap}
+.dlc-badges .upd-badge{font-style:normal;font-size:.6rem;padding:3px 8px;backdrop-filter:blur(6px)}
+.dlc-badges .upd-badge.likely{background:rgba(10,14,22,.78);color:#e8f4fd}
+.dlc-card strong{font-size:.88rem;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dlc-card small{font-size:.74rem;color:var(--text-dim)}
+.dlc-card small s{margin-right:2px}
+.dlc-off{color:#34d399}
+.dlc .note{margin-top:var(--s4)}
+html[data-motion="reduced"] .dlc-card:hover{transform:none}
+
+/* Importar → Xbox: jogados e não instalados */
+.steam-grid.xni{flex:none;min-height:0;max-height:42vh}
+.steam-card.xbox-missing .steam-cover img{filter:saturate(.75)}

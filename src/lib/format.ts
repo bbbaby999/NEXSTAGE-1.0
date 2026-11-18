@@ -39,3 +39,17 @@ export function formatPlaytime(sec: number): string | null {
   if (!h) return `${m} min`;
   return h < 10 && m ? `${h} h ${m} min` : `${h} h`;
 }
+
+/**
+ * Data de saída do PC Game Pass ("AAAA-MM-DD", dia do calendário, sem fuso). Só datas de hoje até daqui a
+ * 120 dias são aceitas; fora disso (data passada ou distante) a saída é tratada como "em breve".
+ */
+export function gamePassLeaveDate(s: string | null | undefined): Date | null {
+  const m = s ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(s) : null;
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = (d.getTime() - today.getTime()) / 86400000;
+  return days >= 0 && days <= 120 ? d : null;
+}

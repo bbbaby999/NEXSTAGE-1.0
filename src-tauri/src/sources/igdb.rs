@@ -448,6 +448,24 @@ pub async fn search_titles(creds: &Creds, term: &str, limit: u32) -> AppResult<V
     Ok(v.as_array().into_iter().flatten().filter_map(|g| parse_candidate(g, None, None)).collect())
 }
 
+/// Vídeos (YouTube) de um jogo identificado pelo código da Microsoft Store (`external_games`, fonte 11 =
+/// Microsoft): identificação exata, sem depender do nome. `None` = o IGDB não conhece esse código.
+pub async fn videos_by_microsoft_id(creds: &Creds, product_id: &str) -> AppResult<Option<Vec<Video>>> {
+    let uid: String = product_id.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+    if uid.is_empty() {
+        return Ok(None);
+    }
+    // a API trocou `category` por `external_game_source`: a versão reduzida usa o campo antigo
+    let full = format!("fields game; where uid = \"{uid}\" & external_game_source = 11; limit 1;");
+    let reduced = format!("fields game; where uid = \"{uid}\" & category = 11; limit 1;");
+    let ext = query_fallback(creds, "external_games", &full, &reduced).await?;
+    let Some(game) = ext.as_array().and_then(|a| a.first()).and_then(|e| e["game"].as_i64()) else { return Ok(None) };
+    let q = format!("fields videos.video_id,videos.name; where id = {game};");
+    let v = query_fallback(creds, "games", &q, &q).await?;
+    let videos = v.as_array().and_then(|a| a.first()).map(|g| parse_detail(g).videos).unwrap_or_default();
+    Ok(Some(videos))
+}
+
 /// Usa uma imagem do IGDB como capa ou fundo do jogo — só por ação explícita do usuário.
 #[tauri::command]
 pub fn igdb_apply_image(db: State<Db>, profile_id: i64, game_id: i64, kind: String, url: String) -> AppResult<()> {

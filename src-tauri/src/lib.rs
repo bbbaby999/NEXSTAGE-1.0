@@ -29,6 +29,7 @@ mod retro;
 mod steam;
 mod msstore;
 mod xbox;
+mod gamepass;
 mod sources;
 mod accounts;
 mod backup;
@@ -324,6 +325,14 @@ pub fn run() {
             xb::xbox_game,
             xb::xbox_installed,
             xb::xbox_import,
+            xb::xbox_not_installed,
+            xb::xbox_open_store,
+            gamepass::gamepass_overview,
+            gamepass::gamepass_refresh,
+            gamepass::gamepass_open,
+            gamepass::gamepass_detail,
+            gamepass::gamepass_add_to_library,
+            gamepass::gamepass_videos,
             st::steam_get_account,
             st::steam_login,
             st::steam_cancel_login,
@@ -342,6 +351,11 @@ pub fn run() {
             st::steam_news_overview,
             st::steam_news_refresh,
             st::steam_news_seen,
+            st::steam_game_news,
+            st::steam_dlc,
+            st::steam_dlc_refresh,
+            st::steam_dlc_new,
+            st::steam_open_store,
             st::steam_ach_overview,
             st::steam_ach_list,
             shot_toast::preview_achievement_toast,

@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent a
 import { createPortal } from "react-dom";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import Button from "./Button";
-import { GLYPHS, PS_SHAPES, type GlyphKey } from "./Glyph";
-import { useInputDevice, type Device } from "../lib/inputDevice";
+import { useInputDevice } from "../lib/inputDevice";
+import { ArrowKey, HudKey, VideoFullHud, FULL_SEEK, clock } from "./VideoHud";
 import { api } from "../lib/api";
 import { markLayerClosed, onPadButton } from "../lib/nav";
 import { t } from "../lib/i18n";
@@ -24,6 +24,9 @@ const ytThumb = (id: string, q = "hqdefault") => `https://img.youtube.com/vi/${i
  *
  * "Tela cheia" é uma camada do próprio app (como no visualizador de capturas), nunca a tela cheia
  * nativa do WebView — esta tirava a janela do app do modo tela cheia ao sair.
+ *
+ * Vídeos têm a barra de controles do app embaixo (reproduzir/pausar, ±10 s, linha do tempo, som, tela
+ * cheia). Na tela cheia de um vídeo, os únicos comandos são ← -5 s, → +5 s, □ som e ○ volta à página.
  */
 /** `auto=false`: sem troca automática (só navegação manual) — ex.: imagens de um mod. */
 export default function IgdbSlideshow({ slides, auto = true }: { slides: Slide[]; auto?: boolean }) {
@@ -41,6 +44,8 @@ export default function IgdbSlideshow({ slides, auto = true }: { slides: Slide[]
   const layer = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const time = useRef(0); // posição atual do vídeo (para continuar ao entrar/sair da tela cheia)
+  const [vtime, setVtime] = useState(0); // posição e duração para a linha do tempo
+  const [vdur, setVdur] = useState(0);
   const mutedRef = useRef(true);
   mutedRef.current = muted;
   const readyRef = useRef(false);
@@ -64,7 +69,7 @@ export default function IgdbSlideshow({ slides, auto = true }: { slides: Slide[]
   useEffect(() => { setIdx(0); setCycle((c) => c + 1); }, [sig]);
 
   // cada item novo: vídeo começa do zero e sem som
-  useEffect(() => { time.current = 0; setMuted(true); setFailed(false); }, [i, cycle]);
+  useEffect(() => { time.current = 0; setVtime(0); setVdur(0); setMuted(true); setFailed(false); }, [i, cycle]);
   // o player é recriado (novo item ou troca de tela cheia): aguarda ficar pronto de novo
   useEffect(() => { setReady(false); setPlaying(false); setVidPaused(false); }, [i, cycle, full]);
 
@@ -99,7 +104,8 @@ export default function IgdbSlideshow({ slides, auto = true }: { slides: Slide[]
       if (state === 0) { time.current = 0; if (!paused) next(); } // 0 = terminou
       if (m.event === "onError") setFailed(true);
       if (info && typeof info === "object") {
-        if (typeof info.currentTime === "number") time.current = info.currentTime;
+        if (typeof info.currentTime === "number") { time.current = info.currentTime; setVtime(info.currentTime); }
+        if (typeof info.duration === "number" && info.duration > 0) setVdur(info.duration);
         if (typeof info.muted === "boolean") setMuted(info.muted);
       }
     };
@@ -174,8 +180,8 @@ export default function IgdbSlideshow({ slides, auto = true }: { slides: Slide[]
         if (readyRef.current) { e.preventDefault(); muteRef.current(); }
         return;
       }
-      // Espaço / Enter / K: pausa ou retoma o vídeo
-      if ((e.key === " " || e.key === "Enter" || e.key === "k" || e.key === "K") && e.target === layer.current) {
+      // Espaço / K: pausa ou retoma o vídeo (✕ / A / Enter chegam como clique na camada)
+      if ((e.key === " " || e.key === "k" || e.key === "K") && e.target === layer.current) {
         e.preventDefault();
         if (readyRef.current && isVideoRef.current) playRef.current();
         return;
@@ -207,6 +213,14 @@ export default function IgdbSlideshow({ slides, auto = true }: { slides: Slide[]
     setMuted(!muted);
   };
   const togglePlay = () => { send(vidPaused ? "playVideo" : "pauseVideo"); setVidPaused(!vidPaused); };
+  const seekTo = (to: number) => {
+    const v = Math.max(0, vdur > 0 ? Math.min(vdur - 0.5, to) : to);
+    send("seekTo", [v, true]);
+    time.current = v;
+    setVtime(v);
+  };
+  const seekRef = useRef(seekTo);
+  seekRef.current = seekTo;
   const playRef = useRef(togglePlay);
   playRef.current = togglePlay;
   const muteRef = useRef(toggleMute);
@@ -220,7 +234,9 @@ export default function IgdbSlideshow({ slides, auto = true }: { slides: Slide[]
     const onNav = (e: Event) => {
       const all = document.querySelectorAll(".overlay");
       if (all[all.length - 1] !== layer.current) return;
-      go(i + (e as CustomEvent<number>).detail);
+      const d = (e as CustomEvent<number>).detail;
+      if (isVideoRef.current) { if (readyRef.current) seekRef.current(time.current + d * FULL_SEEK); }
+      else go(i + d);
     };
     window.addEventListener("nexstage:viewer", onNav);
     return () => window.removeEventListener("nexstage:viewer", onNav);
@@ -251,6 +267,19 @@ export default function IgdbSlideshow({ slides, auto = true }: { slides: Slide[]
       muteRef.current();
     });
   }, [isVideo, full]);
+
+  // △ / Y: abre a tela cheia com a mídia (ou a barra de controles do vídeo) em foco na página
+  useEffect(() => {
+    if (full) return;
+    return onPadButton((b, e) => {
+      if (b !== "y" || e.defaultPrevented) return;
+      const a = document.activeElement;
+      if (!a || !(a === stageEl.current || a.closest(".vid-ctl"))) return;
+      if (!box.current?.contains(a) || document.querySelector(".overlay")) return;
+      e.preventDefault();
+      fullRef.current(true);
+    });
+  }, [full]);
 
   if (!cur) return null;
   const label = cur.kind === "video" ? (cur.name || t("Vídeo")) : cur.kind === "artwork" ? t("Arte oficial") : t("Captura de tela");
@@ -285,8 +314,11 @@ export default function IgdbSlideshow({ slides, auto = true }: { slides: Slide[]
       ) : (
         <img key={`${cur.url}-${cycle}`} className={`igdb-pic ${reduced ? "" : "fade"}`} src={cur.url} alt="" />
       )}
-      {full ? (
-        // tela cheia: só a pílula com os comandos (glifos do controle em uso; clicáveis com o mouse)
+      {full && cur.kind === "video" ? (
+        <VideoFullHud device={device} time={vtime} dur={vdur} muted={muted} paused={vidPaused} ready={ready && !failed}
+          onPlay={togglePlay} onSeek={(d) => seekTo(time.current + d)} onMute={toggleMute} onClose={() => setFullscreen(false)} closeLabel={t("Fechar")} />
+      ) : full ? (
+        // tela cheia de imagem: só a pílula com os comandos (glifos do controle em uso; clicáveis com o mouse)
         <div className="igdb-hud" aria-label={t("Comandos")}>
           {n > 1 && (
             <>
@@ -317,7 +349,7 @@ export default function IgdbSlideshow({ slides, auto = true }: { slides: Slide[]
         // na página, com controle: a mesma pílula da tela cheia, visível quando a mídia está em foco
         <div className="igdb-hud inline" aria-label={t("Comandos")}>
           <button type="button" tabIndex={-1} onClick={() => setFullscreen(true)}>
-            <HudKey device={device} k="confirm" kb="Enter" />{t("Tela cheia")}
+            <HudKey device={device} k={cur.kind === "video" ? "y" : "confirm"} kb="Enter" />{t("Tela cheia")}
           </button>
           {n > 1 && (
             <>
@@ -370,6 +402,31 @@ export default function IgdbSlideshow({ slides, auto = true }: { slides: Slide[]
           )}
         </>
       ) : stage}
+      {!full && cur.kind === "video" && !failed && (
+        <div className="trl-bar vid-ctl" data-nav-group>
+          <button type="button" data-focus className="trl-btn" onClick={togglePlay} disabled={!ready}
+            aria-label={vidPaused ? t("Reproduzir") : t("Pausar")} title={vidPaused ? t("Reproduzir") : t("Pausar")}>
+            <CtlIcon d={vidPaused ? "M8 5.5v13l11-6.5z" : "M8 5v14M16 5v14"} />
+          </button>
+          <button type="button" data-focus className="trl-btn" onClick={() => seekTo(time.current - 10)} disabled={!ready} aria-label={t("Voltar {n} s", { n: 10 })} title={t("Voltar {n} s", { n: 10 })}>
+            <CtlIcon d="M11 7l-5 5 5 5M18 7l-5 5 5 5" />
+          </button>
+          <button type="button" data-focus className="trl-btn" onClick={() => seekTo(time.current + 10)} disabled={!ready} aria-label={t("Avançar {n} s", { n: 10 })} title={t("Avançar {n} s", { n: 10 })}>
+            <CtlIcon d="M13 7l5 5-5 5M6 7l5 5-5 5" />
+          </button>
+          {/* linha do tempo: só com o mouse (sem foco, para ← → passarem pelos botões) */}
+          <input type="range" tabIndex={-1} data-no-nav className="trl-seek" onPointerUp={(e) => e.currentTarget.blur()} min={0} max={Math.max(1, Math.floor(vdur))} step={1} value={Math.floor(vtime)}
+            onChange={(e) => seekTo(Number(e.currentTarget.value))} disabled={!ready} aria-label={t("Posição do vídeo")} />
+          <span className="trl-time">{clock(vtime)} / {clock(vdur)}</span>
+          <button type="button" data-focus className="trl-btn" onClick={toggleMute} disabled={!ready} aria-pressed={!muted}
+            aria-label={muted ? t("Ativar som") : t("Silenciar")} title={muted ? t("Ativar som") : t("Silenciar")}>
+            <CtlIcon d={muted ? "M4 9v6h4l5 4V5L8 9H4zM17 9l5 6M22 9l-5 6" : "M4 9v6h4l5 4V5L8 9H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"} />
+          </button>
+          <button type="button" data-focus className="trl-btn" onClick={() => setFullscreen(true)} aria-label={t("Tela cheia")} title={t("Tela cheia")}>
+            <CtlIcon d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+          </button>
+        </div>
+      )}
       <div className="row">
         <span className="muted">{label} · {i + 1}/{n}</span>
       </div>
@@ -386,22 +443,9 @@ export default function IgdbSlideshow({ slides, auto = true }: { slides: Slide[]
   );
 }
 
-/** Tecla da pílula de comandos: glifo do controle em uso (ícone no PlayStation) ou a tecla do teclado. */
-function HudKey({ device, k, kb }: { device: Device; k: GlyphKey; kb: string }) {
-  if (device === "keyboard") return <kbd>{kb}</kbd>;
-  const shape = device === "playstation" ? PS_SHAPES[k] : undefined;
+/** Ícone dos botões da barra de controles do vídeo. */
+function CtlIcon({ d }: { d: string }) {
   return (
-    <kbd className={shape ? "ps" : undefined}>
-      {shape ? <svg viewBox="0 0 16 16" aria-hidden="true">{shape}</svg> : GLYPHS[device][k]}
-    </kbd>
-  );
-}
-
-/** Anterior / próxima: só a seta do lado (vale para controle — analógico ou direcional — e teclado). */
-function ArrowKey({ dir }: { dir: "left" | "right" }) {
-  return (
-    <kbd className="ps arrow">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d={dir === "left" ? "M10 3.5L5.5 8l4.5 4.5" : "M6 3.5L10.5 8 6 12.5"} /></svg>
-    </kbd>
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
   );
 }

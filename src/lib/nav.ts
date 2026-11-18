@@ -19,12 +19,13 @@ import { idleSwallow } from "./idle";
 
 type Dir = "left" | "right" | "up" | "down";
 let lastMove = 0;
-export const SEL = "[data-focus]:not([disabled]), input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled])";
+// [data-no-nav]: campo só para o mouse, fora da navegação por controle/teclado (ex.: linha do tempo dos vídeos)
+export const SEL = "[data-focus]:not([disabled]), input:not([type=hidden]):not([disabled]):not([data-no-nav]), select:not([disabled]), textarea:not([disabled])";
 /**
  * Camadas que isolam a navegação (a mais recente no DOM vence): modal, menu lateral, lista de seleção,
  * teclado virtual, menu de contexto e Gameboot. Fonte única: padScroll e o foco entre páginas usam a mesma.
  */
-export const LAYER_SEL = ".overlay:not(.leaving), .sm-root:not(.leaving), .pick-root, .kb-root, .ctx-root, .gb-root";
+export const LAYER_SEL = ".overlay:not(.leaving), .sm-root:not(.leaving), .pick-root, .kb-root, .ctx-root, .gb-root, .trl-full";
 
 /** Troca de página em andamento: o foco inicial é do gerenciador de páginas (lib/pageFocus.ts). */
 let pagePending = 0;
@@ -212,12 +213,18 @@ export function moveFocus(dir: Dir, source: "pad" | "key" = "key") {
   const claim = new CustomEvent<Dir>("nexstage:direction", { detail: dir, cancelable: true });
   window.dispatchEvent(claim);
   if (claim.defaultPrevented) return;
-  // Visualizador de imagens: esquerda/direita trocam de imagem — só quando ele é a camada ativa.
-  // (Com um menu ou confirmação por cima, ex.: "Excluir captura", as setas navegam nos botões dela.)
+  // Visualizador de imagens — só quando ele é a camada ativa (com um menu ou confirmação por cima, ex.:
+  // "Excluir captura", as setas navegam nos botões dela):
+  // - capturas (data-viewer="vertical", ações no rodapé): cima avança e baixo volta a imagem; esquerda/direita
+  //   andam entre os botões do rodapé (movimento normal de foco);
+  // - demais (ex.: tela cheia do IGDB, sem botões): esquerda/direita trocam de imagem.
   const root = navRoot();
-  if ((dir === "left" || dir === "right") && root instanceof Element && root.matches("[data-viewer]")) {
-    window.dispatchEvent(new CustomEvent("nexstage:viewer", { detail: dir === "left" ? -1 : 1 }));
-    return;
+  if (root instanceof Element && root.matches("[data-viewer]")) {
+    const vertical = root.getAttribute("data-viewer") === "vertical";
+    if (vertical ? dir === "up" || dir === "down" : dir === "left" || dir === "right") {
+      window.dispatchEvent(new CustomEvent("nexstage:viewer", { detail: dir === "up" || dir === "right" ? 1 : -1 }));
+      return;
+    }
   }
   // Barra deslizante em foco: esquerda/direita (controle) ajustam o valor em vez de mover o foco.
   const act = document.activeElement;

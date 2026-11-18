@@ -1,4 +1,4 @@
-import { CSSProperties, useEffect, useState } from "react";
+import { CSSProperties, useEffect, useRef, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { pickOpen as openDialog } from "../lib/filePicker";
 import { useSession } from "../state/session";
@@ -27,6 +27,8 @@ import TimeToBeatBlock from "../components/TimeToBeatBlock";
 import AgeRatingBadge from "../components/AgeRatingBadge";
 import MetacriticPanel from "../components/MetacriticPanel";
 import SteamGamePanel from "../components/SteamGamePanel";
+import SteamDlcPanel from "../components/SteamDlcPanel";
+import SteamGameNews from "../components/SteamGameNews";
 import TrophyGamePanel from "../components/TrophyGamePanel";
 import XboxGamePanel from "../components/XboxGamePanel";
 import { isInstalled } from "../lib/steam";
@@ -59,14 +61,25 @@ export default function GameDetail({ gameId }: { gameId: number }) {
   const [wshot, setWshot] = useState(0);
   const [searching, setSearching] = useState(false);
   const [dlg, setDlg] = useState<null | "collections" | "edit" | "notes" | "hltb" | "shots">(null);
-  // abas da página: visão geral ou mods (Nexus Mods)
-  const [tab, setTab] = useState<"overview" | "mods">("overview");
-  // Controle: R2 abre a aba Mods e L2 volta para a Visão geral (só sem janela/lista/menu por cima)
+  // abas da página: visão geral, DLCs (jogos da Steam) e mods (Nexus Mods)
+  type Tab = "overview" | "dlc" | "mods";
+  const [tab, setTab] = useState<Tab>("overview");
+  const hasDlcTab = game?.steamAppId != null;
+  const tabs: Tab[] = hasDlcTab ? ["overview", "dlc", "mods"] : ["overview", "mods"];
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+  // jogo sem AppID da Steam (ou vínculo removido): a aba DLCs some e a página volta para a Visão geral
+  useEffect(() => { if (!hasDlcTab) setTab((cur) => (cur === "dlc" ? "overview" : cur)); }, [hasDlcTab]);
+  // Controle: R2 vai para a próxima aba e L2 para a anterior (só sem janela/lista/menu por cima)
   useEffect(() => onPadButton((b, e) => {
     if (e.defaultPrevented || (b !== "l2" && b !== "r2")) return;
     if (document.querySelector(".overlay, .pick-root, .kb-root, .sm-root:not(.leaving), .ctx-root")) return;
     e.preventDefault();
-    setTab(b === "r2" ? "mods" : "overview");
+    setTab((cur) => {
+      const l = tabsRef.current;
+      const i = Math.max(0, l.indexOf(cur));
+      return l[Math.min(l.length - 1, Math.max(0, i + (b === "r2" ? 1 : -1)))];
+    });
   }), []);
   const [hv, setHv] = useState({ main: "", extra: "", comp: "", all: "" });
   const [confirm, setConfirm] = useState(false);
@@ -244,14 +257,17 @@ export default function GameDetail({ gameId }: { gameId: number }) {
 
       <div className="dp-tabs" data-nav-group role="tablist" aria-label={t("Seções do jogo")}>
         <button data-focus type="button" role="tab" aria-selected={tab === "overview"} className={tab === "overview" ? "on" : ""} onClick={() => setTab("overview")}>{device !== "keyboard" && <Glyph k="l2" />}{t("Visão geral")}</button>
+        {hasDlcTab && <button data-focus type="button" role="tab" aria-selected={tab === "dlc"} className={tab === "dlc" ? "on" : ""} onClick={() => setTab("dlc")}>{t("DLCs")}</button>}
         <button data-focus type="button" role="tab" aria-selected={tab === "mods"} className={tab === "mods" ? "on" : ""} onClick={() => setTab("mods")}>{t("Mods")}{device !== "keyboard" && <Glyph k="r2" />}</button>
       </div>
 
-      {tab === "mods" ? <div className="dp-mods"><ModsPanel game={game} /></div> : (
+      {tab === "dlc" && hasDlcTab ? <div className="dp-mods"><SteamDlcPanel game={game} /></div> : tab === "mods" ? <div className="dp-mods"><ModsPanel game={game} /></div> : (
       <div className="dp-grid">
         <div className="dp-main" data-nav-group>
-          {/* IGDB: sempre o primeiro bloco da página do jogo */}
-          <IgdbPanel game={game} info={info} loaded={infoLoaded} term={term} onInfo={setInfo} onGameChanged={reload} />
+          {/* jogos vinculados à Steam: nota de atualização oficial mais recente, antes de tudo */}
+          {game.steamAppId !== null && <SteamGameNews key={game.steamAppId} game={game} />}
+          {/* IGDB: primeiro bloco da página (logo depois da última atualização, nos jogos da Steam) */}
+          <IgdbPanel game={game} info={info} loaded={infoLoaded} term={term} onInfo={setInfo} />
 
           {/* descrição em destaque; busca de dados/imagens e edição ficam no rodapé do bloco */}
           <Block title={t("Sobre o jogo")}>

@@ -135,6 +135,11 @@ fn packages() -> Vec<(String, String)> {
     vec![]
 }
 
+/// Famílias ("Nome_Editor", em minúsculas) de todos os pacotes instalados para este usuário.
+pub fn installed_families() -> std::collections::HashSet<String> {
+    packages().into_iter().filter_map(|(full, _)| family_of(&full)).map(|f| f.to_lowercase()).collect()
+}
+
 /// Pasta do pacote instalado deste AUMID (None = não instalado para este usuário).
 pub fn package_root(aumid: &str) -> Option<PathBuf> {
     let family = aumid.split('!').next()?.to_lowercase();
@@ -304,6 +309,16 @@ fn shortcut_from(parsing: &str, target: &str, title: String) -> Result<Shortcut,
 }
 
 /// Inicia o app pelo Explorer (como o menu Iniciar). Não devolve o processo do jogo.
+/// AUMID completo para iniciar. Jogo adicionado à biblioteca antes de ser instalado (pelo catálogo do Game
+/// Pass) fica gravado só com a família (`<família>!`): o id do app é procurado no pacote instalado.
+pub fn resolve_aumid(aumid: &str) -> Option<String> {
+    let (family, app) = aumid.split_once('!')?;
+    if !app.trim().is_empty() {
+        return Some(aumid.to_string());
+    }
+    installed_games().into_iter().find(|g| g.family.eq_ignore_ascii_case(family)).map(|g| g.aumid)
+}
+
 pub fn launch(aumid: &str) -> std::io::Result<()> {
     std::process::Command::new("explorer.exe").arg(format!("{PREFIX}{aumid}")).spawn().map(|_| ())
 }

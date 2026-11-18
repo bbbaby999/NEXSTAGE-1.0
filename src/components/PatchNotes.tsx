@@ -16,11 +16,11 @@ export default function PatchNotes({ onClose }: { onClose: () => void }) {
               <h3>{n.version}</h3>
               <span className="muted">{fmt(n.date)}{i === 0 ? t(" · versão atual") : ""}</span>
             </header>
-            {n.summary && <p className="muted">{n.summary}</p>}
+            {n.summary && <p className="muted">{t(n.summary)}</p>}
             {n.sections.map((s) => (
               <div key={s.type} className="note-sec">
                 <span className={`badge ${s.type}`}>{t(NOTE_LABEL[s.type])}</span>
-                <ul>{s.items.map((t) => <li key={t}>{t}</li>)}</ul>
+                <ul>{s.items.map((it) => <li key={it}>{t(it)}</li>)}</ul>
               </div>
             ))}
           </article>

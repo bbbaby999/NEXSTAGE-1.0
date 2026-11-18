@@ -278,6 +278,48 @@ pub fn steam_news_refresh(app: AppHandle, profile_id: i64, manual: bool) -> bool
     crate::steam::news::start(&app, profile_id, manual)
 }
 
+/// Nota de atualização oficial mais recente de um jogo (página do jogo; cache de 6 h, `refresh`: 15 min).
+#[tauri::command]
+pub async fn steam_game_news(db: State<'_, Db>, appid: i64, refresh: bool) -> AppResult<crate::steam::news::GameNews> {
+    if appid <= 0 {
+        return Err(AppError::Validation("AppID da Steam desconhecido.".into()));
+    }
+    crate::steam::news::game_news(&db, appid, refresh).await
+}
+
+// ---------- DLCs ----------
+
+/// DLCs de um jogo (aba "DLCs"): cache de 24 h; `refresh` consulta de novo a loja (mín. 5 min).
+#[tauri::command]
+pub async fn steam_dlc(db: State<'_, Db>, appid: i64, refresh: bool, lang: String) -> AppResult<crate::steam::dlc::DlcView> {
+    if appid <= 0 {
+        return Err(AppError::Validation("AppID da Steam desconhecido.".into()));
+    }
+    crate::steam::dlc::game_dlc(&db, appid, refresh, client::steam_lang(&lang)).await
+}
+
+/// Verifica em segundo plano se os jogos Steam do perfil ganharam DLC nova (cache de 24 h). Não bloqueia.
+#[tauri::command]
+pub fn steam_dlc_refresh(app: AppHandle, profile_id: i64, lang: String) -> bool {
+    crate::steam::dlc::start(&app, profile_id, client::steam_lang(&lang))
+}
+
+/// DLCs novas dos jogos Steam da biblioteca (Home; só cache).
+#[tauri::command(async)]
+pub fn steam_dlc_new(db: State<Db>, profile_id: i64) -> AppResult<Vec<crate::steam::dlc::NewDlc>> {
+    crate::steam::dlc::recent_new(&*db.conn()?, profile_id, 12)
+}
+
+/// Abre a página de um item (jogo ou DLC) na loja do cliente Steam (ou no navegador, sem o protocolo).
+#[tauri::command]
+pub fn steam_open_store(app: AppHandle, appid: i64) -> AppResult<()> {
+    if appid <= 0 {
+        return Err(AppError::Validation("AppID da Steam desconhecido.".into()));
+    }
+    let url = if local::protocol_available() { format!("steam://store/{appid}") } else { store::store_url(appid) };
+    app.opener().open_url(url, None::<&str>).map_err(|_| AppError::Other("Não foi possível abrir a Steam.".into()))
+}
+
 /// Guarda a última atualização já vista (indicação de "novo" na Home).
 #[tauri::command]
 pub fn steam_news_seen(db: State<Db>, profile_id: i64, gid: String) -> AppResult<()> {

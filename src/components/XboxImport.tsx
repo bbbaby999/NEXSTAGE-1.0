@@ -4,7 +4,7 @@ import Button from "./Button";
 import { api, errMsg } from "../lib/api";
 import { useSession } from "../state/session";
 import { t } from "../lib/i18n";
-import type { XboxInstalled } from "../types";
+import type { XboxInstalled, XboxNotInstalledList } from "../types";
 import { ImportSourceTabs, type ImportSource } from "./ImportSource";
 
 /**
@@ -22,12 +22,18 @@ export default function XboxImport({ onClose, onImported, onSource }: {
   const [list, setList] = useState<XboxInstalled[] | null>(null);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [missing, setMissing] = useState<XboxNotInstalledList | null>(null);
 
   useEffect(() => {
     api.xboxInstalled(p.id)
       .then((l) => { setList(l); setSel(new Set(l.filter((g) => !g.inLibrary).map((g) => g.aumid))); })
       .catch((e) => { toast(errMsg(e), "err"); setList([]); });
   }, [p.id, toast]);
+  // jogos de PC do histórico da conta que não estão instalados (só com conta Xbox conectada)
+  useEffect(() => { api.xboxNotInstalled(p.id).then(setMissing).catch(() => setMissing(null)); }, [p.id]);
+  const openStore = (pfn: string) => api.xboxOpenStore(pfn)
+    .then(() => toast(t("Página do jogo aberta na Microsoft Store. Depois de instalar, importe-o por aqui.")))
+    .catch((e) => toast(errMsg(e), "err"));
 
   const toggle = (a: string) => setSel((s) => { const n = new Set(s); if (n.has(a)) n.delete(a); else n.add(a); return n; });
 
@@ -62,6 +68,32 @@ export default function XboxImport({ onClose, onImported, onSource }: {
           </button>
         ))}
       </div>
+      {missing?.connected && (
+        <>
+          <h3 className="steam-h3">{t("Jogados no Xbox e não instalados neste PC")}</h3>
+          <p className="muted note">{t("Jogos de PC do histórico da sua conta Xbox (o Xbox não informa jogos comprados e nunca abertos). A instalação é feita pela Microsoft Store, inclusive os do Game Pass enquanto estiverem no catálogo.")}</p>
+          {missing.items.length === 0 && (
+            <p className="muted">{missing.pending > 0
+              ? t("Sincronize a conta Xbox em Configurações → Contas e plataformas para listar os jogos jogados no PC.")
+              : t("Todos os jogos de PC do seu histórico do Xbox já estão instalados.")}</p>
+          )}
+          {missing.items.length > 0 && (
+            <div className="steam-grid xni" data-nav-group>
+              {missing.items.map((g) => (
+                <button key={g.titleId} data-focus data-focus-key={`xni-${g.titleId}`} className="steam-card xbox-missing" onClick={() => openStore(g.pfn)}
+                  aria-label={t("{name}: abrir na Microsoft Store para instalar", { name: g.name })}>
+                  <div className="steam-cover">
+                    {g.image ? <img src={g.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.visibility = "hidden")} /> : null}
+                  </div>
+                  <strong>{g.name}</strong>
+                  <small>{t("Não instalado")}</small>
+                  <em className="steam-lib">{t("Instalar pela Microsoft Store")}</em>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
       <div className="row end">
         <span className="grow muted">{t("{n} selecionado(s)", { n: sel.size })}</span>
         <Button variant="ghost" onClick={onClose}>{t("Cancelar")}</Button>

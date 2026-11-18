@@ -15,7 +15,7 @@ type Hint = [GlyphKey[], string];
  */
 export default function ControlHints() {
   const device = useInputDevice();
-  const { profile, view, openGameId } = useSession();
+  const { profile, view, openGameId, openGamePass } = useSession();
   const [hints, setHints] = useState<Hint[] | null>(null);
   const pad = device !== "keyboard";
 
@@ -24,12 +24,13 @@ export default function ControlHints() {
     let raf = 0;
     const compute = (): Hint[] | null => {
       // camadas com dicas próprias (ou sem navegação): nada aqui
-      if (document.querySelector(".kb-root, .sm-root:not(.leaving), .gb-root, .viewer-full, .igdb-fs")) return null;
+      if (document.querySelector(".kb-root, .sm-root:not(.leaving), .gb-root, .viewer-full, .igdb-fs, .trl-full")) return null;
       if (document.querySelector(".pick-root, .ctx-root")) return [[["dpad"], tk("Mover")], [["confirm"], tk("Selecionar")], [["back"], tk("Fechar")]];
       // navegador de arquivos (pode abrir por cima de outra janela): Ⓑ sobe uma pasta (fecha em "Este computador"); ☰ confirma
       if (document.querySelector(".overlay:not(.leaving) .fp")) return [[["confirm"], tk("Abrir")], [["back"], tk("Pasta acima")], [["x"], tk("Favoritar pasta")], [["l1", "r1"], tk("Áreas")], [["l2", "r2"], tk("Página")], [["menu"], tk("Confirmar")]];
       const layer = document.querySelector<HTMLElement>(".overlay:not(.leaving)");
       if (layer) {
+        if (layer.matches("[data-viewer=\"vertical\"]")) return [[["dpad"], tk("↑ ↓ captura · ← → opções")], [["confirm"], tk("Selecionar")], [["back"], tk("Fechar")]];
         if (layer.matches("[data-viewer]")) return [[["dpad"], tk("Anterior / próxima")], [["back"], tk("Fechar")]];
         // Zerei!: formulário (L2/R2 ajustam o campo em foco ou mudam o status)
         if (layer.querySelector(".zr-edit") && !document.querySelector(".overlay:not(.leaving) .is-body")) {
@@ -50,7 +51,10 @@ export default function ControlHints() {
       const act = document.activeElement;
       if (act instanceof HTMLInputElement && act.type === "range") return [[["dpad"], tk("Ajustar")], pages, [["back"], tk("Voltar")]];
       if (!profile) return [[["dpad"], tk("Mover")], [["confirm"], tk("Selecionar")]];
-      if (openGameId !== null) return [[["confirm"], tk("Selecionar")], pages, [["back"], tk("Voltar")]];
+      // vídeo em foco (trailer do Game Pass ou vídeo do IGDB): △ / Y abre a tela cheia
+      const trl = act instanceof Element ? act.closest(".trl") : null;
+      if (act instanceof Element && ((trl && trl.querySelector(".trl-bar")) || act.closest(".vid-ctl, .igdb-stage[data-video]"))) return [[["confirm"], tk("Selecionar")], [["y"], tk("Tela cheia")], pages, [["back"], tk("Voltar")]];
+      if (openGameId !== null || openGamePass !== null) return [[["confirm"], tk("Selecionar")], pages, [["back"], tk("Voltar")]];
       switch (view) {
         case "home": return [[["confirm"], tk("Selecionar")], [["menu"], tk("Opções")], pages, [["back"], tk("Menu")]];
         case "stats": return [[["confirm"], tk("Selecionar")], [["l2", "r2"], tk("Abas")], pages, [["back"], tk("Voltar")]];
@@ -79,7 +83,7 @@ export default function ControlHints() {
     mo.observe(document.body, { childList: true, subtree: true });
     document.addEventListener("focusin", update);
     return () => { mo.disconnect(); document.removeEventListener("focusin", update); cancelAnimationFrame(raf); };
-  }, [pad, profile, view, openGameId]);
+  }, [pad, profile, view, openGameId, openGamePass]);
 
   // Reserva espaço no fim das páginas para as dicas não cobrirem o último item.
   const shown = pad && !!hints?.length;

@@ -443,6 +443,47 @@ export interface XboxGameData {
   fetchedAt: string | null; achievements: XboxAch[]; error: string | null;
 }
 export interface XboxInstalled { aumid: string; name: string; image: string | null; inLibrary: boolean }
+/** Jogo de PC já jogado na conta Xbox e não instalado neste PC (histórico; o Xbox não informa compras). */
+export interface XboxNotInstalled { titleId: string; name: string; image: string | null; pfn: string; lastPlayed: number | null; minutes: number | null }
+export interface XboxNotInstalledList { connected: boolean; items: XboxNotInstalled[]; pending: number }
+
+// ---------- Última atualização (página do jogo) ----------
+export interface SteamGameNewsItem { gid: string; title: string; author: string; date: number; contents: string; official: boolean; url: string }
+export interface SteamGameNews { appid: number; checkedAt: number | null; item: SteamGameNewsItem | null; localUpdated: number | null; error: string | null }
+
+// ---------- DLCs da Steam ----------
+export interface SteamDlcPrice { currency: string; initial: number; final: number; discount: number }
+export interface SteamDlcItem {
+  id: number; name: string; image: string | null; price: SteamDlcPrice | null;
+  /** epoch do lançamento (null = não informado) */
+  release: number | null;
+  installed: boolean; new: boolean; upcoming: boolean; firstSeen: number;
+}
+export interface SteamDlcView { appid: number; fetchedAt: number | null; items: SteamDlcItem[]; error: string | null }
+export interface SteamNewDlc extends SteamDlcItem { gameId: number; gameTitle: string; cover: string | null; appid: number }
+
+// ---------- Catálogo do PC Game Pass (Home, experimental) ----------
+export interface GamePassItem {
+  id: string; title: string; publisher: string | null; description: string | null; image: string | null; release: number | null;
+  /** Último dia da oferta no catálogo ("AAAA-MM-DD"); só vale como saída na lista "Saindo". */
+  leavesOn: string | null;
+}
+export type GamePassList = "coming" | "added" | "leaving";
+export interface GamePassShot { full: string; thumb: string }
+export interface GamePassDetail {
+  id: string; title: string; developer: string | null; publisher: string | null; description: string | null;
+  release: number | null; hero: string | null; poster: string | null; screenshots: GamePassShot[];
+  hasTrailer: boolean; categories: string[]; rating: number | null; ratingCount: number; size: number | null;
+  /** Recursos no PC (chaves estáveis: single, coop_online, xpa, cloud_saves, hdr...). */
+  features: string[]; ageRating: { system: string; value: string } | null; pfn: string | null; hasAddOns: boolean; leavesOn: string | null;
+  /** Trailers do Xbox que tocam no app (HLS). */
+  trailers: { title: string; hls: string; poster: string | null }[];
+}
+export interface GamePassDetailView { detail: GamePassDetail; fetchedAt: number; error: string | null; installed: boolean; aumid: string | null; inLibrary: boolean; libraryGameId: number | null }
+export interface GamePassOverview {
+  enabled: boolean; running: boolean; fetchedAt: number | null; error: string | null;
+  coming: GamePassItem[]; added: GamePassItem[]; leaving: GamePassItem[];
+}
 
 // ---------- Navegador de arquivos do app ----------
 export interface FsPlace { id: "desktop" | "documents" | "downloads" | "pictures" | "videos" | "music" | "home"; path: string }

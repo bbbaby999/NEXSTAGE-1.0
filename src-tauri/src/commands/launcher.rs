@@ -178,6 +178,9 @@ fn plan(db: &Db, profile_id: i64, game_id: i64) -> AppResult<Launch> {
         if crate::msstore::package_root(&a).is_none() {
             return Err(AppError::NotFound("Este jogo da Microsoft Store / Xbox não está instalado neste PC. Instale-o pelo app Xbox.".into()));
         }
+        // adicionado pelo catálogo do Game Pass antes de instalar: completa o AUMID pelo pacote instalado
+        let a = crate::msstore::resolve_aumid(&a)
+            .ok_or_else(|| AppError::NotFound("O jogo está instalado, mas o Windows ainda não registrou como iniciá-lo. Abra-o uma vez pelo app Xbox.".into()))?;
         return Ok(Launch::App(a));
     }
     if let Some(a) = appid {

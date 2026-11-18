@@ -14,6 +14,7 @@ import { t } from "../lib/i18n";
 
 export const itemSrc = (i: GalleryItem) => convertFileSrc(i.path);
 
+
 /**
  * Visualizador de capturas: imagem centralizada e proporcional (contain, sem cortar nem esticar),
  * ações em coluna vertical (alcançáveis por controle com cima/baixo), sem tela cheia.
@@ -138,7 +139,7 @@ export default function Viewer({ items, index, onIndex, onClose, onFavorite, onD
   ];
 
   return (
-    <div className="overlay viewer" data-viewer ref={ref} role="dialog" aria-modal="true"
+    <div className="overlay viewer" data-viewer="vertical" ref={ref} role="dialog" aria-modal="true"
       onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}>
       {/* com a tela cheia aberta, a interface normal fica inerte (o controle não "clica" no que está escondido) */}
       <div className="viewer-main" {...({ inert: full ? "" : undefined } as Record<string, unknown>)}>
@@ -174,10 +175,10 @@ export default function Viewer({ items, index, onIndex, onClose, onFavorite, onD
           {/* única informação na tela: atalhos de anterior / próxima / sair (clicáveis com o mouse) */}
           <div className="vf-hints">
             <button type="button" tabIndex={-1} disabled={atFirst} onClick={() => { onIndex(index - 1); play("move"); }} aria-label={t("Anterior")}>
-              <Icon d={ICON.prev} /><kbd>{device === "keyboard" ? "←" : GLYPHS[device].l1}</kbd>
+              <Icon d={ICON.prev} /><kbd>{device === "keyboard" ? "↓" : GLYPHS[device].l1}</kbd>
             </button>
             <button type="button" tabIndex={-1} disabled={atLast} onClick={() => { onIndex(index + 1); play("move"); }} aria-label={t("Próxima")}>
-              <kbd>{device === "keyboard" ? "→" : GLYPHS[device].r1}</kbd><Icon d={ICON.next} />
+              <kbd>{device === "keyboard" ? "↑" : GLYPHS[device].r1}</kbd><Icon d={ICON.next} />
             </button>
             <i aria-hidden="true" />
             <button type="button" tabIndex={-1} onClick={() => { play("back"); toggleFull.current(false); }} aria-label={t("Sair da tela cheia")}>

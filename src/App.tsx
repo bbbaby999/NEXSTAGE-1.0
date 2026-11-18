@@ -33,6 +33,7 @@ import ProfileSelect from "./features/ProfileSelect";
 import Home from "./features/Home";
 import Library from "./features/Library";
 import GameDetail from "./features/GameDetail";
+import GamePassDetail from "./features/GamePassDetail";
 import { loadControllers } from "./lib/controllers";
 import type { View } from "./types";
 import { t } from "./lib/i18n";
@@ -64,7 +65,7 @@ const preloadPages = () => { for (const load of Object.values(PAGES)) load().cat
 type Phase = "loading" | "boot" | "done";
 
 function Shell() {
-  const { profile, view, setView, returnTo, openGameId, setOpenGameId, toast } = useSession();
+  const { profile, view, setView, returnTo, openGameId, setOpenGameId, openGamePass, setOpenGamePass, toast } = useSession();
   const checkedUpdate = useRef(false);
   const [ingame, setIngame] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -202,10 +203,11 @@ function Shell() {
       if (["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName)) { t.blur(); return; }
       // Camadas por cima (modal, menu, lista de filtro, teclado virtual, menu de contexto) tratam o próprio
       // "voltar"; e um "voltar" repetido logo após uma delas fechar não leva a página para a Home.
-      if (document.querySelector(".overlay, .sm-root:not(.leaving), .pick-root, .kb-root, .ctx-root") || layerJustClosed()) return;
+      if (document.querySelector(".overlay, .sm-root:not(.leaving), .pick-root, .kb-root, .ctx-root, .trl-full") || layerJustClosed()) return;
       play("back");
       if (ingame) { api.closeOverlay(); return; }
       if (openGameId !== null) { setOpenGameId(null); return; }
+      if (openGamePass !== null) { setOpenGamePass(null); return; }
       if (returnTo && view !== returnTo.view) {
         // página aberta a partir de outra (ex.: Configurações → Central de Controles): volta para ela,
         // com o foco no item que a abriu
@@ -225,14 +227,16 @@ function Shell() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [profile, ingame, openGameId, view, returnTo, setOpenGameId, setView]);
+  }, [profile, ingame, openGameId, openGamePass, view, returnTo, setOpenGameId, setOpenGamePass, setView]);
 
   const go = (v: View) => { setView(v); setMenuOpen(false); };
   // Home: a área de conteúdo ocupa a altura toda (arte do jogo em tela cheia, destaque embaixo).
-  const homeMode = view === "home" && openGameId === null && !ingame;
+  const homeMode = view === "home" && openGameId === null && openGamePass === null && !ingame;
 
   const content = openGameId !== null ? (
     <GameDetail gameId={openGameId} />
+  ) : openGamePass !== null ? (
+    <GamePassDetail key={openGamePass.item.id} item={openGamePass.item} list={openGamePass.list} />
   ) : (
     <Suspense fallback={null}>
       {view === "home" && <Home />}
@@ -257,7 +261,7 @@ function Shell() {
         <TopBar />
         {ingame && <OverlayBar />}
         <main className="main">
-          <Transition id={openGameId !== null ? `g${openGameId}` : view}>{content}</Transition>
+          <Transition id={openGameId !== null ? `g${openGameId}` : openGamePass !== null ? `gp${openGamePass.item.id}` : view}>{content}</Transition>
         </main>
       </div>
       <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} onGo={go} />

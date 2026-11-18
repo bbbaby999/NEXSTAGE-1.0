@@ -249,15 +249,19 @@ html[data-motion="reduced"] .bg-layer,html[data-motion="reduced"] .dp-hero-img{t
 .ctx-item{display:flex;gap:var(--s3);align-items:center;padding:12px 14px;border-radius:var(--r-md);background:none;border:none;color:var(--text);font:inherit;text-align:left;cursor:pointer}
 .ctx-item:hover{background:rgba(var(--ar),.2)}
 .ctx-item.danger{color:#ff8da1}
-.viewer{display:grid;place-items:center;padding:var(--s5)}
-.viewer-main{display:flex;gap:var(--s6);align-items:center;justify-content:center;width:100%}
-.viewer-stage{flex:0 1 auto;display:flex;flex-direction:column;align-items:center;gap:var(--s3);min-width:0;padding:0}
-.viewer-stage img{max-width:min(72vw,1280px);max-height:64vh;width:auto;height:auto;object-fit:contain;border-radius:var(--r-md);box-shadow:var(--elev-3)}
-.viewer-caption{color:var(--text-dim);font-size:.9rem}
-.viewer-rail{display:flex;flex-direction:column;gap:var(--s3);align-items:stretch;min-width:15rem}
-.viewer-rail .btn{display:flex;gap:var(--s2);align-items:center;justify-content:center}
+/* Visualizador de capturas: imagem ocupando quase toda a tela e as ações numa faixa no rodapé */
+.viewer{display:flex;flex-direction:column;padding:var(--s5) var(--s5) var(--s4)}
+.viewer-main{display:flex;flex-direction:column;gap:var(--s4);align-items:center;justify-content:center;width:100%;height:100%;min-height:0}
+.viewer-stage{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--s3);width:100%;min-width:0;min-height:0;padding:0}
+/* a imagem ocupa todo o espaço que sobra acima da legenda e do rodapé (contain: sem cortar nem esticar) */
+.viewer-stage img{flex:1 1 0;min-height:0;width:100%;max-width:2400px;object-fit:contain;filter:drop-shadow(0 18px 36px rgba(0,0,0,.55))}
+.viewer-caption{flex:none;color:var(--text-dim);font-size:.9rem}
+.viewer-rail{flex:none;display:flex;flex-direction:row;flex-wrap:wrap;justify-content:center;gap:var(--s3);align-items:center;max-width:100%}
+.viewer-rail .btn{display:flex;gap:var(--s2);align-items:center;justify-content:center;white-space:nowrap}
 .viewer-rail .btn.fav-on{color:#ffd24a;border-color:rgba(255,210,74,.5)}
-@media (max-width:1000px){.viewer-main{flex-direction:column}.viewer-rail{flex-direction:row;flex-wrap:wrap;min-width:0}.viewer-stage img{max-width:92vw;max-height:52vh}}
+/* dicas do controle (fixas no canto inferior): o rodapé do visualizador fica acima delas */
+html.has-hints .viewer{padding-bottom:76px}
+@media (max-width:1000px){.viewer{padding:var(--s3) var(--s3) var(--s3)}.viewer-main{gap:var(--s3)}.viewer-rail{gap:var(--s2)}}
 
 /* ---------- Menu lateral: perfil ---------- */
 .sm-user{display:flex;gap:var(--s3);align-items:center;padding:10px 12px;margin-bottom:var(--s3);border-radius:var(--r-md);background:var(--glass);border:1px solid var(--glass-line);cursor:pointer;color:var(--text);text-align:left}

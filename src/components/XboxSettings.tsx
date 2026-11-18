@@ -29,12 +29,14 @@ export default function XboxSettings() {
   const [minutes, setMinutes] = useState(60);
   const [notify, setNotify] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [gamePass, setGamePass] = useState(true);
 
   const load = useCallback(() => api.xboxStatus(p.id).then(setSt).catch(() => {}), [p.id]);
   useEffect(() => {
     load();
     api.getAppSetting("xbox_sync_minutes").then((v) => setMinutes(v === null ? 60 : Number(v))).catch(() => {});
     api.getAppSetting("xbox_notify").then((v) => setNotify(v !== "0")).catch(() => {});
+    api.getAppSetting("gamepass_home").then((v) => setGamePass(v !== "0")).catch(() => {});
   }, [load]);
   // sincronização automática concluída em segundo plano
   useXboxSynced(p.id, load);
@@ -170,6 +172,13 @@ export default function XboxSettings() {
       <div className="setting">
         <div><strong>{t("Jogos do Xbox instalados neste PC")}</strong><small>{t("Adiciona de uma vez os jogos do app Xbox / Microsoft Store instalados, sem procurar atalho por atalho. Não precisa de conta.")}</small></div>
         <div className="row"><Button onClick={() => setImporting(true)}>{t("Importar jogos")}</Button></div>
+      </div>
+
+      <div className="setting">
+        <div><strong>{t("Catálogo do PC Game Pass na Home (experimental)")}</strong><small>{t("Mostra na Home os jogos que estão chegando, os adicionados recentemente e os que vão sair do PC Game Pass. Usa o catálogo público do site do Xbox, sem conta e sem dados seus; como não é um serviço oficial para outros apps, pode parar de funcionar sem aviso — nesse caso a seção some da Home.")}</small></div>
+        <div className="row">
+          <Button variant={gamePass ? "primary" : "default"} onClick={() => { const v = !gamePass; setGamePass(v); api.setAppSetting("gamepass_home", v ? "1" : "0").catch(() => {}); }}>{gamePass ? t("Ligado") : t("Desligado")}</Button>
+        </div>
       </div>
 
       {acc && (

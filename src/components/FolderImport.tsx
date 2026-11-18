@@ -110,7 +110,7 @@ export default function FolderImport({ profileId, folder, folderId, onClose, onI
           <div className="scan-table" role="table">
             <div className="scan-row head" role="row"><span /><span>{t("Nome")}</span><span>{t("Formato")}</span><span>{t("Plataforma")}</span><span>{t("Emulador")}</span><span>{t("Status")}</span></div>
             {items.map((i) => (
-              <ScanRow key={i.path} item={i} on={sel.has(i.path)} onToggle={() => toggle(i.path)} emus={emus}
+              <ScanRow key={i.path} item={i} on={sel.has(i.path)} onToggle={() => toggle(i.path)}
                 chosen={choice.get(i.path) ?? null} onChoose={(v) => setChoice(new Map(choice).set(i.path, v))} emuName={emuName} />
             ))}
           </div>
@@ -144,8 +144,8 @@ export default function FolderImport({ profileId, folder, folderId, onClose, onI
   );
 }
 
-function ScanRow({ item: i, on, onToggle, emus, chosen, onChoose, emuName }: {
-  item: ScanItem; on: boolean; onToggle: () => void; emus: Emulator[]; chosen: number | null; onChoose: (v: number | null) => void; emuName: (id: number | null) => string;
+function ScanRow({ item: i, on, onToggle, chosen, onChoose, emuName }: {
+  item: ScanItem; on: boolean; onToggle: () => void; chosen: number | null; onChoose: (v: number | null) => void; emuName: (id: number | null) => string;
 }) {
   const can = selectable(i);
   return (

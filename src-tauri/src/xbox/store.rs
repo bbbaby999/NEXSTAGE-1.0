@@ -49,6 +49,21 @@ CREATE TABLE IF NOT EXISTS xbox_achievements (
 );
 "#;
 
+/// Colunas adicionadas depois (bancos antigos): tipo do título ("Game", "App"...) e aparelhos em que ele
+/// foi jogado ("PC", "XboxSeries"...), usados para listar jogos de PC jogados e não instalados.
+pub fn migrate(conn: &Connection) -> AppResult<()> {
+    if !crate::db::has_column(conn, "xbox_titles", "kind")? {
+        conn.execute_batch("ALTER TABLE xbox_titles ADD COLUMN kind TEXT; ALTER TABLE xbox_titles ADD COLUMN devices TEXT;")?;
+    }
+    Ok(())
+}
+
+/// Aparelhos informados pelo Xbox para o título, separados por vírgula (None = não informado).
+fn devices_of(t: &Value) -> Option<String> {
+    let d: Vec<String> = t["devices"].as_array()?.iter().filter_map(|v| v.as_str()).map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+    Some(d.join(","))
+}
+
 /// Grava o histórico de jogos (mantém a data da última busca de conquistas de cada um).
 pub fn store_titles(conn: &Connection, profile_id: i64, titles: &[Value], minutes: &std::collections::HashMap<String, i64>) -> AppResult<usize> {
     let mut n = 0;
@@ -63,15 +78,16 @@ pub fn store_titles(conn: &Connection, profile_id: i64, titles: &[Value], minute
         let image = Some(text(&t["displayImage"])).filter(|s| s.starts_with("https://"));
         let last = parse_epoch(&text(&t["titleHistory"]["lastTimePlayed"])).filter(|e| *e > 0);
         conn.execute(
-            "INSERT INTO xbox_titles(profile_id,title_id,pfn,name,image,ach_current,ach_total,gs_current,gs_total,last_played,minutes,updated_at)
-             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,datetime('now'))
+            "INSERT INTO xbox_titles(profile_id,title_id,pfn,name,image,ach_current,ach_total,gs_current,gs_total,last_played,minutes,kind,devices,updated_at)
+             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,datetime('now'))
              ON CONFLICT(profile_id,title_id) DO UPDATE SET pfn=excluded.pfn,name=excluded.name,image=excluded.image,
                ach_current=excluded.ach_current,ach_total=excluded.ach_total,gs_current=excluded.gs_current,gs_total=excluded.gs_total,
-               last_played=excluded.last_played,minutes=COALESCE(excluded.minutes,xbox_titles.minutes),updated_at=excluded.updated_at",
+               last_played=excluded.last_played,minutes=COALESCE(excluded.minutes,xbox_titles.minutes),
+               kind=COALESCE(excluded.kind,xbox_titles.kind),devices=COALESCE(excluded.devices,xbox_titles.devices),updated_at=excluded.updated_at",
             params![
                 profile_id, id, Some(text(&t["pfn"])).filter(|s| !s.is_empty()), name, image,
                 num(&a["currentAchievements"]), num(&a["totalAchievements"]), num(&a["currentGamerscore"]), num(&a["totalGamerscore"]),
-                last, minutes.get(&id),
+                last, minutes.get(&id), Some(text(&t["type"])).filter(|s| !s.is_empty()), devices_of(t),
             ],
         )?;
         n += 1;
@@ -315,6 +331,48 @@ pub fn game_data(conn: &Connection, profile_id: i64, title_id: &str) -> AppResul
     Ok(Some(d))
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotInstalled {
+    pub title_id: String,
+    pub name: String,
+    pub image: Option<String>,
+    pub pfn: String,
+    pub last_played: Option<i64>,
+    pub minutes: Option<i64>,
+}
+
+/// Jogos de PC do histórico da conta que não estão instalados neste PC (`installed` = famílias de pacote
+/// instaladas, em minúsculas). Só títulos do tipo jogo, com pacote da Microsoft Store e jogados no PC.
+/// Devolve também quantos títulos ainda não têm os aparelhos gravados (cache anterior a esta versão:
+/// a próxima sincronização completa).
+pub fn not_installed(conn: &Connection, profile_id: i64, installed: &std::collections::HashSet<String>) -> AppResult<(Vec<NotInstalled>, usize)> {
+    let mut st = conn.prepare(
+        "SELECT title_id, name, image, pfn, last_played, minutes, devices FROM xbox_titles
+         WHERE profile_id=?1 AND pfn IS NOT NULL AND trim(pfn)<>'' AND COALESCE(kind,'Game')='Game'
+         ORDER BY COALESCE(last_played,0) DESC, name",
+    )?;
+    let rows = st.query_map([profile_id], |r| {
+        Ok((
+            NotInstalled { title_id: r.get(0)?, name: r.get(1)?, image: r.get(2)?, pfn: r.get(3)?, last_played: r.get(4)?, minutes: r.get(5)? },
+            r.get::<_, Option<String>>(6)?,
+        ))
+    })?;
+    let (mut out, mut unknown) = (Vec::new(), 0usize);
+    for row in rows {
+        let (t, devices) = row?;
+        if installed.contains(&t.pfn.to_lowercase()) {
+            continue;
+        }
+        match devices {
+            None => unknown += 1,
+            Some(d) if d.split(',').any(|x| x.trim().eq_ignore_ascii_case("PC")) => out.push(t),
+            Some(_) => {} // jogado só no console
+        }
+    }
+    Ok((out, unknown))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -334,6 +392,7 @@ mod tests {
         )
         .unwrap();
         c.execute_batch(SCHEMA).unwrap();
+        migrate(&c).unwrap();
         c
     }
 
@@ -353,6 +412,28 @@ mod tests {
         let d = game_data(&c, 1, "111").unwrap().unwrap();
         assert_eq!((d.minutes, d.ach_current, d.gs_total), (Some(600), Some(3), Some(1000)));
         assert!(achievements_stale(&c, 1, "111", 30).unwrap());
+    }
+
+    #[test]
+    fn played_on_pc_but_not_installed() {
+        let c = db();
+        let titles = vec![
+            json!({ "titleId": "1", "name": "Instalado", "type": "Game", "pfn": "A.Jogo_8wekyb3d8bbwe", "devices": ["PC"] }),
+            json!({ "titleId": "2", "name": "Só no PC", "type": "Game", "pfn": "B.Jogo_8wekyb3d8bbwe", "devices": ["PC", "XboxSeries"],
+                    "titleHistory": { "lastTimePlayed": "2026-11-01T10:00:00.000Z" } }),
+            json!({ "titleId": "3", "name": "Só console", "type": "Game", "pfn": "C.Jogo_8wekyb3d8bbwe", "devices": ["XboxSeries"] }),
+            json!({ "titleId": "4", "name": "App", "type": "App", "pfn": "D.App_8wekyb3d8bbwe", "devices": ["PC"] }),
+            json!({ "titleId": "5", "name": "Sem pacote", "type": "Game", "devices": ["PC"] }),
+            json!({ "titleId": "6", "name": "Cache antigo", "type": "Game", "pfn": "F.Jogo_8wekyb3d8bbwe" }),
+        ];
+        store_titles(&c, 1, &titles, &HashMap::new()).unwrap();
+        let installed = std::collections::HashSet::from([String::from("a.jogo_8wekyb3d8bbwe")]);
+        let (list, unknown) = not_installed(&c, 1, &installed).unwrap();
+        assert_eq!(list.iter().map(|t| t.title_id.as_str()).collect::<Vec<_>>(), vec!["2"]);
+        assert_eq!(unknown, 1, "sem aparelhos informados: aguarda a sincronização");
+        // nova sincronização sem o campo não apaga os aparelhos já gravados
+        store_titles(&c, 1, &[json!({ "titleId": "2", "name": "Só no PC", "pfn": "B.Jogo_8wekyb3d8bbwe" })], &HashMap::new()).unwrap();
+        assert_eq!(not_installed(&c, 1, &installed).unwrap().0.len(), 1);
     }
 
     #[test]

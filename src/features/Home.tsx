@@ -17,6 +17,8 @@ import { CaptureMenu, ICON, MenuAction } from "../components/CaptureUi";
 import { itemSrc } from "../components/Viewer";
 import HomeUniverse from "../components/stats/HomeUniverse";
 import SteamUpdates from "../components/SteamUpdates";
+import SteamNewDlcs from "../components/SteamNewDlcs";
+import GamePassHome from "../components/GamePassHome";
 import type { Game, GalleryItem } from "../types";
 import { t } from "../lib/i18n";
 import { steamHero } from "../lib/steam";
@@ -204,6 +206,10 @@ export default function Home() {
       <HomeUniverse />
       {/* notas de atualização oficiais dos jogos Steam (carrega sozinha, sem atrasar a Home) */}
       <SteamUpdates />
+      {/* DLCs novas dos jogos Steam (só aparece quando há alguma) */}
+      <SteamNewDlcs />
+      {/* catálogo do PC Game Pass (experimental; some se o catálogo estiver indisponível ou desligado) */}
+      <GamePassHome />
       {menu && <CaptureMenu actions={actions} onClose={() => setMenu(false)} />}
     </div>
   );

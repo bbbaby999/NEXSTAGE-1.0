@@ -13,8 +13,10 @@
 //! - `vdf`: leitor de arquivos da Steam · `store`: cache e importação · `sync`: sincronização
 //! - `watch`: aviso de conquista quase em tempo real
 //! - `news`: notas de atualização oficiais dos jogos (seção "Últimas atualizações" da Home)
+//! - `dlc`: DLCs de cada jogo (lista pública da loja, instaladas pelo manifesto local) e aviso de DLC nova
 
 pub mod client;
+pub mod dlc;
 pub mod local;
 pub mod news;
 pub mod openid;

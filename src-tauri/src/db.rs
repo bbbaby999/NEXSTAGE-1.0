@@ -26,8 +26,12 @@ impl Db {
         // Steam: cache da conta, vínculos com a biblioteca e conquistas.
         tx.execute_batch(crate::steam::store::SCHEMA)?;
         tx.execute_batch(crate::steam::news::SCHEMA)?;
+        tx.execute_batch(crate::steam::dlc::SCHEMA)?;
         // Xbox: histórico de jogos e conquistas da conta.
         tx.execute_batch(crate::xbox::store::SCHEMA)?;
+        crate::xbox::store::migrate(&tx)?;
+        // Catálogo do PC Game Pass (Home, experimental): só cache.
+        tx.execute_batch(crate::gamepass::SCHEMA)?;
         // Central de fontes de dados (IGDB, HowLongToBeat, Nexus Mods).
         tx.execute_batch(crate::sources::SCHEMA)?;
         // Zerei!: acompanhamento de jogos (independente da biblioteca). Só cria tabelas novas.
@@ -218,7 +222,7 @@ CREATE TABLE IF NOT EXISTS library_folders (
 CREATE INDEX IF NOT EXISTS idx_play_sessions_profile ON play_sessions(profile_id, started_at);
 "#;
 
-fn has_column(conn: &Connection, table: &str, col: &str) -> AppResult<bool> {
+pub(crate) fn has_column(conn: &Connection, table: &str, col: &str) -> AppResult<bool> {
     let mut st = conn.prepare(&format!("PRAGMA table_info({table})"))?;
     let names = st
         .query_map([], |r| r.get::<_, String>(1))?
