@@ -9,6 +9,7 @@ import { LAYER_SEL } from "../lib/nav";
 import { play } from "../lib/sound";
 import { currentLang, t, tk } from "../lib/i18n";
 import type { FsEntry, FsListing, FsPlaces } from "../types";
+import { ALL_FORMATS } from "../data/emulatorPresets";
 
 /* =====================================================================================================
  * Navegador de arquivos do NEXSTAGE (substitui o seletor do Windows; ver lib/filePicker.ts).
@@ -18,7 +19,9 @@ import type { FsEntry, FsListing, FsPlaces } from "../types";
  * nome ao salvar, Cancelar/confirmar).
  *
  * Controle: direcional move · Ⓐ abre a pasta / escolhe o arquivo · Ⓑ pasta acima (em "Este computador",
- * fecha) · Ⓧ/▢ favorita a pasta em foco (ou a atual) · L1/R1 lateral ↔ conteúdo · L2/R2 página · ☰ confirma.
+ * fecha; segurado, cancela de uma vez) · Ⓧ/▢ favorita a pasta em foco (ou a atual) · Ⓨ/△ vai aos botões do
+ * rodapé (Cancelar / Selecionar esta pasta) e volta · L1/R1 lateral ↔ conteúdo · L2/R2 página · ☰ confirma.
+ * O rodapé é um painel à parte: pelo direcional só se chega a ele saindo da última linha da lista, por isso Ⓨ.
  * Cada tela (purpose) lembra a última pasta aberta; as favoritas aparecem no Acesso rápido.
  * Teclado: Backspace = pasta acima; Esc igual ao Ⓑ.
  * ===================================================================================================== */
@@ -90,7 +93,7 @@ const ICON_PATH: Record<IconKind, string> = {
 function Icon({ k }: { k: IconKind }) {
   return <svg className={`fp-ico fp-ico-${k}`} viewBox="0 0 24 24" aria-hidden="true"><path d={ICON_PATH[k]} /></svg>;
 }
-const DISC_EXTS = new Set(["iso", "bin", "cue", "chd", "cso", "nsp", "xci", "nup", "pkg", "vpk", "img", "gcm", "rvz", "wbfs"]);
+const DISC_EXTS = new Set<string>([...ALL_FORMATS, "cso", "img"]);
 const EXE_EXTS = new Set(["exe", "bat", "cmd", "lnk"]);
 const iconFor = (e: FsEntry): IconKind => (e.dir ? "folder" : IMAGE_EXTS.includes(e.ext) ? "image" : EXE_EXTS.has(e.ext) ? "exe" : DISC_EXTS.has(e.ext) ? "disc" : "file");
 
@@ -144,9 +147,10 @@ function FilePicker({ req }: { req: PickRequest }) {
   const { opts, mode } = req;
   const dirMode = !!opts.directory && mode === "open";
   const multiple = !!opts.multiple && mode === "open" && !dirMode;
+  const browse = !!opts.browse && mode === "open";
   const filters = opts.filters?.length ? opts.filters : [{ name: t("Todos os arquivos"), extensions: ["*"] }];
   const imagesOnly = filters[0].extensions.every((x) => IMAGE_EXTS.includes(x.toLowerCase()));
-  const title = opts.title ?? (dirMode ? t("Escolha uma pasta") : mode === "save" ? t("Salvar como") : multiple ? t("Escolha os arquivos") : t("Escolha um arquivo"));
+  const title = opts.title ?? (browse ? t("Explorar pasta") : dirMode ? t("Escolha uma pasta") : mode === "save" ? t("Salvar como") : multiple ? t("Escolha os arquivos") : t("Escolha um arquivo"));
 
   const [places, setPlaces] = useState<FsPlaces | null>(null);
   const [path, setPath] = useState<string | null>(null); // null = decidindo a pasta inicial
@@ -292,7 +296,7 @@ function FilePicker({ req }: { req: PickRequest }) {
   };
 
   async function confirm() {
-    if (path === null) return;
+    if (path === null || browse) return;
     if (dirMode) { if (path) done([path]); return; }
     if (mode === "save") {
       const target = saveTarget();
@@ -313,6 +317,7 @@ function FilePicker({ req }: { req: PickRequest }) {
 
   function activate(e: FsEntry) {
     if (e.dir) { go(e.path); return; }
+    if (browse) return; // só navegação: arquivos não são escolhidos nem abertos
     if (mode === "save") { setName(e.name); setOverwrite(null); return; }
     if (multiple) { setSelected((s) => (s.includes(e.path) ? s.filter((x) => x !== e.path) : [...s, e.path])); return; }
     done([e.path]);
@@ -339,10 +344,14 @@ function FilePicker({ req }: { req: PickRequest }) {
     const layers = document.querySelectorAll(LAYER_SEL);
     return !!ov && layers[layers.length - 1] === ov;
   };
-  const focusArea = (area: "side" | "main") => {
+  const focusArea = (area: "side" | "main" | "foot") => {
     const root = rootRef.current;
     if (!root) return;
-    if (area === "main") {
+    if (area === "foot") {
+      // botão principal do rodapé (Selecionar esta pasta / Salvar / Abrir), senão Cancelar/Fechar
+      const btns = Array.from(root.querySelectorAll<HTMLElement>(".fp-actions button:not([disabled])"));
+      (btns[btns.length - 1] ?? null)?.focus();
+    } else if (area === "main") {
       const main = mainRef.current;
       const el = (lastMain.current ? main?.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(lastMain.current)}"]`) : null) ?? main?.querySelector<HTMLElement>("[data-focus]");
       el?.focus();
@@ -388,6 +397,11 @@ function FilePicker({ req }: { req: PickRequest }) {
       const b = (ev as CustomEvent<string>).detail;
       const h = handlers.current;
       if (b === "x") { const target = h.favTarget(); if (target) h.toggleFav(target); }
+      else if (b === "y") {
+        // Ⓨ/△: alterna entre o conteúdo e os botões do rodapé
+        const inFoot = document.activeElement instanceof Element && !!document.activeElement.closest(".fp-foot");
+        h.focusArea(inFoot ? "main" : "foot");
+      }
       else if (b === "l1") h.focusArea("side");
       else if (b === "r1") h.focusArea("main");
       else if (b === "l2") h.page(-1);
@@ -396,9 +410,21 @@ function FilePicker({ req }: { req: PickRequest }) {
       else return;
       ev.preventDefault();
     };
+    // segurar Ⓑ/○: cancela de uma vez (o toque só sobe uma pasta)
+    const onBackHold = (ev: Event) => {
+      if (!topmost()) return;
+      ev.preventDefault();
+      play("back");
+      handlers.current.cancel();
+    };
     window.addEventListener("keydown", onKey, true);
     window.addEventListener("nexstage:button", onBtn);
-    return () => { window.removeEventListener("keydown", onKey, true); window.removeEventListener("nexstage:button", onBtn); };
+    window.addEventListener("nexstage:back-hold", onBackHold);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("nexstage:button", onBtn);
+      window.removeEventListener("nexstage:back-hold", onBackHold);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -447,7 +473,7 @@ function FilePicker({ req }: { req: PickRequest }) {
             </div>
           )}
           <button type="button" data-focus className="fp-tool wide" onClick={() => setTyping(here)}>{t("Digitar caminho")}</button>
-          <button type="button" data-focus className={`fp-tool fav ${here && isFav(here) ? "on" : ""}`} disabled={!here} aria-pressed={!!here && isFav(here)}
+          <button type="button" data-focus className={`fp-tool fp-fav-tool ${here && isFav(here) ? "on" : ""}`} disabled={!here} aria-pressed={!!here && isFav(here)}
             onClick={() => toggleFav(here)} title={here && isFav(here) ? t("Remover dos favoritos") : t("Favoritar pasta")}>
             <Icon k="star" />{here && isFav(here) ? t("Favorita") : t("Favoritar")}</button>
           <button type="button" data-focus className={`fp-tool ${showHidden ? "on" : ""}`} aria-pressed={showHidden} onClick={() => setShowHidden((v) => !v)}>{t("Ocultos")}</button>
@@ -497,7 +523,7 @@ function FilePicker({ req }: { req: PickRequest }) {
                   <h4>{t("Favoritas")}</h4>
                   <div className="fp-drives">
                     {favs.map((f) => (
-                      <button key={f} type="button" data-focus data-focus-key={f} className="fp-drive place fav" onClick={() => go(f)}>
+                      <button key={f} type="button" data-focus data-focus-key={f} className="fp-drive place fp-fav" onClick={() => go(f)}>
                         <Icon k="star" /><span className="fp-drive-text"><b>{baseOf(f)}</b><small>{f}</small></span>
                       </button>
                     ))}
@@ -553,12 +579,12 @@ function FilePicker({ req }: { req: PickRequest }) {
           )}
           <span className="fp-status">
             {overwrite ? t("“{name}” já existe. Salvar de novo para substituir.", { name: baseOf(overwrite) })
-              : dirMode ? (here ? here : t("Escolha uma unidade ou pasta."))
+              : dirMode || browse ? (here ? here : t("Escolha uma unidade ou pasta."))
               : multiple ? (selected.length ? t("{n} selecionado(s)", { n: selected.length }) : t("Selecione os arquivos e confirme."))
               : ""}
           </span>
           <div className="fp-actions">
-            <Button variant="ghost" onClick={cancel}>{t("Cancelar")}</Button>
+            <Button variant={browse ? "primary" : "ghost"} onClick={cancel}>{browse ? t("Fechar") : t("Cancelar")}</Button>
             {(dirMode || mode === "save" || multiple) && (
               <Button variant={overwrite ? "danger" : "primary"} disabled={!canConfirm} onClick={confirm}>{overwrite ? t("Substituir") : confirmLabel}</Button>
             )}

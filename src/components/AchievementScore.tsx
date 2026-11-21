@@ -38,6 +38,7 @@ export default function AchievementScore({ score }: { score: ProfileScore | null
     ["Steam", score.steam, t("{n} jogo(s) 100%", { n: score.steam.completed })],
     ["RetroAchievements", score.ra, t("{n} jogo(s) completo(s)", { n: score.ra.completed })],
     [t("Troféus"), score.trophies, t("{n} platina(s)", { n: score.trophies.completed })],
+    ["NexStage", score.nexstage, t("{n} jogo(s) 100%", { n: score.nexstage.completed })],
   ];
   return (
     <div className="score-panel">

@@ -5,7 +5,10 @@
 //!   o tamanho vem do cabeçalho "PS-X EXE" (+ 2048 do próprio cabeçalho).
 //! - PlayStation 2: nome do executável (SYSTEM.CNF → BOOT2) + conteúdo (tamanho do diretório).
 //! - PSP: PSP_GAME\PARAM.SFO + PSP_GAME\SYSDIR\EBOOT.BIN (sem nomes).
-//! - NES: arquivo inteiro sem o cabeçalho iNES de 16 bytes; SNES: sem o cabeçalho de copiadora de 512 bytes.
+//! - NES: arquivo inteiro sem o cabeçalho iNES de 16 bytes; SNES: sem o cabeçalho de copiadora de 512 bytes;
+//!   Game Boy, Game Boy Color, Game Boy Advance e Mega Drive: arquivo inteiro.
+//! - Nintendo 64: arquivo inteiro convertido para a ordem big-endian (.z64) — .v64 troca os bytes de cada
+//!   par, .n64 inverte cada palavra de 4 bytes.
 //!
 //! A leitura do ISO 9660 reaproveita `crate::detect` (a mesma usada para identificar a plataforma na
 //! importação), tanto para .iso (setores de 2048) quanto para .bin/.cue brutos (2352).
@@ -21,6 +24,11 @@ pub const PS2: i64 = 21;
 pub const PSP: i64 = 41;
 pub const NES: i64 = 7;
 pub const SNES: i64 = 3;
+pub const GBA: i64 = 5;
+pub const MEGA_DRIVE: i64 = 1;
+pub const N64: i64 = 2;
+pub const GB: i64 = 4;
+pub const GBC: i64 = 6;
 
 /// Plataforma oficial do NEXSTAGE → ID do console no RetroAchievements (`None` = sem suporte no RA).
 pub fn console_for_platform(platform: &str) -> Option<i64> {
@@ -30,6 +38,11 @@ pub fn console_for_platform(platform: &str) -> Option<i64> {
         "PSP" => Some(PSP),
         "Nintendinho" => Some(NES),
         "Super Nintendo" => Some(SNES),
+        "Game Boy Advance" => Some(GBA),
+        "Game Boy" => Some(GB),
+        "Game Boy Color" => Some(GBC),
+        "Mega Drive" => Some(MEGA_DRIVE),
+        "Nintendo 64" => Some(N64),
         _ => None,
     }
 }
@@ -54,7 +67,8 @@ pub fn hash_file(console: i64, path: &Path) -> Result<String, String> {
         PS1 => hash_psx(&mut r),
         PS2 => hash_ps2(&mut r),
         PSP => hash_psp(&mut r),
-        NES | SNES => hash_cart(console, &mut r),
+        NES | SNES | GBA | GB | GBC | MEGA_DRIVE => hash_cart(console, &mut r),
+        N64 => hash_n64(&mut r),
         _ => Err("Console sem suporte a hash no NEXSTAGE.".into()),
     }
 }
@@ -180,6 +194,30 @@ fn hash_psp<R: Read + Seek>(r: &mut R) -> Result<String, String> {
 
 // ---------------------------------------------------------------- cartuchos
 
+/// Nintendo 64: reordena para big-endian (.z64) pelo início do cabeçalho e calcula o md5.
+fn hash_n64<R: Read + Seek>(r: &mut R) -> Result<String, String> {
+    let size = r.seek(std::io::SeekFrom::End(0)).map_err(|_| "Arquivo ilegível.")?;
+    if size < 0x40 || size > 128 * 1024 * 1024 {
+        return Err("Tamanho de ROM inesperado para o console.".into());
+    }
+    r.seek(std::io::SeekFrom::Start(0)).map_err(|_| "Arquivo ilegível.")?;
+    let mut data = Vec::with_capacity(size as usize);
+    r.read_to_end(&mut data).map_err(|_| "Erro ao ler a ROM.")?;
+    n64_to_big_endian(&mut data);
+    let mut md5 = Md5::new();
+    md5.update(&data);
+    Ok(md5.hex())
+}
+
+/// .z64 (80 37 12 40) fica como está; .v64 (37 80 40 12) troca bytes em pares; .n64 (40 12 37 80) inverte palavras.
+fn n64_to_big_endian(data: &mut [u8]) {
+    match data.get(..4) {
+        Some([0x37, 0x80, ..]) => data.chunks_exact_mut(2).for_each(|c| c.swap(0, 1)),
+        Some([0x40, 0x12, ..]) => data.chunks_exact_mut(4).for_each(|c| c.reverse()),
+        _ => {}
+    }
+}
+
 fn hash_cart<R: Read + Seek>(console: i64, r: &mut R) -> Result<String, String> {
     let size = r.seek(std::io::SeekFrom::End(0)).map_err(|_| "Arquivo ilegível.")?;
     if size == 0 || size > 64 * 1024 * 1024 {
@@ -190,7 +228,7 @@ fn hash_cart<R: Read + Seek>(console: i64, r: &mut R) -> Result<String, String> 
             Some(h) if h == b"NES\x1a" => 16,
             _ => 0,
         },
-        _ if size % 8192 == 512 => 512,
+        SNES if size % 8192 == 512 => 512,
         _ => 0,
     };
     r.seek(std::io::SeekFrom::Start(skip)).map_err(|_| "Arquivo ilegível.")?;
@@ -361,5 +399,23 @@ mod tests {
         assert_eq!(console_for_platform("PSP"), Some(PSP));
         assert_eq!(console_for_platform("Playstation 3"), None);
         assert_eq!(console_for_platform("PC"), None);
+    }
+}
+
+#[cfg(test)]
+mod n64_tests {
+    use super::*;
+
+    #[test]
+    fn n64_byte_orders_hash_the_same() {
+        let z64: Vec<u8> = [0x80u8, 0x37, 0x12, 0x40, 1, 2, 3, 4, 5, 6, 7, 8].iter().copied().cycle().take(0x80).collect();
+        let v64: Vec<u8> = z64.chunks(2).flat_map(|c| [c[1], c[0]]).collect();
+        let n64: Vec<u8> = z64.chunks(4).flat_map(|c| [c[3], c[2], c[1], c[0]]).collect();
+        let h = |d: Vec<u8>| hash_n64(&mut std::io::Cursor::new(d)).unwrap();
+        let expected = h(z64.clone());
+        assert_eq!(h(v64), expected);
+        assert_eq!(h(n64), expected);
+        assert_eq!(console_for_platform("N64"), Some(N64));
+        assert_eq!(console_for_platform("Sega Genesis"), Some(MEGA_DRIVE));
     }
 }

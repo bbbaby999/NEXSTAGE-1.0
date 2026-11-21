@@ -7,6 +7,10 @@
 //! Limitação conhecida: jogos cujo executável é apenas um "stub" que abre outro
 //! processo e encerra (alguns launchers) terão tempo de jogo subestimado.
 //!
+//! Jogos integrados ao NexStage (`source = 'nexstage'`): antes de iniciar, o Game Bridge abre uma sessão
+//! local e passa as credenciais ao processo do jogo por variáveis de ambiente (ver `bridge`). Sem sessão
+//! (falha ou jogo comum), o jogo abre normalmente.
+//!
 //! Jogos da Steam (importados ou vinculados a um AppID e instalados) são SEMPRE iniciados pelo cliente
 //! oficial (`steam://run/<appid>`): a Steam autentica, atualiza e executa, e o overlay da Steam e os
 //! anti-cheats funcionam normalmente. O NEXSTAGE não abre, monitora, injeta nem encerra esses processos
@@ -164,6 +168,11 @@ fn plan(db: &Db, profile_id: i64, game_id: i64) -> AppResult<Launch> {
     let (appid, steam_only, store_app) = {
         let conn = db.conn()?;
         super::games::ensure_owned(&conn, profile_id, game_id)?;
+        // jogo integrado ainda não instalado (ou pasta movida/apagada) neste PC
+        let exe_now: String = conn.query_row("SELECT executable_path FROM games WHERE id=?1", [game_id], |r| r.get(0)).unwrap_or_default();
+        if crate::integrated::library_source_is_integrated(&conn, game_id) && (exe_now.trim().is_empty() || !Path::new(&exe_now).is_file()) {
+            return Err(AppError::NotFound("Este jogo integrado não está instalado neste PC. Use Instalar ou Localizar instalação na página do jogo.".into()));
+        }
         let only: bool = conn
             .query_row("SELECT source='steam' AND trim(executable_path)='' FROM games WHERE id=?1", [game_id], |r| r.get(0))
             .unwrap_or(false);
@@ -248,9 +257,20 @@ pub fn launch_game(app: AppHandle, db: State<Db>, profile_id: i64, game_id: i64)
     if let Some(dir) = path.parent() {
         cmd.current_dir(dir);
     }
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| AppError::Other(format!("Falha ao iniciar o jogo: {e}")))?;
+    // jogo integrado: sessão do Game Bridge (variáveis de ambiente para o processo do jogo)
+    let bridge = crate::bridge::for_game(&app, profile_id, game_id);
+    if let Some(b) = &bridge {
+        cmd.envs(b.env.iter().map(|(k, v)| (k.as_str(), v.as_str())));
+    }
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => {
+            if let Some(b) = &bridge {
+                crate::bridge::end(&app, &b.session);
+            }
+            return Err(AppError::Other(format!("Falha ao iniciar o jogo: {e}")));
+        }
+    };
     let started = Instant::now();
     // Só marca como "iniciado" quando o processo realmente subiu (define a ordem da Home).
     if let Ok(conn) = db.conn() {
@@ -268,6 +288,9 @@ pub fn launch_game(app: AppHandle, db: State<Db>, profile_id: i64, game_id: i64)
     std::thread::spawn(move || {
         let _ = child.wait();
         end_session(&app, profile_id, game_id, started.elapsed().as_secs() as i64);
+        if let Some(b) = bridge {
+            crate::bridge::end(&app, &b.session);
+        }
     });
 
     Ok(())

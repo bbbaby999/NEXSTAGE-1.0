@@ -27,6 +27,8 @@ import TimeToBeatBlock from "../components/TimeToBeatBlock";
 import AgeRatingBadge from "../components/AgeRatingBadge";
 import MetacriticPanel from "../components/MetacriticPanel";
 import SteamGamePanel from "../components/SteamGamePanel";
+import NexStageGamePanel, { jobLabel, useIntegrated } from "../components/NexStageGamePanel";
+import { NEX_TABS, NexAchievementsTab, NexNewsTab, NexOverview, NexSlotsTab, NexStatsTab, type NexTab } from "./NexStagePage";
 import SteamDlcPanel from "../components/SteamDlcPanel";
 import SteamGameNews from "../components/SteamGameNews";
 import TrophyGamePanel from "../components/TrophyGamePanel";
@@ -62,10 +64,12 @@ export default function GameDetail({ gameId }: { gameId: number }) {
   const [searching, setSearching] = useState(false);
   const [dlg, setDlg] = useState<null | "collections" | "edit" | "notes" | "hltb" | "shots">(null);
   // abas da página: visão geral, DLCs (jogos da Steam) e mods (Nexus Mods)
-  type Tab = "overview" | "dlc" | "mods";
+  type Tab = "overview" | "dlc" | "mods" | NexTab;
   const [tab, setTab] = useState<Tab>("overview");
   const hasDlcTab = game?.steamAppId != null;
-  const tabs: Tab[] = hasDlcTab ? ["overview", "dlc", "mods"] : ["overview", "mods"];
+  // jogos oficiais do NexStage: página especial com abas próprias (no lugar de DLCs/Mods)
+  const nex = game?.source === "nexstage";
+  const tabs: Tab[] = nex ? NEX_TABS.map(([k]) => k) : hasDlcTab ? ["overview", "dlc", "mods"] : ["overview", "mods"];
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
   // jogo sem AppID da Steam (ou vínculo removido): a aba DLCs some e a página volta para a Visão geral
@@ -135,6 +139,8 @@ export default function GameDetail({ gameId }: { gameId: number }) {
   ]);
   // mesma cor de destaque (tirada da capa) do selo de plataforma do jogo em destaque da Home
   const accent = useAccent(game?.cover);
+  // jogo oficial integrado ao NexStage: instalado/localizado ou não (botão principal e bloco NexStage)
+  const integrated = useIntegrated(game);
 
   if (!game) return null;
 
@@ -205,7 +211,7 @@ export default function GameDetail({ gameId }: { gameId: number }) {
   }
 
   return (
-    <div className="dp">
+    <div className={`dp ${nex ? "nx-theme" : ""}`}>
       <header className="dp-hero" data-parallax>
         {heroSrc ? (
           <img className="dp-hero-img" src={heroSrc} alt="" decoding="async"
@@ -219,6 +225,7 @@ export default function GameDetail({ gameId }: { gameId: number }) {
           <span className="plat-tag" style={accent ? ({ "--game-rgb": accent } as CSSProperties) : undefined}>{game.platform}</span>
           {genreList.slice(0, 3).map((g) => <span key={g}>{t(g)}</span>)}
           {genreList.length > 3 && <span className="dp-more-genres" title={genreList.slice(3).map((g) => t(g)).join(", ")}>+{genreList.length - 3}</span>}
+          {game.source === "nexstage" && <span className="nx-chip-tag" title={t("Jogo oficial integrado ao NexStage")}>NexStage</span>}
           {game.steamAppId !== null && <span className="steam-chip-tag" title={t("Vinculado à Steam")}>Steam</span>}
           {game.raGameId !== null && <span className="ra-chip-tag" title={t("Compatível com RetroAchievements")}><TrophyIcon size={12} /> RA</span>}
         </div>
@@ -239,7 +246,11 @@ export default function GameDetail({ gameId }: { gameId: number }) {
             ) : <h1>{game.title}</h1>}
             {/* Jogar/Instalar em destaque · Favoritar · Mais opções (Zerado, Capturas, Coleções, Editar, Remover) */}
             <div className="dp-actions">
-              {needInstall ? (
+              {integrated.gameId && integrated.st?.job ? (
+                <Button variant="primary" className="dp-play stage-play" disabled>{jobLabel(integrated.st.job)}</Button>
+              ) : integrated.gameId && !game.installed ? (
+                <Button variant="primary" className="dp-play stage-play" onClick={() => run(async () => { await api.integratedInstall(integrated.gameId!); integrated.reload(); })}>{t("Instalar")}</Button>
+              ) : needInstall ? (
                 <Button variant="primary" className="dp-play stage-play" onClick={install} disabled={steamSt!.install === "installing"}>
                   {steamSt!.install === "installing" ? t("Instalando na Steam…") : t("Instalar")}</Button>
               ) : (
@@ -256,21 +267,35 @@ export default function GameDetail({ gameId }: { gameId: number }) {
       </header>
 
       <div className="dp-tabs" data-nav-group role="tablist" aria-label={t("Seções do jogo")}>
+        {nex ? NEX_TABS.map(([k, label], i) => (
+          <button key={k} data-focus type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
+            {i === 0 && device !== "keyboard" && <Glyph k="l2" />}{t(label)}{i === NEX_TABS.length - 1 && device !== "keyboard" && <Glyph k="r2" />}
+          </button>
+        )) : <>
         <button data-focus type="button" role="tab" aria-selected={tab === "overview"} className={tab === "overview" ? "on" : ""} onClick={() => setTab("overview")}>{device !== "keyboard" && <Glyph k="l2" />}{t("Visão geral")}</button>
         {hasDlcTab && <button data-focus type="button" role="tab" aria-selected={tab === "dlc"} className={tab === "dlc" ? "on" : ""} onClick={() => setTab("dlc")}>{t("DLCs")}</button>}
         <button data-focus type="button" role="tab" aria-selected={tab === "mods"} className={tab === "mods" ? "on" : ""} onClick={() => setTab("mods")}>{t("Mods")}{device !== "keyboard" && <Glyph k="r2" />}</button>
+        </>}
       </div>
 
-      {tab === "dlc" && hasDlcTab ? <div className="dp-mods"><SteamDlcPanel game={game} /></div> : tab === "mods" ? <div className="dp-mods"><ModsPanel game={game} /></div> : (
+      {nex && tab !== "overview" && integrated.gameId ? (
+        <div className="dp-mods nx-tab">
+          {tab === "achievements" && <NexAchievementsTab gameId={integrated.gameId} />}
+          {tab === "stats" && <NexStatsTab gameId={integrated.gameId} />}
+          {tab === "slots" && <NexSlotsTab gameId={integrated.gameId} />}
+          {tab === "news" && <NexNewsTab gameId={integrated.gameId} status={integrated.st} />}
+        </div>
+      ) : tab === "dlc" && hasDlcTab ? <div className="dp-mods"><SteamDlcPanel game={game} /></div> : tab === "mods" ? <div className="dp-mods"><ModsPanel game={game} /></div> : (
       <div className="dp-grid">
         <div className="dp-main" data-nav-group>
           {/* jogos vinculados à Steam: nota de atualização oficial mais recente, antes de tudo */}
           {game.steamAppId !== null && <SteamGameNews key={game.steamAppId} game={game} />}
           {/* IGDB: primeiro bloco da página (logo depois da última atualização, nos jogos da Steam) */}
-          <IgdbPanel game={game} info={info} loaded={infoLoaded} term={term} onInfo={setInfo} />
+          {nex && integrated.gameId && <NexOverview gameId={integrated.gameId} status={integrated.st} />}
+          {!nex && <IgdbPanel game={game} info={info} loaded={infoLoaded} term={term} onInfo={setInfo} />}
 
           {/* descrição em destaque; busca de dados/imagens e edição ficam no rodapé do bloco */}
-          <Block title={t("Sobre o jogo")}>
+          {!nex && <Block title={t("Sobre o jogo")}>
             <p className="desc">{info?.description || t("Descrição não encontrada.")}</p>
             <div className="dp-tools">
               <div className="row dp-search">
@@ -286,7 +311,7 @@ export default function GameDetail({ gameId }: { gameId: number }) {
                 )}
               </div>
             </div>
-          </Block>
+          </Block>}
 
           {/* sem capturas (Steam ou internet), o bloco não aparece — nenhuma mensagem de "não encontrado" */}
           {(shots.length > 0 || web.length > 0) && (
@@ -361,6 +386,7 @@ export default function GameDetail({ gameId }: { gameId: number }) {
           {/* nota do Metacritic: a primeira coisa da coluna */}
           <MetacriticPanel game={game} info={info} loaded={infoLoaded} term={term} onInfo={setInfo} />
 
+          {game.source === "nexstage" && <NexStageGamePanel key={integrated.st?.installDir ?? ""} game={game} onChanged={() => { integrated.reload(); reload(); }} />}
           {game.steamAppId !== null && <SteamGamePanel game={game} status={steamSt} onInstall={install} onChanged={reload} />}
           <XboxGamePanel game={game} />
           <RaGamePanel game={game} onChanged={reload} />

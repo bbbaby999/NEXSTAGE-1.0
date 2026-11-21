@@ -40,6 +40,8 @@ impl Db {
         crate::commands::zerei::migrate(&tx)?;
         // Logos automáticas (SteamGridDB): jogos já tentados.
         tx.execute_batch(crate::commands::logos::SCHEMA)?;
+        // Game Bridge (jogos integrados): sessões, conquistas, estatísticas. Só cria tabelas novas.
+        tx.execute_batch(crate::bridge::store::SCHEMA)?;
         // Esquema 2 = com Zerei!. Versões anteriores do NEXSTAGE recusam restaurar backups com esquema
         // mais novo — sem isso, a limpeza de imagens delas apagaria as capas do Zerei! (que não conhecem).
         let v: i64 = tx.query_row("PRAGMA user_version", [], |r| r.get(0))?;
@@ -289,6 +291,15 @@ fn migrate(conn: &Connection) -> AppResult<()> {
                 conn.execute("UPDATE emulators SET args=?1, fullscreen=?2 WHERE id=?3", rusqlite::params![stripped, on, id])?;
             }
         }
+    }
+    // Atualização dos emuladores: fonte (NULL = automática pelo emulador reconhecido, "-" = desligada,
+    // senão "dono/repositório" ou URL) e a versão instalada pelo NEXSTAGE (rótulo + chave do pacote).
+    if !has_column(conn, "emulators", "update_source")? {
+        conn.execute_batch(
+            "ALTER TABLE emulators ADD COLUMN update_source TEXT;
+             ALTER TABLE emulators ADD COLUMN update_version TEXT;
+             ALTER TABLE emulators ADD COLUMN update_key TEXT;",
+        )?;
     }
     // RetroAchievements: a conta usa a tabela reservada `platform_accounts` (uma por perfil), com a chave
     // cifrada (DPAPI), o último perfil sincronizado e o estado da sincronização.

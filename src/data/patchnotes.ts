@@ -21,6 +21,32 @@ export const NOTE_LABEL: Record<NoteType, string> = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "1.3.2",
+    date: "2026-11-21",
+    summary: tk("Emuladores prontos para baixar e atualizar pelo app, 11 novas plataformas (GameCube, Wii, Nintendo 64, Mega Drive e mais) e o primeiro jogo integrado ao NexStage."),
+    sections: [
+      { type: "new", items: [
+        tk("Jogos integrados ao NexStage: o Tomb Survivors aparece na biblioteca, instala e atualiza pelo app e tem página própria com conquistas e estatísticas."),
+        tk("Emuladores: cartões prontos de 19 emuladores para baixar e instalar pelo app (você escolhe a pasta) ou localizar uma instalação que já existe. “Procurar no PC” encontra os que você já tem."),
+        tk("Atualização dos emuladores: aviso de versão nova e botão Atualizar em cada emulador, com a opção de atualizar automaticamente (com o emulador fechado). Configurações, BIOS e saves são mantidos."),
+        tk("Novas plataformas: GameCube, Wii, Wii U, Nintendo DS, Nintendo 3DS, Game Boy, Game Boy Color, Game Boy Advance, Nintendo 64, Dreamcast e Mega Drive, com os formatos de arquivo de cada uma."),
+        tk("Novos emuladores sugeridos: Dolphin, Cemu, melonDS, mGBA, Azahar, Flycast, Snes9x, Mesen, RMG e ares. Lichii e Eden também podem ser baixados pelo app."),
+        tk("Editar emulador: abra a pasta de instalação no navegador de arquivos do app (ou no Explorador do Windows) e mova a pasta para outro lugar."),
+      ] },
+      { type: "improve", items: [
+        tk("Importação: reconhece discos de GameCube e Wii (inclusive .rvz, .wia e .gcz), as faixas citadas em arquivos .gdi e cartuchos de Mega Drive salvos como .bin."),
+        tk("RetroAchievements: vínculo com jogos de Game Boy, Game Boy Color, Game Boy Advance, Nintendo 64 e Mega Drive."),
+        tk("“Iniciar jogos em tela cheia” funciona também nos novos emuladores."),
+        tk("Tela de emuladores: filtro Instalados / Não instalados."),
+        tk("Ao instalar ou mover um emulador para um lugar onde já existe uma pasta com o mesmo nome, o app pergunta se quer substituí-la (a pasta antiga vai para a Lixeira)."),
+      ] },
+      { type: "fix", items: [
+        tk("Navegador de arquivos: com o controle, △ leva aos botões Cancelar e Selecionar esta pasta, que antes eram difíceis de alcançar; segurar ○ cancela de uma vez."),
+        tk("Navegador de arquivos: as pastas favoritas apareciam empilhadas no canto superior direito na página “Este computador”."),
+      ] },
+    ],
+  },
+  {
     version: "1.3.1",
     date: "2026-11-18",
     summary: tk("PC Game Pass na Home com página própria para cada jogo e trailers, DLCs e notas de atualização dos jogos da Steam, jogos do Xbox não instalados e controles de vídeo do próprio app."),

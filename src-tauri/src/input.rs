@@ -274,11 +274,16 @@ pub struct Tracker {
     bnext: [Option<Instant>; 9],
     /// Confirmar segurado: quando vira "confirm_hold" (uma vez por toque) — ver `HOLD_CONFIRM`.
     hold_at: Option<Instant>,
+    /// Voltar segurado: quando vira "back_hold" (uma vez por toque) — ver `HOLD_BACK`.
+    back_at: Option<Instant>,
 }
 
 /// Segurar "confirmar" por este tempo dispara `confirm_hold` (ex.: abrir a seleção de vários no Zerei!).
 /// Soltar dispara `confirm_up`: a interface decide entre clique e "segurar" nos itens que aceitam os dois.
 const HOLD_CONFIRM: Duration = Duration::from_millis(500);
+/// Segurar "voltar" por este tempo dispara `back_hold` (ex.: cancelar o navegador de arquivos de uma vez,
+/// em vez de subir pasta por pasta). O toque normal continua disparando "back" ao apertar.
+const HOLD_BACK: Duration = Duration::from_millis(600);
 
 const DIRS: [&str; 4] = ["left", "right", "up", "down"];
 const REPEAT_DELAY: Duration = Duration::from_millis(380);
@@ -327,11 +332,23 @@ impl Tracker {
                     self.hold_at = None;
                 }
             }
+            // voltar: segurou → "back_hold" (uma vez por toque)
+            if i == 1 {
+                if down && self.prev & bit != 0 && self.back_at.is_some_and(|t| now >= t) {
+                    out.push("back_hold");
+                    self.back_at = None;
+                } else if !down {
+                    self.back_at = None;
+                }
+            }
             if down && self.prev & bit == 0 {
                 out.push(action);
                 self.bnext[i] = Some(now + REPEAT_DELAY);
                 if i == 0 {
                     self.hold_at = Some(now + HOLD_CONFIRM);
+                }
+                if i == 1 {
+                    self.back_at = Some(now + HOLD_BACK);
                 }
             } else if down && repeat && REPEATABLE.contains(&i) && self.bnext[i].is_some_and(|t| now >= t) {
                 out.push(action);
@@ -1111,10 +1128,17 @@ mod tests {
         assert!(t.update_with(&RawPad::default(), &DEFAULT_MAP, at(500), true).is_empty());
         assert_eq!(t.update_with(&a, &DEFAULT_MAP, at(600), true), ["confirm"]);
         assert_eq!(t.update_with(&a, &DEFAULT_MAP, at(980), true), ["confirm"]);
-        // voltar nunca repete
+        // voltar nunca repete; segurado avisa uma vez ("back_hold")
         let mut t = Tracker::default();
         assert_eq!(t.update_with(&b, &DEFAULT_MAP, at(0), true), ["back"]);
-        assert!(t.update_with(&b, &DEFAULT_MAP, at(2000), true).is_empty());
+        assert!(t.update_with(&b, &DEFAULT_MAP, at(300), true).is_empty());
+        assert_eq!(t.update_with(&b, &DEFAULT_MAP, at(2000), true), ["back_hold"]);
+        assert!(t.update_with(&b, &DEFAULT_MAP, at(2600), true).is_empty());
+        // toque curto: só "back"
+        assert!(t.update_with(&RawPad::default(), &DEFAULT_MAP, at(2700), true).is_empty());
+        assert_eq!(t.update_with(&b, &DEFAULT_MAP, at(3000), true), ["back"]);
+        assert!(t.update_with(&RawPad::default(), &DEFAULT_MAP, at(3200), true).is_empty());
+        assert!(t.update_with(&b, &DEFAULT_MAP, at(3300), true) == ["back"]);
         // sem repetição (resto do app): um disparo por toque
         let mut t = Tracker::default();
         assert_eq!(t.update_with(&a, &DEFAULT_MAP, at(0), false), ["confirm"]);

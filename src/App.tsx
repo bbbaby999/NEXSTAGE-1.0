@@ -121,6 +121,21 @@ function Shell() {
     return () => { cancelled = true; un?.(); };
   }, [toast]);
 
+  // Jogos integrados ao NexStage: instalação concluída/falhou e versão nova (em qualquer tela do app).
+  useEffect(() => {
+    let cancelled = false;
+    const uns: (() => void)[] = [];
+    const on = <T,>(ev: string, f: (p: T) => void) => listen<T>(ev, (e) => f(e.payload)).then((u) => (cancelled ? u() : uns.push(u)));
+    on<{ name: string; version: string }>("integrated-installed", (p) => toast(t("{name} {v} instalado. Bom jogo!", { name: p.name, v: p.version })));
+    on<{ name: string; version: string }>("integrated-update-available", (p) => toast(t("Nova versão de {name}: {v}. Abra a página do jogo para atualizar.", { name: p.name, v: p.version })));
+    on<{ message: string }>("integrated-error", (p) => toast(p.message, "err"));
+    // Emuladores cadastrados: versão nova encontrada / instalada sozinha (atualização automática).
+    on<{ name: string; version: string }>("emulator-update-available", (p) => toast(t("Nova versão de {name}: {v}. Atualize em Emuladores.", { name: p.name, v: p.version })));
+    on<{ name: string; version: string }>("emulator-update-installed", (p) => toast(t("{name} atualizado para {v}.", { name: p.name, v: p.version })));
+    on<{ name: string; message: string }>("emulator-update-failed", (p) => toast(t("Não foi possível atualizar {name}: {msg}", { name: p.name, msg: t(p.message) }), "err"));
+    return () => { cancelled = true; uns.forEach((u) => u()); };
+  }, [toast]);
+
   // Patch Notes: abre sozinho na primeira abertura após uma atualização (se a opção estiver ligada).
   useEffect(() => {
     if (phase !== "done") return;

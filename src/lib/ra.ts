@@ -5,7 +5,7 @@ import { currentLang, t, tk } from "./i18n";
 import type { RaAchievement, RaSyncReport } from "../types";
 
 /** Plataformas do NEXSTAGE com suporte no RetroAchievements (mesma tabela do backend: retro/hash.rs). */
-export const RA_PLATFORMS = ["Playstation 1", "Playstation 2", "PSP", "Super Nintendo", "Nintendinho"];
+export const RA_PLATFORMS = ["Playstation 1", "Playstation 2", "PSP", "Super Nintendo", "Nintendinho", "Game Boy Advance", "Game Boy", "Game Boy Color", "Nintendo 64", "Mega Drive"];
 export const raSupported = (platform: string) => RA_PLATFORMS.includes(platform);
 
 export const RA_SITE = "https://retroachievements.org";

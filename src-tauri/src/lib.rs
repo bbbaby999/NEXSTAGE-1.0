@@ -8,7 +8,11 @@
 //! - `commands::*`: comandos expostos ao frontend
 
 mod commands;
+mod bridge;
+mod integrated;
 mod emu_fullscreen;
+mod emu_update;
+mod emu_catalog;
 mod trophies;
 mod score;
 mod detect;
@@ -82,6 +86,17 @@ pub fn run() {
             app.manage(db);
             app.manage(overlay::Runtime::default());
             app.manage(scan::ScanState::default());
+            // Game Bridge: sessões dos jogos integrados (servidor local só existe enquanto o jogo roda).
+            app.manage(bridge::Bridge::default());
+            app.manage(integrated::Installs::default());
+            // Jogos oficiais integrados (Tomb Survivors): cadastro idempotente.
+            if let Ok(conn) = app.state::<db::Db>().conn() {
+                let _ = integrated::seed(&conn);
+            }
+            integrated::spawn_startup_check(app.handle().clone());
+            // Emuladores cadastrados: procura versão nova (e instala sozinho, se a opção estiver ligada).
+            app.manage(emu_update::EmuUpdates::default());
+            emu_update::spawn_background(app.handle().clone());
 
             // Atalho global do overlay (configurável em Configurações; padrão Ctrl+Shift+O).
             app.handle().plugin(
@@ -168,6 +183,16 @@ pub fn run() {
             emulators::delete_emulator,
             emulators::set_game_emulator,
             emulators::emulator_fullscreen_supported,
+            emu_update::emulator_updates,
+            emu_update::emulator_update_install,
+            emu_update::emulator_update_preset,
+            emu_catalog::emulator_catalog,
+            emu_catalog::emulator_catalog_install,
+            emu_catalog::emulator_catalog_detect,
+            emu_catalog::emulator_catalog_set_dir,
+            emu_catalog::emulator_reveal,
+            emu_catalog::emulator_folder_info,
+            emu_catalog::emulator_move_folder,
             trophies::game_trophies,
             trophies::trophy_overview,
             score::profile_score,
@@ -360,6 +385,21 @@ pub fn run() {
             st::steam_ach_list,
             shot_toast::preview_achievement_toast,
             shot_toast::preview_pad_toast,
+            integrated::integrated_status,
+            integrated::integrated_locate,
+            integrated::integrated_unlink,
+            integrated::integrated_add_to_library,
+            integrated::integrated_check_update,
+            integrated::integrated_install,
+            integrated::integrated_pause,
+            integrated::integrated_cancel,
+            integrated::integrated_verify,
+            integrated::integrated_rollback,
+            integrated::integrated_uninstall,
+            integrated::integrated_achievements,
+            integrated::integrated_stats,
+            integrated::integrated_info,
+            integrated::integrated_slots,
             ];
             handler
         })

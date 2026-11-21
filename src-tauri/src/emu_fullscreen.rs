@@ -22,6 +22,20 @@ pub enum Kind {
     Lichii,
     Xemu,
     Xenia,
+    /// Tela cheia pela opção de configuração na linha de comando (`-C Dolphin.Display.Fullscreen=True`).
+    Dolphin,
+    Cemu,
+    MelonDs,
+    Mgba,
+    /// Azahar (sucessor do Citra).
+    Azahar,
+    /// `-config window:fullscreen=yes`.
+    Flycast,
+    Snes9x,
+    Mesen,
+    /// ares (vários consoles) e RMG (Nintendo 64): `--fullscreen`.
+    Ares,
+    Rmg,
 }
 
 /// Reconhece o emulador. O executável vem primeiro: o nome cadastrado pode ser genérico
@@ -49,6 +63,19 @@ fn by_text(s: &str) -> Option<Kind> {
         ("lichii", Kind::Lichii),
         ("xemu", Kind::Xemu),
         ("xenia", Kind::Xenia),
+        ("dolphin", Kind::Dolphin),
+        ("cemu", Kind::Cemu),
+        ("melonds", Kind::MelonDs),
+        ("mgba", Kind::Mgba),
+        ("azahar", Kind::Azahar),
+        ("lime3ds", Kind::Azahar),
+        ("citra", Kind::Azahar),
+        ("flycast", Kind::Flycast),
+        ("snes9x", Kind::Snes9x),
+        ("mesen", Kind::Mesen),
+        ("ares", Kind::Ares),
+        ("rmg", Kind::Rmg),
+        ("rosalie", Kind::Rmg),
     ];
     TABLE.iter().find(|(k, _)| s.contains(k)).map(|(_, v)| *v)
 }
@@ -64,6 +91,11 @@ impl Kind {
             Kind::Yuzu | Kind::Lichii => &["-f"],
             Kind::Xemu => &["-full-screen"],
             Kind::Xenia => &["--fullscreen=true"],
+            Kind::Dolphin => &["-C", "Dolphin.Display.Fullscreen=True"],
+            Kind::Cemu | Kind::MelonDs | Kind::Mgba | Kind::Azahar => &["-f"],
+            Kind::Flycast => &["-config", "window:fullscreen=yes"],
+            Kind::Snes9x => &["-fullscreen"],
+            Kind::Mesen | Kind::Ares | Kind::Rmg => &["--fullscreen"],
             Kind::Rpcs3 => &[],
         }
     }
@@ -73,6 +105,8 @@ impl Kind {
             Kind::Pcsx2 | Kind::DuckStation => &["-nofullscreen"],
             Kind::Ppsspp => &["--windowed"],
             Kind::Xenia => &["--fullscreen=false"],
+            Kind::Dolphin => &["-C", "Dolphin.Display.Fullscreen=False"],
+            Kind::Flycast => &["-config", "window:fullscreen=no"],
             _ => &[],
         }
     }
@@ -91,9 +125,29 @@ impl Kind {
             Kind::Yuzu | Kind::Lichii => l == "-f" || l == "--fullscreen",
             Kind::Xemu => l == "-full-screen",
             Kind::Xenia => l == "--fullscreen" || l.starts_with("--fullscreen="),
+            Kind::Dolphin => l.starts_with("dolphin.display.fullscreen="),
+            Kind::Cemu | Kind::MelonDs | Kind::Mgba | Kind::Azahar => l == "-f",
+            Kind::Flycast => l.starts_with("window:fullscreen="),
+            Kind::Snes9x | Kind::Mesen | Kind::Ares => false,
+            Kind::Rmg => l == "-f",
             Kind::Rpcs3 => false,
         }
     }
+}
+
+/// Tira os argumentos de modo e, junto, a opção que os introduz ("-C" do Dolphin, "-config" do Flycast).
+fn drop_mode_args(kind: Kind, args: &mut Vec<String>) {
+    let mut out: Vec<String> = Vec::with_capacity(args.len());
+    for a in args.drain(..) {
+        if kind.is_mode_arg(&a) {
+            if out.last().is_some_and(|p| p == "-C" || p == "--config" || p.eq_ignore_ascii_case("-config")) {
+                out.pop();
+            }
+            continue;
+        }
+        out.push(a);
+    }
+    *args = out;
 }
 
 /// O NEXSTAGE sabe aplicar a opção a este emulador?
@@ -116,14 +170,14 @@ pub fn strip_text(kind: Kind, args: &str) -> String {
         }
     }
     if !cur.is_empty() { out.push(cur); }
-    out.retain(|a| !kind.is_mode_arg(a));
+    drop_mode_args(kind, &mut out);
     out.join(" ")
 }
 
 /// Aplica a opção aos argumentos já separados: tira os de modo escritos à mão e põe os da opção no início
 /// (alguns emuladores, como Lichii/yuzu e PCSX2 com `--`, param de ler opções depois do arquivo do jogo).
 pub fn apply_args(kind: Kind, fullscreen: bool, mut args: Vec<String>) -> Vec<String> {
-    args.retain(|a| !kind.is_mode_arg(a));
+    drop_mode_args(kind, &mut args);
     let add = if fullscreen { kind.on() } else { kind.off() };
     let mut out: Vec<String> = add.iter().map(|s| s.to_string()).collect();
     out.append(&mut args);

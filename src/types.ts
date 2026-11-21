@@ -1,4 +1,4 @@
-export interface Profile {
+﻿export interface Profile {
   id: number;
   username: string;
   displayName: string;
@@ -44,6 +44,8 @@ export interface Game {
   raGameId: number | null;
   /** Origem: "manual", "iso", "folder", "steam"... */
   source: string;
+  /** Identificador externo (jogos integrados ao NexStage: id do jogo, ex. "tomb-survivors"). */
+  externalId?: string | null;
   /** AppID da Steam (importado da Steam ou vinculado). */
   steamAppId: number | null;
   /** Pronto para jogar neste PC (Steam: instalado pelo cliente; demais: arquivo presente). */
@@ -151,7 +153,9 @@ export type View =
 /** Plataformas oficiais (mesma ordem do backend). */
 export const PLATFORMS = [
   "PC", "XBOX", "Xbox 360", "Xbox Series", "Playstation 1", "Playstation 2", "Playstation 3", "Playstation 4",
-  "Playstation 5", "PSP", "Ps Vita", "Nintendo Switch", "Nintendo Switch 2", "Super Nintendo", "Nintendinho",
+  "Playstation 5", "PSP", "Ps Vita", "Nintendo Switch", "Nintendo Switch 2", "Wii U", "Wii", "GameCube", "Nintendo 64",
+  "Nintendo 3DS", "Nintendo DS", "Game Boy Advance", "Game Boy Color", "Game Boy", "Dreamcast", "Mega Drive",
+  "Super Nintendo", "Nintendinho",
 ];
 
 export interface GalleryItem {
@@ -188,7 +192,19 @@ export interface StartupInfo { mode: "none" | "minimized" | "window" | "fullscre
 export interface PadCombos { overlay: number; screenshot: number; summon: number; overlayDefault: number; screenshotDefault: number; summonDefault: number }
 export interface FandomLink { url: string; direct: boolean }
 
-export interface Emulator { id: number; name: string; exePath: string; platforms: string[]; formats: string[]; args: string; cover: string | null; exeExists: boolean; games: number; fullscreen: boolean; fullscreenSupported: boolean }
+export interface Emulator { id: number; name: string; exePath: string; platforms: string[]; formats: string[]; args: string; cover: string | null; exeExists: boolean; games: number; fullscreen: boolean; fullscreenSupported: boolean; updateSource: string | null }
+/** Catálogo de emuladores que o NEXSTAGE sabe baixar/localizar (emu_catalog.rs). */
+export interface EmuCatalogItem { id: string; folder: string; registered: number | null; page: string; busy: boolean }
+export interface EmuCatalogInfo { installDir: string; items: EmuCatalogItem[] }
+export interface EmuFoundInstall { id: string; exePath: string }
+export interface EmuFolderInfo { dir: string; name: string; files: number; bytes: number; blocked: string | null }
+/** Atualização de um emulador cadastrado (fonte: versões publicadas no GitHub/Gitea do emulador). */
+export interface EmuUpdateStatus {
+  emulatorId: number; name: string;
+  state: "off" | "unsupported" | "upToDate" | "available" | "noPackage" | "error";
+  page: string | null; installed: string | null; installedDate: string | null;
+  latest: string | null; latestDate: string | null; installable: boolean; message: string | null; busy: boolean;
+}
 /** Troféus (Vita3K/RPCS3): "P" platina, "G" ouro, "S" prata, "B" bronze. */
 export type TrophyGrade = "P" | "G" | "S" | "B";
 export interface Trophy { id: number; name: string; detail: string; grade: TrophyGrade; hidden: boolean; unlocked: boolean; unlockedAt: number | null; icon: string | null }
@@ -201,9 +217,9 @@ export interface TrophySetSummary {
   lastUnlockAt: number | null; libraryGameId: number | null; trophies: Trophy[];
 }
 export interface ScoreSource { points: number; achievements: number; completed: number }
-export interface ProfileScore { total: number; level: number; levelFloor: number; nextLevelAt: number; ra: ScoreSource; steam: ScoreSource; trophies: ScoreSource }
+export interface ProfileScore { total: number; level: number; levelFloor: number; nextLevelAt: number; ra: ScoreSource; steam: ScoreSource; trophies: ScoreSource; nexstage: ScoreSource }
 export interface ScanItem {
-  path: string; name: string; ext: string; kind: "windows" | "disc" | "switch" | "pkg" | "vpk";
+  path: string; name: string; ext: string; kind: "windows" | "disc" | "switch" | "pkg" | "vpk" | "rom";
   platform: string | null; status: "new" | "secondary" | "duplicate" | "invalid" | "unrecognized";
   note: string; size: number; compatible: number[]; assigned: number | null;
 }
@@ -275,6 +291,21 @@ export interface SteamOwnedList { games: SteamOwned[]; clientFound: boolean }
 export interface SteamPreviewItem { appid: number; name: string; status: "new" | "existing" | "title"; gameId: number | null; gameTitle: string | null; updates: ("link" | "playtime" | "cover" | "launch")[] }
 export interface SteamImportReport { added: number; linked: number; updated: number; skipped: number }
 export interface SteamSyncReport { owned: number | null; recent: number | null; libraryPrivate: boolean; achievementsUpdated: number; usedKey: boolean; warning: string | null; syncedAt: string }
+/** Jogo oficialmente integrado ao NexStage (Tomb Survivors). */
+export interface IntegratedLatest { version: string; build: number; size: number; notes: Record<string, string> | null; releasedAt: string }
+export interface NexAchievement {
+  id: string; name: Record<string, string>; description: Record<string, string>; category: string; rarity: string; points: number;
+  glyph: string; hidden: boolean; reserved: boolean; target: number | null; current: number; unlockedAt: string | null; origin: string | null;
+}
+export interface NexStat { key: string; name: Record<string, string>; kind: string; group: string; value: number | string; label: Record<string, string> | null; of: number | null }
+export interface NexProfileStats { slots: number; lastUpdate: string | null; stats: NexStat[] }
+export interface NexIntegratedInfo { gameId: string; name: string; description: Record<string, string>; releasesUrl: string }
+export interface NexSlot { slotUid: string; slotNumber: number | null; firstSeen: string | null; lastSeen: string | null; values: Record<string, number | string> }
+export interface IntegratedJob { phase: string; version: string; done: number; total: number }
+export interface IntegratedStatus {
+  gameId: string; name: string; installed: boolean; version: string | null; installDir: string | null; managed: boolean;
+  build: number | null; previousVersion: string | null; latest: IntegratedLatest | null; updateAvailable: boolean; job: IntegratedJob | null;
+}
 export interface SteamAppStatus { appid: number; clientFound: boolean; protocol: boolean; install: SteamInstall; sizeOnDisk: number }
 export interface SteamAch { apiname: string; name: string; description: string; icon: string | null; hidden: boolean; globalPct: number | null; unlockedAt: string | null }
 export interface SteamGameData {

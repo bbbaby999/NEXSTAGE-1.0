@@ -6,6 +6,8 @@
 //! - Steam: pela raridade global (% de jogadores com a conquista); jogo 100% vale um bônus de 180.
 //! - RetroAchievements: pelos pontos da conquista, +50% se obtida em Hardcore; jogo completo/masterizado
 //!   vale um bônus de 180.
+//! - Jogos integrados ao NexStage: os pontos do catálogo assinado (já na mesma escala: 15/30/90/180), do
+//!   perfil; todas as conquistas disponíveis (não reservadas) obtidas vale o bônus de 180.
 //! A pontuação é sempre CALCULADA a partir dos dados guardados (nada é acumulado), então é retroativa e se
 //! ajusta sozinha se a raridade de uma conquista mudar.
 //! A mesma tabela existe em `src/lib/score.ts` (valor exibido nas listas e nos avisos): mude as duas juntas.
@@ -81,6 +83,7 @@ pub struct ProfileScore {
     pub ra: SourceScore,
     pub steam: SourceScore,
     pub trophies: SourceScore,
+    pub nexstage: SourceScore,
 }
 
 fn ra_score(conn: &Connection, profile: i64) -> AppResult<SourceScore> {
@@ -99,6 +102,33 @@ fn ra_score(conn: &Connection, profile: i64) -> AppResult<SourceScore> {
     s.completed = conn.query_row(
         "SELECT COUNT(*) FROM ra_progress WHERE profile_id = ?1
            AND (award_kind IN ('completed', 'mastered') OR (max_possible > 0 AND awarded >= max_possible))",
+        [profile],
+        |r| r.get(0),
+    )?;
+    s.points += s.completed * COMPLETION_BONUS;
+    Ok(s)
+}
+
+fn nexstage_score(conn: &Connection, profile: i64) -> AppResult<SourceScore> {
+    let mut s = SourceScore::default();
+    let mut st = conn.prepare(
+        "SELECT a.data FROM bridge_unlocks u JOIN bridge_achievements a ON a.game_id = u.game_id AND a.achievement_id = u.achievement_id
+         WHERE u.profile_id = ?1",
+    )?;
+    let rows = st.query_map([profile], |r| r.get::<_, String>(0))?;
+    for r in rows {
+        let d: serde_json::Value = serde_json::from_str(&r?).unwrap_or_default();
+        s.points += d["points"].as_i64().unwrap_or(0).clamp(0, 180);
+        s.achievements += 1;
+    }
+    // jogo completo: todas as disponíveis (não reservadas) obtidas
+    s.completed = conn.query_row(
+        "SELECT COUNT(*) FROM (
+            SELECT a.game_id FROM bridge_achievements a
+            LEFT JOIN bridge_unlocks u ON u.profile_id = ?1 AND u.game_id = a.game_id AND u.achievement_id = a.achievement_id
+            WHERE COALESCE(json_extract(a.data, '$.reserved'), 0) = 0
+            GROUP BY a.game_id
+            HAVING COUNT(*) > 0 AND SUM(u.unlocked_at IS NOT NULL) = COUNT(*))",
         [profile],
         |r| r.get(0),
     )?;
@@ -169,9 +199,10 @@ pub fn compute(conn: &Connection, profile_id: i64, lang: &str) -> AppResult<Prof
     let ra = ra_score(conn, profile_id)?;
     let steam = steam_score(conn, profile_id)?;
     let trophies = trophy_score(conn, profile_id, lang)?;
-    let total = ra.points + steam.points + trophies.points;
+    let nexstage = nexstage_score(conn, profile_id)?;
+    let total = ra.points + steam.points + trophies.points + nexstage.points;
     let (level, level_floor, next_level_at) = level(total);
-    Ok(ProfileScore { total, level, level_floor, next_level_at, ra, steam, trophies })
+    Ok(ProfileScore { total, level, level_floor, next_level_at, ra, steam, trophies, nexstage })
 }
 
 #[cfg(test)]
@@ -184,6 +215,21 @@ mod tests {
         assert_eq!([steam_value(None), steam_value(Some(55.0)), steam_value(Some(29.9)), steam_value(Some(9.0)), steam_value(Some(2.5))], [15, 15, 30, 60, 90]);
         assert_eq!([ra_value(1, false), ra_value(5, false), ra_value(10, false), ra_value(25, false), ra_value(100, false)], [15, 30, 60, 90, 90]);
         assert_eq!([ra_value(1, true), ra_value(25, true)], [22, 135]);
+    }
+
+    #[test]
+    fn nexstage_points_come_from_signed_catalog() {
+        let mut c = crate::bridge::achievements::tests::db();
+        crate::bridge::achievements::save_catalog(&mut c, "g", &crate::bridge::achievements::tests::catalog()).unwrap();
+        let now = crate::bridge::protocol::now_secs();
+        let un = |id: &str, ev: &str| crate::bridge::achievements::apply_unlock(&c, 1, "g", &serde_json::json!({"achievement_id": id, "slot_uid": "s"}), "live", ev, now).unwrap();
+        un("first_blood", "ev-00000001");
+        let s = nexstage_score(&c, 1).unwrap();
+        assert_eq!((s.points, s.achievements, s.completed), (15, 1, 0));
+        un("relic_hunter", "ev-00000002");
+        let s = nexstage_score(&c, 1).unwrap();
+        assert_eq!((s.points, s.achievements, s.completed), (15 + 30 + COMPLETION_BONUS, 2, 1), "reservada não impede o 100%");
+        assert_eq!(nexstage_score(&c, 2).unwrap().points, 0, "outro perfil");
     }
 
     #[test]

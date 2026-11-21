@@ -19,6 +19,7 @@ import { GLYPHS } from "../components/Glyph";
 import Select from "../components/Select";
 import Skeleton from "../components/Skeleton";
 import { PLATFORMS } from "../types";
+import { ALL_FORMATS } from "../data/emulatorPresets";
 import type { Game, GameCollection } from "../types";
 import { t, tk } from "../lib/i18n";
 
@@ -36,7 +37,7 @@ const DIR_LABEL: Record<SortKey, Record<Dir, string>> = {
 };
 /** Formatos do "Adicionar jogo": executáveis (jogo de PC) e arquivos iniciados por emulador. */
 const EXE_EXTS = ["exe", "bat", "cmd", "lnk"]; // .lnk: atalhos, inclusive de jogos do app Xbox / Microsoft Store
-const FILE_EXTS = ["iso", "bin", "cue", "nsp", "xci", "nup", "pkg", "vpk"];
+const FILE_EXTS: string[] = [...ALL_FORMATS];
 type NewGame = { exePath?: string; title?: string; isoPath?: string; platform?: string | null; emulatorId?: number | null };
 
 const byTitle = (a: Game, b: Game) => a.title.localeCompare(b.title, "pt");
@@ -207,6 +208,10 @@ export default function Library() {
         { name: t("Imagens de disco (ISO, BIN, CUE)"), extensions: ["iso", "bin", "cue"] },
         { name: "Nintendo Switch (NSP, XCI, NUP)", extensions: ["nsp", "xci", "nup"] },
         { name: t("Pacotes de PS3/PS4 e PS Vita (PKG, VPK)"), extensions: ["pkg", "vpk"] },
+        { name: "GameCube / Wii (ISO, RVZ, WBFS…)", extensions: ["iso", "gcm", "rvz", "wbfs", "wia", "gcz", "wad"] },
+        { name: t("Portáteis da Nintendo (DS, 3DS, GBA)"), extensions: ["nds", "3ds", "cci", "cxi", "3dsx", "gba", "gb", "gbc"] },
+        { name: t("Nintendo 64 e Mega Drive"), extensions: ["z64", "n64", "v64", "md", "gen", "smd", "bin"] },
+        { name: t("Wii U, Dreamcast, SNES e NES"), extensions: ["wud", "wux", "wua", "rpx", "gdi", "cdi", "chd", "sfc", "smc", "nes"] },
       ] });
       if (typeof sel !== "string") return;
       const it = await api.inspectGameFile(p.id, sel);

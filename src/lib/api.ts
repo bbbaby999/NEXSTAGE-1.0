@@ -3,7 +3,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { currentLang, t } from "./i18n";
 import { idleBusy } from "./idle";
-import type { ScanItem, GameHit, ImageSet, SourceRef, WebShot, Emulator, FolderRow, ImportSummary, Activity, FandomLink, PadCombos, StartupInfo, ClassifyResult, Controller, Drive, GalleryItem, ImportResult, ShortcutInfo, Game, GameCollection, GameInfo, GameInput, Profile, ProfileInput, RaAccount, RaOverview, RaAchievement, RaGameDetail, RaSyncReport, RaLinkInfo, RaGame, RaScanReport, RaEmuSupport, SteamAccount, SteamOwnedList, SteamPreviewItem, SteamImportReport, SteamSyncReport, SteamAppStatus, SteamGameData, SteamClientStatus, SteamAchOverview, SteamAchEntry, SteamNewsOverview, BackupInfo, BackupTarget, BackupReport, BackupInspect, BackupVerify, BackupRestoreReport, BackupAuto, BackupAutoMode, GamerStats, StatsVisibility, MetacriticResult, StoreHit, SourceView, SourceId, IgdbResult, NexusLinkStatus, NexusGame, NexusModsPage, NexusModDetail, NexusMod, ModSort, ZereiSearch, ZereiArt, ZereiEntry, ZereiInput, ZereiImport, LogoGames, MonitorState, FsPlaces, FsListing, ZereiRefreshReport, ZereiStatus } from "../types";
+import type { ScanItem, GameHit, ImageSet, SourceRef, WebShot, Emulator, EmuUpdateStatus, EmuCatalogInfo, EmuFoundInstall, EmuFolderInfo, FolderRow, ImportSummary, Activity, FandomLink, PadCombos, StartupInfo, ClassifyResult, Controller, Drive, GalleryItem, ImportResult, ShortcutInfo, Game, GameCollection, GameInfo, GameInput, Profile, ProfileInput, RaAccount, RaOverview, RaAchievement, RaGameDetail, RaSyncReport, RaLinkInfo, RaGame, RaScanReport, RaEmuSupport, SteamAccount, SteamOwnedList, SteamPreviewItem, SteamImportReport, SteamSyncReport, SteamAppStatus, IntegratedStatus, NexAchievement, NexProfileStats, NexIntegratedInfo, NexSlot, SteamGameData, SteamClientStatus, SteamAchOverview, SteamAchEntry, SteamNewsOverview, BackupInfo, BackupTarget, BackupReport, BackupInspect, BackupVerify, BackupRestoreReport, BackupAuto, BackupAutoMode, GamerStats, StatsVisibility, MetacriticResult, StoreHit, SourceView, SourceId, IgdbResult, NexusLinkStatus, NexusGame, NexusModsPage, NexusModDetail, NexusMod, ModSort, ZereiSearch, ZereiArt, ZereiEntry, ZereiInput, ZereiImport, LogoGames, MonitorState, FsPlaces, FsListing, ZereiRefreshReport, ZereiStatus } from "../types";
 
 /**
  * Capas e fundos ficam em arquivos na pasta de dados do app (ver src-tauri/src/images.rs): o backend
@@ -26,6 +26,21 @@ export interface FeedbackInput {
 }
 
 export const api = {
+  integratedStatus: (gameId: string) => invoke<IntegratedStatus>("integrated_status", { gameId }),
+  integratedLocate: (gameId: string, path: string) => invoke<IntegratedStatus>("integrated_locate", { gameId, path }),
+  integratedUnlink: (gameId: string) => invoke<IntegratedStatus>("integrated_unlink", { gameId }),
+  integratedAddToLibrary: (profileId: number, gameId: string) => invoke<number>("integrated_add_to_library", { profileId, gameId }),
+  integratedCheckUpdate: (gameId: string) => invoke<IntegratedStatus>("integrated_check_update", { gameId }),
+  integratedInstall: (gameId: string) => invoke<void>("integrated_install", { gameId }),
+  integratedPause: (gameId: string) => invoke<void>("integrated_pause", { gameId }),
+  integratedCancel: (gameId: string) => invoke<void>("integrated_cancel", { gameId }),
+  integratedVerify: (gameId: string) => invoke<string[]>("integrated_verify", { gameId }),
+  integratedRollback: (gameId: string) => invoke<IntegratedStatus>("integrated_rollback", { gameId }),
+  integratedUninstall: (gameId: string) => invoke<IntegratedStatus>("integrated_uninstall", { gameId }),
+  integratedInfo: (gameId: string) => invoke<NexIntegratedInfo>("integrated_info", { gameId }),
+  integratedSlots: (profileId: number, gameId: string) => invoke<NexSlot[]>("integrated_slots", { profileId, gameId }),
+  integratedStats: (profileId: number, gameId: string) => invoke<NexProfileStats>("integrated_stats", { profileId, gameId }),
+  integratedAchievements: (profileId: number, gameId: string) => invoke<NexAchievement[]>("integrated_achievements", { profileId, gameId }),
   listProfiles: () => invoke<Profile[]>("list_profiles"),
   createProfile: (input: ProfileInput) => invoke<Profile>("create_profile", { input }),
   updateProfile: (id: number, input: ProfileInput) => invoke<Profile>("update_profile", { id, input }),
@@ -188,11 +203,22 @@ export const api = {
   capturesFolder: () => invoke<string>("captures_folder"),
   openCapturesFolder: () => invoke<string>("open_captures_folder"),
   listEmulators: () => invoke<Emulator[]>("list_emulators").then((l) => l.map(withEmuImage)),
-  saveEmulator: (input: { id?: number; name: string; exePath: string; platforms: string[]; formats: string[]; args: string; cover: string | null }) =>
+  saveEmulator: (input: { id?: number; name: string; exePath: string; platforms: string[]; formats: string[]; args: string; cover: string | null; updateSource?: string | null }) =>
     invoke<Emulator>("save_emulator", { input }).then(withEmuImage),
   deleteEmulator: (id: number) => invoke<void>("delete_emulator", { id }),
   emulatorFullscreenSupported: (name: string, exePath: string) =>
     invoke<boolean>("emulator_fullscreen_supported", { name, exePath }),
+  emulatorUpdates: (force: boolean) => invoke<EmuUpdateStatus[]>("emulator_updates", { force }),
+  emulatorUpdateInstall: (id: number) => invoke<EmuUpdateStatus>("emulator_update_install", { id }),
+  emulatorCatalog: () => invoke<EmuCatalogInfo>("emulator_catalog"),
+  emulatorCatalogInstall: (id: string, input: { name: string; exePath: string; platforms: string[]; formats: string[]; args: string; cover: string | null; fullscreen: boolean }, baseDir?: string, remember?: boolean, replace?: boolean) =>
+    invoke<Emulator>("emulator_catalog_install", { id, input, baseDir: baseDir || null, remember: !!remember, replace: !!replace }).then(withEmuImage),
+  emulatorReveal: (id: number) => invoke<void>("emulator_reveal", { id }),
+  emulatorFolderInfo: (id: number) => invoke<EmuFolderInfo>("emulator_folder_info", { id }),
+  emulatorMoveFolder: (id: number, dest: string, replace?: boolean) => invoke<Emulator>("emulator_move_folder", { id, dest, replace: !!replace }).then(withEmuImage),
+  emulatorCatalogDetect: () => invoke<EmuFoundInstall[]>("emulator_catalog_detect"),
+  emulatorCatalogSetDir: (dir: string) => invoke<void>("emulator_catalog_set_dir", { dir }),
+  emulatorUpdatePreset: (name: string, exePath: string) => invoke<string | null>("emulator_update_preset", { name, exePath }),
   gameTrophies: (profileId: number, gameId: number) =>
     invoke<import("../types").GameTrophies | null>("game_trophies", { profileId, gameId }),
   trophyOverview: (profileId: number) =>

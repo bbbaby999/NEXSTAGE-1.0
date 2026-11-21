@@ -315,7 +315,9 @@ const CONFIRM_FALLBACK = () => {
 
 export type PadAction = "left" | "right" | "up" | "down" | "confirm" | "back" | "x" | "y" | "l1" | "r1" | "l2" | "r2" | "menu"
   /** Confirmar segurado (0,5 s) e solto: só para itens com [data-hold] (ver `handle`). */
-  | "confirm_hold" | "confirm_up";
+  | "confirm_hold" | "confirm_up"
+  /** Voltar segurado (0,6 s): `nexstage:back-hold` na janela (ex.: cancelar o navegador de arquivos). */
+  | "back_hold";
 /** Botões que uma tela pode tomar para si (teclado virtual, filtros da biblioteca...). */
 export type PadButton = "x" | "y" | "l1" | "r1" | "l2" | "r2" | "menu";
 
@@ -380,6 +382,10 @@ function handle(action: PadAction) {
     if (!el || !el.isConnected || document.activeElement !== el) return;
     if (action === "confirm_hold") el.dispatchEvent(new CustomEvent("nexstage:hold", { bubbles: true }));
     else el.click();
+    return;
+  }
+  if (action === "back_hold") {
+    window.dispatchEvent(new CustomEvent("nexstage:back-hold", { cancelable: true }));
     return;
   }
   // Modo Ocioso ativo (ou acabou de ser encerrado por este comando): o comando só o encerra.
@@ -476,6 +482,7 @@ export function useSpatialNav() {
     const nextAt: Record<Dir, number> = { left: 0, right: 0, up: 0, down: 0 };
     const btn: boolean[] = [];
     let holdAt = 0;
+    let backAt = 0; // voltar segurado (ver "back_hold")
     const btnNext: number[] = [];
     /**
      * Eixos que já passaram pelo centro, por controle. Um eixo só navega depois de ter sido visto em
@@ -569,6 +576,12 @@ export function useSpatialNav() {
             if (on && btn[0] && holdAt > 0 && t >= holdAt) { holdAt = 0; handle("confirm_hold"); }
             else if (!on && btn[0]) { holdAt = 0; handle("confirm_up"); }
             else if (on && !btn[0]) holdAt = t + 500;
+          }
+          // voltar: segurou 0,6 s → "back_hold" (o toque já disparou "back" ao apertar)
+          if (ai === 1) {
+            if (on && btn[1] && backAt > 0 && t >= backAt) { backAt = 0; handle("back_hold"); }
+            else if (!on) backAt = 0;
+            else if (on && !btn[1]) backAt = t + 600;
           }
           let fire = on && !btn[ai];
           if (fire) btnNext[ai] = t + 380;

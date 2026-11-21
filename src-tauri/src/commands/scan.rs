@@ -25,7 +25,10 @@ pub struct ScanState {
     pub cancel: AtomicBool,
 }
 
-const EXTS: [&str; 9] = ["iso", "bin", "cue", "exe", "nsp", "xci", "nup", "pkg", "vpk"];
+/// Arquivos procurados na varredura: executáveis do Windows e os formatos de jogo aceitos.
+fn wanted(ext: &str) -> bool {
+    ext == "exe" || super::emulators::FORMATS.contains(&ext)
+}
 const SKIP_DIRS: [&str; 10] = [
     "$recycle.bin", "system volume information", "windows", "node_modules", ".git", "_commonredist",
     "redist", "redistributables", "directx", "vcredist",
@@ -140,7 +143,7 @@ fn walk(root: &Path, cancel: &AtomicBool, app: &AppHandle) -> (Vec<Cand>, u64, V
             } else if ft.is_file() {
                 scanned += 1;
                 let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-                if EXTS.contains(&ext.as_str()) {
+                if wanted(&ext) {
                     let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
                     cands.push(Cand { path, ext, size });
                 }
@@ -200,6 +203,8 @@ fn classify(c: &Cand, cue_bin: Option<&str>) -> Option<ScanItem> {
             _ => item(c, "disc", None, "invalid", "O .cue aponta para um .bin que não foi encontrado.".into()),
         },
         "bin" => match File::open(&c.path) {
+            // cartucho de Mega Drive salvo como .bin (cabeçalho "SEGA"); senão, imagem de disco
+            Ok(f) if detect::is_mega_drive_rom(&mut &f) => item(c, "rom", Some("Mega Drive"), "new", "ROM de Mega Drive (.bin)".into()),
             Ok(mut f) => disc(&mut f, " (.bin sem .cue)", true),
             Err(e) => inaccessible("disc", e),
         },
@@ -214,6 +219,16 @@ fn classify(c: &Cand, cue_bin: Option<&str>) -> Option<ScanItem> {
             Ok(d) => item(c, "switch", d.platform, if d.platform.is_some() { "new" } else { "invalid" }, d.note),
             Err(e) => inaccessible("switch", e),
         },
+        "gcm" | "rvz" | "wia" | "gcz" | "wbfs" | "wad" => match File::open(&c.path) {
+            Ok(mut f) => {
+                let d = detect::detect_gc_wii(&mut f, &c.ext);
+                let st = if d.platform.is_some() { "new" } else { "unrecognized" };
+                item(c, "disc", d.platform, st, d.note)
+            }
+            Err(e) => inaccessible("disc", e),
+        },
+        // CHD guarda discos de vários consoles (PS1, PS2, Dreamcast…): a plataforma é escolhida na importação
+        "chd" => item(c, "disc", None, "unrecognized", "Imagem CHD: escolha a plataforma do jogo.".into()),
         "nsp" | "pkg" | "vpk" => match File::open(&c.path) {
             Ok(mut f) => {
                 let d = match c.ext.as_str() { "nsp" => detect::detect_nsp(&mut f), "pkg" => detect::detect_pkg(&mut f), _ => detect::detect_vpk(&mut f) };
@@ -228,7 +243,12 @@ fn classify(c: &Cand, cue_bin: Option<&str>) -> Option<ScanItem> {
             }
             Err(e) => inaccessible("pkg", e),
         },
-        _ => return None,
+        // formatos de um console só (cartuchos, pacotes, imagens próprias): a extensão basta
+        ext => {
+            let d = detect::platform_by_ext(ext)?;
+            let kind = if matches!(ext, "gdi" | "cdi" | "wud" | "wux") { "disc" } else { "rom" };
+            item(c, kind, d.platform, "new", d.note)
+        }
     })
 }
 
@@ -299,13 +319,18 @@ fn analyze(cands: Vec<Cand>, library: &HashSet<String>, emus: &[Emulator], cance
     // .cue -> .bin referenciados (o .cue é o jogo; o .bin associado não vira outro item)
     let mut bin_of_cue: HashMap<String, String> = HashMap::new();
     let mut covered: HashSet<String> = HashSet::new();
-    for c in cands.iter().filter(|c| c.ext == "cue") {
+    // (o .gdi do Dreamcast também cita as faixas .bin/.raw: elas não viram itens soltos)
+    for c in cands.iter().filter(|c| c.ext == "cue" || c.ext == "gdi") {
         let mut txt = String::new();
         let _ = File::open(&c.path).and_then(|f| f.take(256 * 1024).read_to_string(&mut txt));
         let dir = c.path.parent().unwrap_or(Path::new(""));
-        let refs: Vec<PathBuf> = detect::cue_files(&txt).into_iter().map(|n| dir.join(n)).collect();
+        let names = if c.ext == "gdi" { detect::gdi_files(&txt) } else { detect::cue_files(&txt) };
+        let refs: Vec<PathBuf> = names.into_iter().map(|n| dir.join(n)).collect();
         for r in &refs {
             covered.insert(norm_key(&r.to_string_lossy()));
+        }
+        if c.ext != "cue" {
+            continue;
         }
         if let Some(first) = refs.first() {
             bin_of_cue.insert(norm_key(&c.path.to_string_lossy()), first.to_string_lossy().to_string());
@@ -595,7 +620,7 @@ mod tests {
         let emu = |id, pl: &[&str], fm: &[&str]| Emulator {
             id, name: format!("e{id}"), exe_path: String::new(),
             platforms: pl.iter().map(|s| s.to_string()).collect(), formats: fm.iter().map(|s| s.to_string()).collect(),
-            args: String::new(), cover: None, exe_exists: true, games: 0, fullscreen: false, fullscreen_supported: false,
+            args: String::new(), cover: None, exe_exists: true, games: 0, fullscreen: false, fullscreen_supported: false, update_source: None,
         };
         let list = vec![emu(1, &["Playstation 2"], &["iso", "cue"]), emu(2, &["Playstation 2"], &["iso"]), emu(3, &["PSP"], &["iso"])];
         assert_eq!(compatible(&list, "Playstation 2", "iso"), vec![1, 2]);

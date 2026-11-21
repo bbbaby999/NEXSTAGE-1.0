@@ -40,8 +40,10 @@ pub struct Game {
     pub emulator_name: Option<String>,
     /// Jogo do RetroAchievements associado (por hash ou confirmado pelo usuário).
     pub ra_game_id: Option<i64>,
-    /// Origem ("manual", "iso", "folder", "steam"...).
+    /// Origem ("manual", "iso", "folder", "steam", "nexstage"...).
     pub source: String,
+    /// Identificador externo (jogos integrados ao NexStage: id do jogo, ex. "tomb-survivors").
+    pub external_id: Option<String>,
     /// AppID da Steam (jogo importado da Steam ou vinculado a ela).
     pub steam_app_id: Option<i64>,
     /// Pronto para jogar neste PC: jogo da Steam instalado pelo cliente Steam; demais, executável ou
@@ -82,7 +84,7 @@ const SELECT: &str = "SELECT g.id,g.title,g.platform,g.executable_path,g.launch_
     g.background,g.bg_x,g.bg_y,json_extract(gi.data,'$.externalId'),
     json_extract(gi.data,'$.releaseDate'),json_extract(gi.data,'$.genres[0]'),json_extract(gi.data,'$.genres'),EXISTS(SELECT 1 FROM zerei_entries z WHERE z.profile_id=pg.profile_id AND z.game_id=g.id AND z.status='completed'),
     (SELECT MAX(z.completed_at) FROM zerei_entries z WHERE z.profile_id=pg.profile_id AND z.game_id=g.id AND z.status='completed'),g.iso_path,g.rom_path,g.emulator_id,em.name,rl.ra_game_id,g.source,
-    COALESCE(sl.appid, CASE WHEN g.source='steam' THEN CAST(g.external_id AS INTEGER) END),g.logo,pg.favorited_at
+    COALESCE(sl.appid, CASE WHEN g.source='steam' THEN CAST(g.external_id AS INTEGER) END),g.logo,pg.favorited_at,g.external_id
     FROM profile_games pg JOIN games g ON g.id = pg.game_id
     LEFT JOIN game_info gi ON gi.game_id = g.id
     LEFT JOIN emulators em ON em.id = g.emulator_id
@@ -125,6 +127,7 @@ fn map(r: &Row) -> rusqlite::Result<Game> {
         emulator_name: r.get(22)?,
         ra_game_id: r.get(23)?,
         source: r.get(24)?,
+        external_id: r.get(28)?,
         steam_app_id: r.get(25)?,
         installed: false,
         genre: r.get(15)?,
@@ -205,7 +208,7 @@ fn validate(i: &mut GameInput, allow_no_exe: bool) -> AppResult<()> {
 
 /// Formatos de arquivo de jogo aceitos no "Adicionar jogo" (iniciados por um emulador). O .iso vai para
 /// `iso_path`; os demais para `rom_path`, como na importação por pasta.
-const GAME_FILE_EXTS: [&str; 8] = ["iso", "bin", "cue", "nsp", "xci", "nup", "pkg", "vpk"];
+const GAME_FILE_EXTS: &[&str] = super::emulators::FORMATS;
 
 /// O caminho já pertence a um jogo do perfil? Compara caminhos normalizados (maiúsculas, barras).
 /// `file`: compara com arquivos de jogo (ISO/ROM); senão, com executáveis de jogos sem arquivo.
@@ -297,6 +300,10 @@ fn fetch(conn: &Connection, profile_id: i64, game_id: i64) -> AppResult<Game> {
 #[tauri::command(async)] // fora da thread da interface (E/S de disco ou consulta grande)
 pub fn list_library(db: State<Db>, profile_id: i64) -> AppResult<Vec<Game>> {
     let conn = db.conn()?;
+    // jogos oficiais integrados ao NexStage entram uma vez na biblioteca de cada perfil
+    if let Err(e) = crate::integrated::ensure_library(&conn, profile_id) {
+        crate::diaglog::write("erro", "integrated", &e.to_string());
+    }
     let mut stmt = conn.prepare(&format!(
         "{SELECT} WHERE pg.profile_id=?1 ORDER BY g.title COLLATE NOCASE"
     ))?;
@@ -369,8 +376,16 @@ pub fn update_game(
     // `input.iso_path`: novo local do arquivo do jogo (ISO/ROM), se o usuário trocou (ver `relocate_file`).
     // ISO/ROM ou jogo da Steam (abre pelo cliente Steam) podem ficar sem executável
     let no_exe_ok: bool = conn
-        .query_row("SELECT COALESCE(iso_path, rom_path) IS NOT NULL OR source='steam' OR EXISTS(SELECT 1 FROM steam_links WHERE game_id=?1) FROM games WHERE id=?1", [game_id], |r| r.get(0))
+        .query_row("SELECT COALESCE(iso_path, rom_path) IS NOT NULL OR source IN ('steam','nexstage') OR EXISTS(SELECT 1 FROM steam_links WHERE game_id=?1) FROM games WHERE id=?1", [game_id], |r| r.get(0))
         .unwrap_or(false);
+    // jogo integrado: executável e argumentos são do NexStage (instalação gerenciada ou localizada)
+    let managed: Option<(String, String)> = conn
+        .query_row("SELECT executable_path, launch_args FROM games WHERE id=?1 AND source='nexstage'", [game_id], |r| Ok((r.get(0)?, r.get(1)?)))
+        .ok();
+    if let Some((exe, args)) = managed {
+        input.executable_path = exe;
+        input.launch_args = args;
+    }
     validate(&mut input, no_exe_ok)?;
     let old_platform: Option<String> = conn.query_row("SELECT platform FROM games WHERE id=?1", [game_id], |r| r.get(0)).ok();
     input.cover = crate::images::store(input.cover.take())?;
@@ -465,9 +480,11 @@ pub fn ensure_owned(conn: &Connection, profile_id: i64, game_id: i64) -> AppResu
 }
 
 /// Plataformas oficiais do NEXSTAGE, na ordem exibida na interface.
-pub const PLATFORMS: [&str; 15] = [
+pub const PLATFORMS: [&str; 26] = [
     "PC", "XBOX", "Xbox 360", "Xbox Series", "Playstation 1", "Playstation 2", "Playstation 3", "Playstation 4",
-    "Playstation 5", "PSP", "Ps Vita", "Nintendo Switch", "Nintendo Switch 2", "Super Nintendo", "Nintendinho",
+    "Playstation 5", "PSP", "Ps Vita", "Nintendo Switch", "Nintendo Switch 2", "Wii U", "Wii", "GameCube", "Nintendo 64",
+    "Nintendo 3DS", "Nintendo DS", "Game Boy Advance", "Game Boy Color", "Game Boy", "Dreamcast", "Mega Drive",
+    "Super Nintendo", "Nintendinho",
 ];
 
 /// Converte nomes antigos/variações para o valor oficial. `None` = sem equivalente seguro.
@@ -489,6 +506,17 @@ pub fn canonical_platform(s: &str) -> Option<&'static str> {
         "ps vita" | "psvita" | "playstation vita" | "vita" => "Ps Vita",
         "nintendo switch" | "switch" => "Nintendo Switch",
         "nintendo switch 2" | "switch 2" | "switch2" | "ns2" | "lichii" => "Nintendo Switch 2",
+        "wii u" | "wiiu" | "nintendo wii u" | "cemu" => "Wii U",
+        "wii" | "nintendo wii" => "Wii",
+        "gamecube" | "nintendo gamecube" | "game cube" | "gcn" | "ngc" => "GameCube",
+        "nintendo 3ds" | "3ds" | "new nintendo 3ds" | "azahar" | "citra" => "Nintendo 3DS",
+        "nintendo ds" | "ds" | "nds" | "nintendo dsi" | "melonds" => "Nintendo DS",
+        "game boy advance" | "gameboy advance" | "gba" => "Game Boy Advance",
+        "game boy color" | "gameboy color" | "gbc" => "Game Boy Color",
+        "game boy" | "gameboy" | "gb" | "dmg" => "Game Boy",
+        "nintendo 64" | "n64" | "rmg" => "Nintendo 64",
+        "mega drive" | "sega mega drive" | "genesis" | "sega genesis" | "sega mega drive/genesis" | "mega drive/genesis" | "megadrive" => "Mega Drive",
+        "dreamcast" | "sega dreamcast" | "flycast" => "Dreamcast",
         "super nintendo" | "snes" | "super nes" | "super famicom" => "Super Nintendo",
         "nintendinho" | "nes" | "famicom" | "nintendo 8 bits" => "Nintendinho",
         _ => return None,
@@ -541,7 +569,7 @@ mod platform_tests {
             id: 1, title: "x".into(), platform: "PC".into(), executable_path: exe.into(), launch_args: String::new(), cover: None, favorite: false, favorited_at: None,
             playtime_seconds: 0, last_played_at: None, added_at: String::new(), background: None, bg_x: 50, bg_y: 50, logo: None, steam_id: None,
             release_date: None, release_iso: None, genre: None, genres: vec![], completed: false, completed_at: None, iso_path: iso, rom_path: None,
-            emulator_id: None, emulator_name: None, ra_game_id: None, source: source.into(), steam_app_id: appid, installed: false,
+            emulator_id: None, emulator_name: None, ra_game_id: None, source: source.into(), external_id: None, steam_app_id: appid, installed: false,
         }
     }
 

@@ -27,7 +27,7 @@ export default function ControlHints() {
       if (document.querySelector(".kb-root, .sm-root:not(.leaving), .gb-root, .viewer-full, .igdb-fs, .trl-full")) return null;
       if (document.querySelector(".pick-root, .ctx-root")) return [[["dpad"], tk("Mover")], [["confirm"], tk("Selecionar")], [["back"], tk("Fechar")]];
       // navegador de arquivos (pode abrir por cima de outra janela): Ⓑ sobe uma pasta (fecha em "Este computador"); ☰ confirma
-      if (document.querySelector(".overlay:not(.leaving) .fp")) return [[["confirm"], tk("Abrir")], [["back"], tk("Pasta acima")], [["x"], tk("Favoritar pasta")], [["l1", "r1"], tk("Áreas")], [["l2", "r2"], tk("Página")], [["menu"], tk("Confirmar")]];
+      if (document.querySelector(".overlay:not(.leaving) .fp")) return [[["confirm"], tk("Abrir")], [["back"], tk("Pasta acima (segure: cancelar)")], [["x"], tk("Favoritar pasta")], [["y"], tk("Botões")], [["l1", "r1"], tk("Áreas")], [["l2", "r2"], tk("Página")], [["menu"], tk("Confirmar")]];
       const layer = document.querySelector<HTMLElement>(".overlay:not(.leaving)");
       if (layer) {
         if (layer.matches("[data-viewer=\"vertical\"]")) return [[["dpad"], tk("↑ ↓ captura · ← → opções")], [["confirm"], tk("Selecionar")], [["back"], tk("Fechar")]];

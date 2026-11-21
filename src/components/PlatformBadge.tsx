@@ -8,7 +8,8 @@ import {
  * PlayStation (1–5, PSP, Vita): formas oficiais do pacote simple-icons (CC0).
  * PC, Xbox, Switch, Super Nintendo e Nintendinho: a Microsoft e a Nintendo não permitem distribuir os
  * logotipos em pacotes de ícones, então são símbolos simplificados reconhecíveis (bandeira de 4
- * janelas, "X" na esfera, Joy-Con, os 4 botões do SNES e o controle do NES).
+ * janelas, "X" na esfera, Joy-Con, os 4 botões do SNES e o controle do NES). Wii, Wii U, GameCube, DS, 3DS,
+ * GBA e Dreamcast seguem a mesma ideia (controle, cubo, telas, espiral), sem os logotipos das marcas.
  */
 const si = (d: string) => <path d={d} fill="currentColor" />;
 const XBOX = (
@@ -42,6 +43,122 @@ const MARKS: Record<string, Mark> = {
   "Ps Vita": { label: "PlayStation Vita", glyph: si(siPlaystationvita.path) },
   "Nintendo Switch": { label: "Nintendo Switch", glyph: SWITCH },
   "Nintendo Switch 2": { label: "Nintendo Switch 2", glyph: SWITCH, suffix: "2" },
+  "Wii U": {
+    label: "Wii U",
+    glyph: (
+      <>
+        <rect x="1.5" y="5" width="21" height="14" rx="4" fill="none" stroke="currentColor" strokeWidth="1.7" />
+        <rect x="7" y="8" width="10" height="8" rx="1" fill="currentColor" />
+        <circle cx="4.4" cy="10" r="1.1" fill="currentColor" />
+        <circle cx="19.6" cy="14" r="1.1" fill="currentColor" />
+      </>
+    ),
+  },
+  "Wii": {
+    label: "Wii",
+    glyph: (
+      <>
+        <rect x="8.5" y="1.5" width="7" height="21" rx="3.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
+        <circle cx="12" cy="6" r="1.5" fill="currentColor" />
+        <rect x="11.2" y="10" width="1.6" height="5" rx=".8" fill="currentColor" />
+      </>
+    ),
+  },
+  "GameCube": {
+    label: "Nintendo GameCube",
+    glyph: (
+      <>
+        <path d="M12 1.8 21 7v10l-9 5.2L3 17V7z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+        <path d="M12 7.2 16.5 9.8v5.2L12 17.6 7.5 15V9.8z" fill="currentColor" />
+      </>
+    ),
+  },
+  "Nintendo 3DS": {
+    label: "Nintendo 3DS",
+    glyph: (
+      <>
+        <rect x="4.5" y="1.5" width="15" height="9.5" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <rect x="4.5" y="13" width="15" height="9.5" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <rect x="9" y="15.2" width="6" height="5" rx=".6" fill="currentColor" />
+      </>
+    ),
+    suffix: "3D",
+  },
+  "Nintendo DS": {
+    label: "Nintendo DS",
+    glyph: (
+      <>
+        <rect x="4.5" y="1.5" width="15" height="9.5" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <rect x="4.5" y="13" width="15" height="9.5" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <rect x="8" y="4" width="8" height="4.5" rx=".6" fill="currentColor" />
+        <rect x="8" y="15.5" width="8" height="4.5" rx=".6" fill="currentColor" />
+      </>
+    ),
+  },
+  "Game Boy Advance": {
+    label: "Game Boy Advance",
+    glyph: (
+      <>
+        <rect x="1.5" y="5.5" width="21" height="13" rx="5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <rect x="8" y="8" width="8" height="8" rx="1" fill="currentColor" />
+        <path d="M3.6 11.2h1.2V10h1.2v1.2h1.2v1.2H6v1.2H4.8v-1.2H3.6z" fill="currentColor" />
+        <circle cx="19.2" cy="11" r="1" fill="currentColor" />
+        <circle cx="18" cy="13.2" r="1" fill="currentColor" />
+      </>
+    ),
+  },
+  "Nintendo 64": {
+    label: "Nintendo 64",
+    glyph: (
+      <>
+        <path d="M3 9.5c0-2 1.5-3.5 3.5-3.5h11c2 0 3.5 1.5 3.5 3.5V12l-2.5 6.5H16L13.5 13h-3L8 18.5H5.5L3 12z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <circle cx="12" cy="10" r="1.6" fill="currentColor" />
+        <path d="M6 9.4h1.2V8.2h1.2v1.2h1.2v1.2H8.4v1.2H7.2v-1.2H6z" fill="currentColor" />
+      </>
+    ),
+  },
+  "Game Boy": {
+    label: "Game Boy",
+    glyph: (
+      <>
+        <rect x="5" y="1.5" width="14" height="21" rx="2.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <rect x="7.5" y="4" width="9" height="7.5" rx=".8" fill="currentColor" />
+        <path d="M7.6 15.8h1.2v-1.2H10v1.2h1.2V17H10v1.2H8.8V17H7.6z" fill="currentColor" />
+        <circle cx="15.8" cy="15.6" r="1.1" fill="currentColor" />
+      </>
+    ),
+  },
+  "Game Boy Color": {
+    label: "Game Boy Color",
+    glyph: (
+      <>
+        <rect x="5" y="1.5" width="14" height="21" rx="2.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <rect x="7.5" y="4" width="9" height="7.5" rx=".8" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="10.2" cy="7.8" r="1.2" fill="currentColor" />
+        <circle cx="13.8" cy="7.8" r="1.2" fill="currentColor" />
+        <path d="M7.6 15.8h1.2v-1.2H10v1.2h1.2V17H10v1.2H8.8V17H7.6z" fill="currentColor" />
+        <circle cx="15.8" cy="15.6" r="1.1" fill="currentColor" />
+      </>
+    ),
+    suffix: "C",
+  },
+  "Mega Drive": {
+    label: "Sega Mega Drive",
+    glyph: (
+      <>
+        <path d="M2 8.5h20v7H2z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <circle cx="7" cy="12" r="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M11 11h9M11 13h9" stroke="currentColor" strokeWidth="1.3" />
+      </>
+    ),
+  },
+  "Dreamcast": {
+    label: "Sega Dreamcast",
+    glyph: (
+      <path d="M12 3.2a8.8 8.8 0 1 0 8.8 8.8h-2.4A6.4 6.4 0 1 1 12 5.6a4.4 4.4 0 1 1-4.4 4.4h2.2A2.2 2.2 0 1 0 12 7.8"
+        fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    ),
+  },
   "Super Nintendo": {
     label: "Super Nintendo",
     glyph: (

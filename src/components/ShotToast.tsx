@@ -7,7 +7,7 @@ import { raValue, steamValue, trophyValue } from "../lib/score";
 interface ToastEvent { thumb: string; title: string | null; secs: number; sound: boolean; show: boolean }
 /** Conquista desbloqueada (RetroAchievements ou Steam, confirmada pela API como nova) ou troféu do
  *  Vita3K/RPCS3 (lido do arquivo do emulador; `grade`: P/G/S/B). */
-interface AchItem { grade: string | null; source: "ra" | "steam" | "xbox" | "vita3k" | "rpcs3"; icon: string | null; title: string; game: string; points: number; hardcore: boolean; rare: boolean; globalPct: number | null; more: number }
+interface AchItem { grade: string | null; source: "ra" | "steam" | "xbox" | "vita3k" | "rpcs3" | "nexstage"; icon: string | null; title: string; game: string; points: number; hardcore: boolean; rare: boolean; globalPct: number | null; more: number }
 interface AchToastEvent { item: AchItem; secs: number; sound: boolean }
 /** Controle conectado / desconectado / bateria baixa. */
 interface PadItem { event: "connected" | "disconnected" | "battery"; device: "xbox" | "playstation" | "generic"; name: string; percent: number | null; label: string | null }
@@ -102,11 +102,11 @@ export default function ShotToast() {
     const a = ra.item;
     const detail = [
       a.game,
-      a.source === "ra" && a.points > 0 ? t("+{n} pontos", { n: a.points }) : null,
+      (a.source === "ra" || a.source === "nexstage") && a.points > 0 ? t("+{n} pontos", { n: a.points }) : null,
       a.source === "xbox" && a.points > 0 ? `${a.points}G` : null,
       a.grade ? (a.grade === "P" ? t("Platina") : a.grade === "G" ? t("Ouro") : a.grade === "S" ? t("Prata") : t("Bronze")) : null,
       a.globalPct !== null ? t("{p}% dos jogadores", { p: a.globalPct < 10 ? a.globalPct.toFixed(1) : Math.round(a.globalPct) }) : null,
-      t("+{n} na pontuação", { n: a.grade ? trophyValue(a.grade) : a.source === "ra" ? raValue(a.points, a.hardcore) : steamValue(a.globalPct) }),
+      a.source === "nexstage" ? null : t("+{n} na pontuação", { n: a.grade ? trophyValue(a.grade) : a.source === "ra" ? raValue(a.points, a.hardcore) : steamValue(a.globalPct) }),
       a.more > 0 ? t("e mais {n} conquista(s)", { n: a.more }) : null,
     ].filter(Boolean).join(" · ");
     return (
@@ -126,7 +126,7 @@ export default function ShotToast() {
           <strong>{a.title}</strong>
           <small>{detail}</small>
         </div>
-        <span className="ach-src">{a.source === "steam" ? "Steam" : a.source === "xbox" ? "Xbox" : a.source === "vita3k" ? "Vita3K" : a.source === "rpcs3" ? "RPCS3" : "RA"}</span>
+        <span className="ach-src">{a.source === "nexstage" ? "NexStage" : a.source === "steam" ? "Steam" : a.source === "xbox" ? "Xbox" : a.source === "vita3k" ? "Vita3K" : a.source === "rpcs3" ? "RPCS3" : "RA"}</span>
       </div>
     );
   }

@@ -21,6 +21,8 @@ export interface PickOptions {
   defaultPath?: string;
   /** Chave para lembrar a última pasta usada (ex.: "games", "images", "backup"). */
   purpose?: string;
+  /** Só navegar (ver o conteúdo de uma pasta): "Fechar" no lugar de Cancelar/confirmar e arquivos não são escolhidos. */
+  browse?: boolean;
 }
 export interface PickRequest { id: number; mode: "open" | "save"; opts: PickOptions; resolve: (v: string[] | null) => void }
 let seq = 0;
@@ -63,6 +65,14 @@ export async function pickOpen(opts: PickOptions): Promise<string | string[] | n
   const r = await request("open", opts);
   if (!r?.length) return null;
   return opts.multiple ? r : r[0];
+}
+
+/**
+ * Explorar uma pasta no navegador de arquivos do NEXSTAGE (sempre o do app, navegável pelo controle, qualquer
+ * que seja a opção do seletor). `defaultPath` pode ser um arquivo: abre na pasta dele, com ele em foco.
+ */
+export async function browseFolder(opts: { title?: string; defaultPath?: string; purpose?: string }): Promise<void> {
+  await request("open", { ...opts, browse: true });
 }
 
 /** "Salvar como": caminho do arquivo a gravar (ou null). */

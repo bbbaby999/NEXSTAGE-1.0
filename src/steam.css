@@ -88,3 +88,38 @@ html[data-motion="reduced"] .dlc-card:hover{transform:none}
 /* Importar → Xbox: jogados e não instalados */
 .steam-grid.xni{flex:none;min-height:0;max-height:42vh}
 .steam-card.xbox-missing .steam-cover img{filter:saturate(.75)}
+/* jogos oficiais integrados ao NexStage (selo e bloco na página do jogo) */
+.chips .nx-chip-tag{border-color:rgba(var(--accent-rgb,138,92,246),.55);color:var(--accent,#a78bfa)}
+.nx-sec{color:var(--accent,#a78bfa)}
+
+.nx-new{color:var(--accent,#a78bfa);font-weight:600}
+.nx-job{margin:var(--s2,8px) 0}
+.nx-notes summary{cursor:pointer;color:var(--accent,#a78bfa)}
+.nx-notes pre{white-space:pre-wrap;font:inherit;font-size:.9em;opacity:.85;max-height:220px;overflow:auto}
+.nx-sub{font-size:1rem;margin:var(--s3,12px) 0 var(--s1,4px)}
+.nx-stat-group h4{margin:var(--s3,12px) 0 var(--s1,4px);font-size:.95rem;opacity:.85}
+/* ---- Página especial dos jogos oficiais do NexStage (tema da tumba: areia escura e ouro) ---- */
+.nx-theme{--nx-gold:#e9b949;--nx-gold-soft:rgba(233,185,73,.16);--nx-sand:#24180c}
+.nx-theme .dp-hero .dp-shade{background:linear-gradient(180deg,rgba(20,12,4,.05) 30%,rgba(20,12,4,.92) 100%)}
+.nx-theme .dp-title h1{background:linear-gradient(180deg,#ffe7a3,#e9b949 55%,#a8721f);-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:.04em;text-shadow:none;filter:drop-shadow(0 3px 10px rgba(0,0,0,.6))}
+.nx-theme .dp-tabs button.on{color:var(--nx-gold);box-shadow:inset 0 -3px 0 var(--nx-gold)}
+.nx-theme .dp-play{background:linear-gradient(180deg,#f0c35a,#c58b24);color:#2a1a06;border-color:#ffd77a}
+.nx-theme .dp-play:hover,.nx-theme .dp-play:focus-visible{filter:brightness(1.08)}
+.nx-overview{display:flex;flex-direction:column;gap:var(--s3,12px)}
+.nx-card{background:linear-gradient(180deg,rgba(233,185,73,.07),rgba(233,185,73,.02));border:1px solid rgba(233,185,73,.22);border-radius:var(--r-md,10px);padding:var(--s3,14px) var(--s4,18px)}
+.nx-card h3{margin:0 0 var(--s2,8px);font-size:1.02rem;color:var(--nx-gold,#e9b949)}
+.nx-card h3:not(:first-child){margin-top:var(--s3,12px)}
+.nx-progress{display:flex;gap:var(--s4,18px);align-items:center}
+.nx-progress p{margin:2px 0}
+.nx-ring{position:relative;flex:none;width:108px;height:108px}
+.nx-ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:1.35rem;color:var(--nx-gold,#e9b949)}
+.nx-ring-bg{fill:none;stroke:rgba(255,255,255,.08);stroke-width:9}
+.nx-ring-fg{fill:none;stroke:var(--nx-gold,#e9b949);stroke-width:9;stroke-linecap:round;transition:stroke-dasharray .6s ease}
+.nx-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--s2,8px)}
+.nx-tile{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:8px;background:rgba(0,0,0,.22);border:1px solid rgba(233,185,73,.14)}
+.nx-tile b{font-size:1.2rem;color:var(--text,#fff)}
+.nx-tile small{opacity:.75}
+.nx-tab{display:flex;flex-direction:column;gap:var(--s3,12px)}
+.nx-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:var(--s3,12px)}
+.nx-notes-full{white-space:pre-wrap;font:inherit;line-height:1.55;margin:0}
+.nx-news{display:flex;flex-direction:column;gap:var(--s3,12px);align-items:flex-start}

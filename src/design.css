@@ -417,3 +417,12 @@ ul.plain{list-style:none;padding:0;margin:var(--s3) 0;display:flex;flex-directio
 /* ---------- Biblioteca: filtros em linha própria (Gênero → Plataforma → Coleção) ---------- */
 .filterbar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:-6px 0 18px}
 .filterbar kbd{padding:1px 6px;border-radius:6px;border:1px solid var(--glass-line);font:inherit;font-size:.68rem;font-weight:700;color:var(--text-dim)}
+.emu-update{font-size:.9rem;color:var(--text-dim)}
+.emu-update.new{color:var(--text);font-weight:600}
+.emu-update-settings{margin-top:var(--s5)}
+.emu-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--s3);margin-bottom:var(--s4)}
+.emu-section{margin:var(--s6) 0 var(--s2);font-size:1.3rem;font-weight:600}
+.emu-dir{margin-bottom:var(--s4);overflow-wrap:anywhere}
+.emu.missing{opacity:.92;border-style:dashed}
+.emu-dest{padding:var(--s2) var(--s3);border-radius:var(--r-md,8px);background:var(--glass);border:1px solid var(--glass-line);overflow-wrap:anywhere;font-size:.9rem}
+.emu-exists{padding:var(--s3);border-radius:var(--r-md,8px);border:1px solid rgba(255,180,84,.5);background:rgba(255,180,84,.08);color:var(--text)}

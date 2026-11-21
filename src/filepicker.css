@@ -111,12 +111,12 @@
   .fp-head span:nth-child(2),.fp-main.list .fp-date{display:none}
 }
 
-/* favoritas */
-.fp-tool.fav .fp-ico{width:17px;height:17px}
-.fp-tool.fav.on{color:#ffd24a;border-color:rgba(255,210,74,.5)}
-.fp-tool.fav.on .fp-ico{fill:#ffd24a}
-.fp-tool.fav.on:focus{color:var(--on-a,#fff)}
-.fp-side-item .fp-ico-star,.fp-drive.fav .fp-ico{color:#ffd24a;fill:rgba(255,210,74,.25)}
+/* favoritas (classes fp-fav*: a classe global .fav — estrela das capas — é position:absolute) */
+.fp-tool.fp-fav-tool .fp-ico{width:17px;height:17px}
+.fp-tool.fp-fav-tool.on{color:#ffd24a;border-color:rgba(255,210,74,.5)}
+.fp-tool.fp-fav-tool.on .fp-ico{fill:#ffd24a}
+.fp-tool.fp-fav-tool.on:focus{color:var(--on-a,#fff)}
+.fp-side-item .fp-ico-star,.fp-drive.fp-fav .fp-ico{color:#ffd24a;fill:rgba(255,210,74,.25)}
 .fp-side-item:focus .fp-ico-star{color:inherit;fill:none}
 .fp-fav-badge{display:inline-grid;place-items:center;margin-left:6px;vertical-align:-2px}
 .fp-fav-badge .fp-ico{width:14px;height:14px;color:#ffd24a;fill:#ffd24a}

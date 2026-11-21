@@ -12,6 +12,10 @@ const TONE: Record<string, string> = {
   "Playstation 1": "0,112,209", "Playstation 2": "0,72,170", "Playstation 3": "40,60,140",
   "Playstation 4": "0,84,180", "Playstation 5": "0,112,209", "PSP": "60,70,110", "Ps Vita": "0,90,170",
   "Nintendo Switch": "230,0,18", "Nintendo Switch 2": "230,0,18",
+  "Wii U": "0,154,199", "Wii": "120,130,145", "GameCube": "88,72,160",
+  "Nintendo 3DS": "206,20,40", "Nintendo DS": "110,110,120", "Game Boy Advance": "80,60,160",
+  "Dreamcast": "238,110,30",
+  "Nintendo 64": "40,110,60", "Game Boy": "130,140,60", "Game Boy Color": "120,60,170", "Mega Drive": "30,30,40",
   "Super Nintendo": "104,92,170",
   "Nintendinho": "178,34,40",
 };

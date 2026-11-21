@@ -9,7 +9,24 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tauri::State;
 
-pub const FORMATS: [&str; 8] = ["iso", "bin", "cue", "nsp", "xci", "nup", "pkg", "vpk"];
+/// Formatos de jogo aceitos (cadastro de emuladores, "Adicionar jogo" e varredura de pastas).
+pub const FORMATS: &[&str] = &[
+    "iso", "bin", "cue", "nsp", "xci", "nup", "pkg", "vpk",
+    // GameCube / Wii
+    "gcm", "rvz", "wbfs", "wia", "gcz", "wad",
+    // Wii U
+    "wud", "wux", "wua", "rpx",
+    // DS / 3DS / GBA / Game Boy / Game Boy Color
+    "nds", "3ds", "cci", "cxi", "3dsx", "gba", "gb", "gbc",
+    // Nintendo 64 (big-endian, byte-swapped e little-endian)
+    "z64", "n64", "v64",
+    // Mega Drive (o .bin de cartucho é reconhecido pelo cabeçalho "SEGA")
+    "md", "gen", "smd",
+    // Dreamcast (e imagens CHD de vários consoles)
+    "gdi", "cdi", "chd",
+    // SNES / NES
+    "sfc", "smc", "nes",
+];
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -27,6 +44,8 @@ pub struct Emulator {
     /// O NEXSTAGE reconhece o emulador e sabe aplicar a opção de tela cheia.
     pub fullscreen_supported: bool,
     pub games: i64,
+    /// Fonte de atualização: `None` = automática (emulador reconhecido), "-" = desligada, senão a escolhida.
+    pub update_source: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -43,12 +62,14 @@ pub struct EmulatorInput {
     pub cover: Option<String>,
     #[serde(default)]
     pub fullscreen: bool,
+    #[serde(default)]
+    pub update_source: Option<String>,
 }
 
 pub fn load_all(conn: &Connection) -> AppResult<Vec<Emulator>> {
     let mut st = conn.prepare(
         "SELECT e.id,e.name,e.exe_path,e.platforms,e.formats,e.args,e.cover,
-                (SELECT COUNT(*) FROM games g WHERE g.emulator_id=e.id), e.fullscreen
+                (SELECT COUNT(*) FROM games g WHERE g.emulator_id=e.id), e.fullscreen, e.update_source
          FROM emulators e ORDER BY e.name COLLATE NOCASE",
     )?;
     let rows = st
@@ -69,6 +90,7 @@ pub fn load_all(conn: &Connection) -> AppResult<Vec<Emulator>> {
                 args: r.get(5)?,
                 cover: crate::images::resolve(r.get(6)?),
                 games: r.get(7)?,
+                update_source: r.get(9)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -82,7 +104,13 @@ pub fn list_emulators(db: State<Db>) -> AppResult<Vec<Emulator>> {
 }
 
 #[tauri::command]
-pub fn save_emulator(db: State<Db>, mut input: EmulatorInput) -> AppResult<Emulator> {
+pub fn save_emulator(db: State<Db>, input: EmulatorInput) -> AppResult<Emulator> {
+    let conn = db.conn()?;
+    save(&conn, input)
+}
+
+/// Valida e grava o emulador (novo ou existente). Usado também pela instalação pelo catálogo.
+pub fn save(conn: &Connection, mut input: EmulatorInput) -> AppResult<Emulator> {
     input.name = input.name.trim().to_string();
     input.exe_path = input.exe_path.trim().to_string();
     if input.name.is_empty() || input.name.chars().count() > 40 {
@@ -111,13 +139,17 @@ pub fn save_emulator(db: State<Db>, mut input: EmulatorInput) -> AppResult<Emula
     if let Some(kind) = crate::emu_fullscreen::detect(&input.name, &input.exe_path) {
         input.args = crate::emu_fullscreen::strip_text(kind, &input.args);
     }
-    let conn = db.conn()?;
+    let update_source = crate::emu_update::normalize_source(input.update_source.as_deref())?;
     let (pl, fm) = (serde_json::to_string(&platforms).unwrap_or_default(), serde_json::to_string(&formats).unwrap_or_default());
     let id = match input.id {
         Some(id) => {
             let n = conn.execute(
-                "UPDATE emulators SET name=?1,exe_path=?2,platforms=?3,formats=?4,args=?5,cover=?6,fullscreen=?7 WHERE id=?8",
-                params![input.name, input.exe_path, pl, fm, input.args.trim(), cover, input.fullscreen, id],
+                // trocar o executável (ou a fonte) invalida a versão instalada que o NEXSTAGE registrou
+                "UPDATE emulators SET name=?1,exe_path=?2,platforms=?3,formats=?4,args=?5,cover=?6,fullscreen=?7,update_source=?9,
+                        update_version=CASE WHEN exe_path=?2 AND update_source IS ?9 THEN update_version END,
+                        update_key=CASE WHEN exe_path=?2 AND update_source IS ?9 THEN update_key END
+                 WHERE id=?8",
+                params![input.name, input.exe_path, pl, fm, input.args.trim(), cover, input.fullscreen, id, update_source],
             )?;
             if n == 0 {
                 return Err(AppError::NotFound("Emulador não encontrado.".into()));
@@ -126,13 +158,13 @@ pub fn save_emulator(db: State<Db>, mut input: EmulatorInput) -> AppResult<Emula
         }
         None => {
             conn.execute(
-                "INSERT INTO emulators(name,exe_path,platforms,formats,args,cover,fullscreen) VALUES(?1,?2,?3,?4,?5,?6,?7)",
-                params![input.name, input.exe_path, pl, fm, input.args.trim(), cover, input.fullscreen],
+                "INSERT INTO emulators(name,exe_path,platforms,formats,args,cover,fullscreen,update_source) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+                params![input.name, input.exe_path, pl, fm, input.args.trim(), cover, input.fullscreen, update_source],
             )?;
             conn.last_insert_rowid()
         }
     };
-    load_all(&conn)?.into_iter().find(|e| e.id == id).ok_or_else(|| AppError::NotFound("Emulador não encontrado.".into()))
+    load_all(conn)?.into_iter().find(|e| e.id == id).ok_or_else(|| AppError::NotFound("Emulador não encontrado.".into()))
 }
 
 /// Remove o emulador do cadastro. Os jogos ficam na biblioteca, apenas sem associação (emulator_id volta a NULL).

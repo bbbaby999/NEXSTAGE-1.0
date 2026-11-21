@@ -24,7 +24,7 @@ const sum = summarize(items, new Set(["a.iso", "c.iso", "d.exe", "f.iso"]), new 
 ok(sum.count === 3, "o duplicado marcado não entra na importação (3 de 4)");
 ok(sum.byPlatform["Playstation 2"] === 2 && sum.byPlatform["PC"] === 1, "resumo por plataforma");
 ok(sum.withoutEmulator === 1, "1 jogo ficará sem emulador associado (aviso na confirmação)");
-const plats = ["PC", "XBOX", "Xbox 360", "Playstation 1", "Playstation 2", "Playstation 3", "Playstation 4", "Playstation 5", "PSP", "Ps Vita", "Nintendo Switch", "Nintendo Switch 2", "Super Nintendo", "Nintendinho"];
+const plats = ["PC", "XBOX", "Xbox 360", "Xbox Series", "Playstation 1", "Playstation 2", "Playstation 3", "Playstation 4", "Playstation 5", "PSP", "Ps Vita", "Nintendo Switch", "Nintendo Switch 2", "Wii U", "Wii", "GameCube", "Nintendo 64", "Nintendo 3DS", "Nintendo DS", "Game Boy Advance", "Game Boy Color", "Game Boy", "Dreamcast", "Mega Drive", "Super Nintendo", "Nintendinho"];
 ok(EMULATOR_PRESETS.every((p) => p.platforms.every((x) => plats.includes(x)) && p.formats.every((f) => ALL_FORMATS.includes(f))), "presets usam só plataformas e formatos válidos");
 ok(EMULATOR_PRESETS.filter((p) => p.formats.includes("pkg") || p.formats.includes("vpk")).every((p) => p.note), "presets com PKG/VPK avisam que precisam de instalação");
 console.log(fails ? `\n${fails} falha(s)` : "\nTodos os testes passaram");

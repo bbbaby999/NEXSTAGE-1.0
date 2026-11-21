@@ -6,6 +6,7 @@ import ImagePicker from "./ImagePicker";
 import LogoPicker from "./LogoPicker";
 import Seg from "./Seg";
 import type { Emulator } from "../types";
+import { ALL_FORMATS } from "../data/emulatorPresets";
 import Select from "./Select";
 import { api, errMsg } from "../lib/api";
 import { useSession } from "../state/session";
@@ -86,7 +87,7 @@ export default function GameForm({ profileId, game, isoPath, exePath, title, pla
         directory: false,
         defaultPath: cur || undefined,
         filters: [
-          { name: t("Arquivos de jogo"), extensions: ["iso", "bin", "cue", "nsp", "nup", "xci", "pkg", "vpk", "chd", "cso"] },
+          { name: t("Arquivos de jogo"), extensions: [...ALL_FORMATS, "cso"] },
           ...(ext && cur.includes(".") ? [{ name: "." + ext, extensions: [ext] }] : []),
           { name: t("Todos os arquivos"), extensions: ["*"] },
         ],
@@ -155,6 +156,9 @@ export default function GameForm({ profileId, game, isoPath, exePath, title, pla
                 options={[[t("Nenhum (usar o executável e os argumentos abaixo)"), ""], ...emus.map((e): [string, number] => [`${e.name}${e.platforms.includes(f.platform) ? t(" ✓ compatível") : ""}`, e.id])]} />
             </label>
           )}
+          {game?.source === "nexstage" ? (
+            <p className="muted">{t("Jogo integrado: o executável é definido pelo NexStage (instalação ou Localizar instalação na página do jogo).")}</p>
+          ) : (<>
           <label>{iso ? t("Emulador ou comando (pode ser configurado depois)") : viaEmu ? t("Arquivo do jogo (enviado ao emulador)") : t("Executável")}
             <div className="row">
               <input value={f.executablePath} readOnly placeholder={t("Nenhum arquivo selecionado")} />
@@ -167,6 +171,7 @@ export default function GameForm({ profileId, game, isoPath, exePath, title, pla
               onChange={(e) => set("launchArgs", e.target.value)}
             />
           </label>
+          </>)}
         </div>
         <div className="fields gf-art" data-nav-group>
           <div className="bg-edit">

@@ -70,10 +70,8 @@ pub fn detect_disc<R: Read + Seek>(r: &mut R) -> Found {
     }
     let Some(pvd) = sector(r, &l, 16) else { return unk("Imagem sem sistema de arquivos reconhecível.") };
     if pvd[0] != 1 || &pvd[1..6] != b"CD001" {
-        if let Some(h) = read_at(r, 0, 0x20) {
-            if u32be(&h, 0x18) == 0x5D1C_9EA3 || u32be(&h, 0x1C) == 0xC233_9F3D {
-                return unk("Nintendo Wii/GameCube: plataforma não suportada pelo NEXSTAGE.");
-            }
+        if let Some(f) = gc_wii_disc(r) {
+            return f;
         }
         return unk("Sem sistema de arquivos ISO 9660: plataforma não identificada.");
     }
@@ -89,6 +87,87 @@ pub fn detect_disc<R: Read + Seek>(r: &mut R) -> Found {
         if txt.contains("BOOT") { return found("Playstation 1", "Disco de PlayStation 1 (SYSTEM.CNF: BOOT)"); }
     }
     unk("ISO sem marcadores de console conhecidos (disco de dados ou plataforma não suportada).")
+}
+
+/// Disco de GameCube/Wii pelo número mágico do cabeçalho (imagem .iso/.gcm sem compressão).
+fn gc_wii_disc<R: Read + Seek>(r: &mut R) -> Option<Found> {
+    let h = read_at(r, 0, 0x20)?;
+    if u32be(&h, 0x18) == 0x5D1C_9EA3 {
+        return Some(found("Wii", "Disco de Wii"));
+    }
+    if u32be(&h, 0x1C) == 0xC233_9F3D {
+        return Some(found("GameCube", "Disco de GameCube"));
+    }
+    None
+}
+
+/// GameCube/Wii nos formatos do Dolphin: .gcm/.iso (disco), .rvz/.wia (tipo do disco no cabeçalho 2),
+/// .gcz (subtipo no cabeçalho), .wbfs e .wad (só Wii).
+pub fn detect_gc_wii<R: Read + Seek>(r: &mut R, ext: &str) -> Found {
+    match ext {
+        "wbfs" => found("Wii", "Imagem WBFS de Wii"),
+        "wad" => found("Wii", "Canal de Wii / WiiWare (.wad)"),
+        "rvz" | "wia" => match read_at(r, 0, 0x4C) {
+            Some(h) if &h[..3] == b"RVZ" || &h[..3] == b"WIA" => match u32be(&h, 0x48) {
+                1 => found("GameCube", "Disco de GameCube (RVZ/WIA)"),
+                2 => found("Wii", "Disco de Wii (RVZ/WIA)"),
+                _ => unk("Imagem RVZ/WIA com tipo de disco desconhecido."),
+            },
+            _ => unk("Arquivo RVZ/WIA inválido."),
+        },
+        "gcz" => match read_at(r, 0, 8) {
+            Some(h) if u32le(&h, 0) == 0xB10B_C001 => match u32le(&h, 4) {
+                0 => found("GameCube", "Disco de GameCube (GCZ)"),
+                1 => found("Wii", "Disco de Wii (GCZ)"),
+                _ => unk("Imagem GCZ com tipo de disco desconhecido."),
+            },
+            _ => unk("Arquivo GCZ inválido."),
+        },
+        _ => gc_wii_disc(r).unwrap_or_else(|| unk("Sem cabeçalho de disco de GameCube/Wii.")),
+    }
+}
+
+/// Formatos de um console só: a extensão basta (cartuchos, pacotes e imagens próprias).
+pub fn platform_by_ext(ext: &str) -> Option<Found> {
+    Some(match ext {
+        "nds" => found("Nintendo DS", "ROM de Nintendo DS"),
+        "3ds" | "cci" | "cxi" | "3dsx" => found("Nintendo 3DS", "Jogo de Nintendo 3DS"),
+        "gba" => found("Game Boy Advance", "ROM de Game Boy Advance"),
+        "gb" => found("Game Boy", "ROM de Game Boy"),
+        "gbc" => found("Game Boy Color", "ROM de Game Boy Color"),
+        "z64" | "n64" | "v64" => found("Nintendo 64", "ROM de Nintendo 64"),
+        "md" | "gen" | "smd" => found("Mega Drive", "ROM de Mega Drive"),
+        "wud" | "wux" => found("Wii U", "Imagem de disco de Wii U"),
+        "wua" => found("Wii U", "Arquivo de jogo de Wii U (.wua)"),
+        "rpx" => found("Wii U", "Jogo de Wii U (pasta com code/*.rpx)"),
+        "gdi" | "cdi" => found("Dreamcast", "Disco de Dreamcast"),
+        "sfc" | "smc" => found("Super Nintendo", "ROM de Super Nintendo"),
+        "nes" => found("Nintendinho", "ROM de Nintendinho (NES)"),
+        _ => return None,
+    })
+}
+
+/// Cartucho de Mega Drive salvo como .bin: "SEGA" no cabeçalho (0x100) e tamanho de cartucho (até 10 MB).
+pub fn is_mega_drive_rom<R: Read + Seek>(r: &mut R) -> bool {
+    let size = r.seek(SeekFrom::End(0)).unwrap_or(0);
+    if !(0x200..=10 * 1024 * 1024).contains(&size) {
+        return false;
+    }
+    read_at(r, 0x100, 4).is_some_and(|b| &b[..] == b"SEGA")
+}
+
+/// Arquivos de faixas citados num .gdi (Dreamcast): "1 0 4 2352 track01.bin 0" ou com o nome entre aspas.
+pub fn gdi_files(text: &str) -> Vec<String> {
+    text.lines()
+        .skip(1)
+        .filter_map(|l| {
+            let t = l.trim();
+            if let Some(a) = t.find('"') {
+                return t[a + 1..].find('"').map(|b| t[a + 1..a + 1 + b].to_string());
+            }
+            t.split_whitespace().nth(4).map(str::to_string)
+        })
+        .collect()
 }
 
 /// Informações do executável do Windows lidas do cabeçalho PE.
@@ -168,6 +247,54 @@ pub fn cue_files(text: &str) -> Vec<String> {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod new_platform_tests {
+    use super::*;
+    use std::io::Cursor;
+
+    fn disc(magic_at: usize, magic: u32) -> Vec<u8> {
+        let mut b = vec![0u8; 64 * 1024];
+        b[magic_at..magic_at + 4].copy_from_slice(&magic.to_be_bytes());
+        b
+    }
+
+    #[test]
+    fn gamecube_and_wii_discs() {
+        assert_eq!(detect_disc(&mut Cursor::new(disc(0x1C, 0xC233_9F3D))).platform, Some("GameCube"));
+        assert_eq!(detect_disc(&mut Cursor::new(disc(0x18, 0x5D1C_9EA3))).platform, Some("Wii"));
+        let mut rvz = vec![0u8; 0x100];
+        rvz[..4].copy_from_slice(b"RVZ");
+        rvz[0x48..0x4C].copy_from_slice(&2u32.to_be_bytes());
+        assert_eq!(detect_gc_wii(&mut Cursor::new(rvz.clone()), "rvz").platform, Some("Wii"));
+        rvz[0x48..0x4C].copy_from_slice(&1u32.to_be_bytes());
+        assert_eq!(detect_gc_wii(&mut Cursor::new(rvz), "rvz").platform, Some("GameCube"));
+        let mut gcz = vec![0u8; 32];
+        gcz[..4].copy_from_slice(&0xB10B_C001u32.to_le_bytes());
+        gcz[4..8].copy_from_slice(&1u32.to_le_bytes());
+        assert_eq!(detect_gc_wii(&mut Cursor::new(gcz), "gcz").platform, Some("Wii"));
+        assert_eq!(detect_gc_wii(&mut Cursor::new(vec![0u8; 8]), "wbfs").platform, Some("Wii"));
+        assert_eq!(detect_gc_wii(&mut Cursor::new(vec![0u8; 0x100]), "rvz").platform, None);
+    }
+
+    #[test]
+    fn single_console_formats_and_gdi_tracks() {
+        for (ext, p) in [("gb", "Game Boy"), ("gbc", "Game Boy Color"), ("z64", "Nintendo 64"), ("v64", "Nintendo 64"), ("md", "Mega Drive"), ("nds", "Nintendo DS"), ("3ds", "Nintendo 3DS"), ("gba", "Game Boy Advance"), ("wua", "Wii U"), ("gdi", "Dreamcast"), ("sfc", "Super Nintendo"), ("nes", "Nintendinho")] {
+            assert_eq!(platform_by_ext(ext).and_then(|f| f.platform), Some(p), "{ext}");
+        }
+        assert!(platform_by_ext("iso").is_none());
+        let mut md = vec![0u8; 0x400];
+        md[0x100..0x104].copy_from_slice(b"SEGA");
+        assert!(is_mega_drive_rom(&mut Cursor::new(md)));
+        assert!(!is_mega_drive_rom(&mut Cursor::new(vec![0u8; 0x400])));
+        let gdi = "3
+1 0 4 2352 track01.bin 0
+2 756 0 2352 \"track 02.raw\" 0
+3 45000 4 2352 track03.bin 0
+";
+        assert_eq!(gdi_files(gdi), vec!["track01.bin", "track 02.raw", "track03.bin"]);
+    }
 }
 
 #[cfg(test)]

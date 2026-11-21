@@ -147,7 +147,7 @@ export function ProfileSidebar({ profileId, score, showScore, stats, games }: {
   const recent = useRecentUnlocks(profileId, stats);
   const completed = games.filter((g) => g.completed).length;
   const hours = stats?.totalSeconds ?? games.reduce((s, g) => s + g.playtimeSeconds, 0);
-  const perfect = score ? score.steam.completed + score.ra.completed + score.trophies.completed : 0;
+  const perfect = score ? score.steam.completed + score.ra.completed + score.trophies.completed + score.nexstage.completed : 0;
   return (
     <aside className="pf2-side">
       {showScore && score && (
@@ -157,7 +157,7 @@ export function ProfileSidebar({ profileId, score, showScore, stats, games }: {
             <strong>{t("{n} pts", { n: score.total.toLocaleString(undefined) })}</strong>
             <small>{t("Faltam {n} pts para o nível {l}", { n: (score.nextLevelAt - score.total).toLocaleString(undefined), l: score.level + 1 })}</small>
             <div className="pf2-split">
-              {([["Steam", score.steam.points], ["RA", score.ra.points], [t("Troféus"), score.trophies.points]] as const).map(([n, v]) => (
+              {([["Steam", score.steam.points], ["RA", score.ra.points], [t("Troféus"), score.trophies.points], ["NexStage", score.nexstage.points]] as const).map(([n, v]) => (
                 <span key={n}><b>{v.toLocaleString(undefined)}</b>{n}</span>
               ))}
             </div>
