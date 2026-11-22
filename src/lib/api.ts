@@ -206,6 +206,7 @@ export const api = {
   saveEmulator: (input: { id?: number; name: string; exePath: string; platforms: string[]; formats: string[]; args: string; cover: string | null; updateSource?: string | null }) =>
     invoke<Emulator>("save_emulator", { input }).then(withEmuImage),
   deleteEmulator: (id: number) => invoke<void>("delete_emulator", { id }),
+  launchEmulator: (id: number) => invoke<void>("launch_emulator", { id }),
   emulatorFullscreenSupported: (name: string, exePath: string) =>
     invoke<boolean>("emulator_fullscreen_supported", { name, exePath }),
   emulatorUpdates: (force: boolean) => invoke<EmuUpdateStatus[]>("emulator_updates", { force }),

@@ -25,6 +25,7 @@ mod shot_toast;
 mod window_bounds;
 mod lnk;
 mod monitor_pref;
+mod game_window;
 mod pad_led;
 mod hidpads;
 mod devident;
@@ -46,7 +47,7 @@ mod pad_notify;
 #[cfg(debug_assertions)]
 mod dev;
 
-use commands::{activity, backup as bk, collections, controllers, emulators, files, scan, gallery, games, info, launcher, logos, profiles, retro as ra, steam as st, settings, startup, stats, storage, system, webshots, xbox as xb, zerei};
+use commands::{activity, backup as bk, clipboard, collections, controllers, emulators, files, scan, gallery, games, info, launcher, logos, profiles, retro as ra, steam as st, settings, startup, stats, storage, system, webshots, xbox as xb, zerei};
 use tauri::Manager;
 use tauri_plugin_global_shortcut::ShortcutState;
 
@@ -181,6 +182,7 @@ pub fn run() {
             emulators::list_emulators,
             emulators::save_emulator,
             emulators::delete_emulator,
+            emulators::launch_emulator,
             emulators::set_game_emulator,
             emulators::emulator_fullscreen_supported,
             emu_update::emulator_updates,
@@ -315,6 +317,8 @@ pub fn run() {
             gallery::delete_gallery_item,
             storage::get_storage,
             system::power_action,
+            clipboard::clipboard_read_text,
+            clipboard::clipboard_write_text,
             bk::backup_info,
             bk::backup_target_status,
             bk::backup_create,

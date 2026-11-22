@@ -60,7 +60,7 @@ export function Showcase({ games, onOpen }: { games: Game[]; onOpen: (g: Game) =
       {rest.length > 0 && (
         <div className="pf2-show-rest">
           {rest.map((g, i) => (
-            <button key={g.id} type="button" data-focus className="pf2-cover" onClick={() => onOpen(g)} title={g.title}>
+            <button key={g.id} type="button" data-focus className="pf2-cover" data-game-id={g.id} onClick={() => onOpen(g)} title={g.title}>
               {g.cover ? <img src={imgUrl(g.cover) ?? undefined} alt="" loading="lazy" /> : <b>{g.title.charAt(0)}</b>}
               <span className="pf2-cover-rank">#{i + 2}</span>
               <span className="pf2-cover-name">{g.title}</span>

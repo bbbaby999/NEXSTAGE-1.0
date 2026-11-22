@@ -1,0 +1,134 @@
+/* =====================================================================================================
+ * Destaque na cor do tema para o RESTO do app (os botões .btn estão em buttons.css).
+ * Mesma regra dos botões: só o item EM FOCO (controle/teclado) ou com o MOUSE POR CIMA ganha a cor.
+ *
+ * - Controles (abas, seletores, chips, opções, itens de menu e de lista, teclas do teclado virtual,
+ *   explorador de arquivos...): preenchidos com o gradiente do tema, texto na cor de contraste.
+ *   O estado "selecionado" (.on/.active/.sel) continua com o destaque próprio quando sem foco.
+ * - Capas, capturas e cartões com arte: só contorno + brilho na cor do tema (a arte não é coberta).
+ * - Itens de perigo (Remover/Excluir em menus): vermelho, como os botões .danger.
+ *
+ * Especificidade: `html body` + classe dupla vence as regras de cada tela sem !important.
+ * Carregado depois de buttons.css e antes de focus.css.
+ * ===================================================================================================== */
+
+/* ---------- Controles: preenchimento com o gradiente do tema ---------- */
+html body :is(
+  .seg button, .dp-tabs button, .tab.tab, .set-nav button, .pad-cat.pad-cat,
+  .chip.chip, .opt.opt, .radio.radio, .chk.chk, .coll-row.coll-row, .folder.folder,
+  .sm-item.sm-item, .sm-user.sm-user, .ctx-item.ctx-item, .kb-key.kb-key, .trl-btn.trl-btn, .trl-item.trl-item,
+  .select-btn.select-btn, .stage-more.stage-more, .igdb-more.igdb-more, .set-search-clear.set-search-clear,
+  .sc-toggle.sc-toggle, .who.who, .zr-sib.zr-sib, .gs-mini.gs-mini, .gs-unlock.gs-unlock, .gs-rank-row.gs-rank-row,
+  .gs-gach-row.gs-gach-row, .pf2-act-row.pf2-act-row, .upd-row.upd-row, .ra-recent-item.ra-recent-item,
+  .ra-user.ra-user, .pad-detect-item.pad-detect-item, .mc-cand.mc-cand, .is-hit.is-hit, .sc-hit.sc-hit,
+  .fp-tool.fp-tool, .fp-crumb.fp-crumb, .fp-side-item.fp-side-item, .fp-main:not(.grid) .fp-item.fp-item
+):not(:disabled):not(.danger):is(:focus,:hover){
+  --text:var(--on-a,#fff);
+  --text-dim:color-mix(in srgb,var(--on-a,#fff) 78%,transparent);
+  --muted:color-mix(in srgb,var(--on-a,#fff) 72%,transparent);
+  background:linear-gradient(135deg,var(--a),var(--b));
+  border-color:transparent;
+  color:var(--on-a,#fff);
+  opacity:1;
+}
+/* ícones e textos secundários que usam cor fixa acompanham o texto */
+html body :is(
+  .seg button, .dp-tabs button, .tab, .set-nav button, .pad-cat, .chip, .opt, .radio, .coll-row, .folder,
+  .sm-item, .sm-user, .ctx-item, .kb-key, .trl-btn, .trl-item, .select-btn, .stage-more, .igdb-more,
+  .sc-toggle, .who, .zr-sib, .gs-mini, .gs-unlock, .gs-rank-row, .gs-gach-row, .pf2-act-row, .upd-row,
+  .ra-recent-item, .ra-user, .pad-detect-item, .mc-cand, .is-hit, .sc-hit, .fp-tool, .fp-crumb, .fp-side-item,
+  .fp-main:not(.grid) .fp-item
+):not(:disabled):not(.danger):is(:focus,:hover) :is(svg,small,em,.muted,.dim,.fp-ico,.fp-date,.fp-size){color:inherit}
+/* marcador lateral do menu de Configurações/Controles: claro sobre o gradiente */
+html body .set-nav button:is(:focus,:hover)::before{background:var(--on-a,#fff);box-shadow:none}
+
+/* ---------- Perigo (Remover/Excluir em menus laterais e de contexto): vermelho ---------- */
+html body :is(.sm-item.sm-item,.ctx-item.ctx-item).danger:not(:disabled):is(:focus,:hover){
+  background:linear-gradient(135deg,#e5384f,#ff5c74);border-color:transparent;color:#fff;
+}
+html body :is(.sm-item,.ctx-item).danger:is(:focus,:hover) svg{color:inherit}
+
+/* ---------- Capas de jogo (Home, Biblioteca, Zerei!, importação, perfil): contorno SÓ na capa ----------
+   O botão inclui o nome do jogo; o contorno vai no elemento da capa, que tem os cantos arredondados e é
+   o que cresce (transform) com o mouse/foco — então o contorno cresce junto. */
+html body :is(.card.card, .replay-card.replay-card, .steam-card.steam-card):is(:focus,:hover){box-shadow:none}
+html body :is(.card.card, .replay-card.replay-card, .steam-card.steam-card):focus::after{display:none}
+html body :is(.card.card .cover, .replay-card.replay-card .replay-cover, .steam-card.steam-card .steam-cover){border-radius:var(--r-md,14px)}
+html body :is(.card.card, .replay-card.replay-card, .steam-card.steam-card):not(:disabled):is(:focus,:hover)
+  :is(.cover, .replay-cover, .steam-cover){
+  border-color:var(--b);
+  box-shadow:0 0 0 2px var(--b),0 0 26px 2px rgba(var(--br),.6),var(--elev-3);
+}
+/* Espaço para o brilho: as fileiras roláveis (carrosséis da Home) e as grades cortavam o brilho da capa
+   em foco nas bordas. Mais respiro por dentro, compensado por margem negativa (o layout não se move). */
+html body .replay-track{padding:30px 28px 30px;margin:-14px -28px -12px}
+html body .grid:has(> .card){padding:20px;margin:-12px}
+
+/* cartão da importação Steam/Xbox: o fundo do cartão fica, só a capa ganha o contorno */
+html body .steam-card.steam-card:not(.on):is(:focus,:hover){border-color:var(--glass-line)}
+
+/* ---------- Capturas, temas e cartões com arte: contorno + brilho na cor do tema ---------- */
+html body :is(
+  .stage-cover.stage-cover, .stage-shot.stage-shot, .shot.shot, .shot-big-btn.shot-big-btn,
+  .hu-card.hu-card, .thumb.thumb, .theme.theme, .swatch.swatch, .pad-swatch.pad-swatch,
+  .cp-preset.cp-preset, .pad-visual.pad-visual, .pad-card.pad-card, .profile-card.profile-card, .pf2-cover.pf2-cover,
+  .pf2-feature.pf2-feature, .is-tile.is-tile, .mod-card.mod-card, .dlc-card.dlc-card,
+  .ra-game.ra-game, .ra-ach.ra-ach, .upd-cover.upd-cover, .trl-cover.trl-cover, .fp-drive.fp-drive,
+  .fp-main.grid .fp-item.fp-item
+):not(:disabled):is(:focus,:hover){
+  outline:none;
+  border-color:var(--b);
+  box-shadow:0 0 0 2px var(--b),0 0 24px rgba(var(--br),.55);
+}
+
+/* ---------- Nome do jogo sob a capa: contorno iluminado NAS LETRAS e o mesmo crescimento da capa ----------
+   A capa cresce a partir do próprio centro (translateY + scale em --ty/--s). O nome usa o MESMO transform,
+   com a origem no centro da capa — assim os dois crescem juntos, como um bloco só. A altura da capa vem da
+   largura do cartão (capa 3:4 → altura = 133,33% da largura = 133,33cqw; o cartão é o contêiner). */
+html body :is(.grid > .card, .replay-card){container-type:inline-size}
+html body :is(.grid > .card .card-meta, .replay-card .replay-meta){
+  --s:1;--ty:0px;min-width:0;
+  transform:translateY(var(--ty)) scale(var(--s));
+  transition:transform var(--dur,.25s) var(--ease,ease);
+}
+html body :is(.grid > .card .card-meta, .replay-card .replay-meta) :is(strong,small){transition:text-shadow var(--dur,.25s),color var(--dur,.25s)}
+/* distância do topo do nome até o centro da capa: meia capa + espaço entre os dois */
+html body .grid > .card .card-meta{transform-origin:50% calc(-66.667cqw - 10px)}
+html body .replay-card .replay-meta{display:flex;flex-direction:column;gap:2px;margin-top:4px;transform-origin:50% calc(-66.667cqw - 10px)}
+html body .replay-card .replay-meta strong{margin-top:0}
+html body :is(.grid > .card, .replay-card):not(:disabled):is(:focus,:hover) :is(.card-meta, .replay-meta){--s:1.05;--ty:-4px}
+/* Texto do nome SEMPRE com contorno preto (1 px em volta de cada letra) + sombra projetada: legível sobre
+   qualquer fundo. Em foco/mouse, o texto fica branco e ganha um brilho suave na cor do próprio texto. */
+html body :is(.grid > .card .card-meta, .replay-card .replay-meta) strong{
+  text-shadow:1px 0 #000,-1px 0 #000,0 1px #000,0 -1px #000,
+    1px 1px #000,-1px -1px #000,1px -1px #000,-1px 1px #000,
+    0 3px 6px rgba(0,0,0,.85);
+}
+html body :is(.grid > .card .card-meta, .replay-card .replay-meta) small{
+  text-shadow:1px 0 #000,-1px 0 #000,0 1px #000,0 -1px #000,0 2px 4px rgba(0,0,0,.8);
+}
+html body :is(.grid > .card, .replay-card):not(:disabled):is(:focus,:hover) :is(.card-meta, .replay-meta) strong{
+  color:#fff;
+  text-shadow:1px 0 #000,-1px 0 #000,0 1px #000,0 -1px #000,
+    1px 1px #000,-1px -1px #000,1px -1px #000,-1px 1px #000,
+    0 3px 6px rgba(0,0,0,.85),0 0 14px color-mix(in srgb,currentColor 40%,transparent);
+}
+html body :is(.grid > .card, .replay-card):not(:disabled):is(:focus,:hover) :is(.card-meta, .replay-meta) small{
+  color:#fff;text-shadow:1px 0 #000,-1px 0 #000,0 1px #000,0 -1px #000,0 2px 4px rgba(0,0,0,.8),0 0 10px color-mix(in srgb,currentColor 35%,transparent);
+}
+/* movimento reduzido: o nome fica parado, como a capa (só o contorno acende) */
+@media (prefers-reduced-motion:reduce){
+  html:not([data-motion="full"]) body :is(.card-meta,.replay-meta){--s:1!important;--ty:0px!important}
+}
+html[data-motion="reduced"] body :is(.card-meta,.replay-meta){--s:1!important;--ty:0px!important}
+
+/* ---------- Barra superior: a página aberta fica preenchida com a cor do tema (sem a linha embaixo) ---------- */
+html body .tab.tab.active{
+  --text:var(--on-a,#fff);
+  background:linear-gradient(135deg,var(--a),var(--b));
+  color:var(--on-a,#fff);
+  box-shadow:0 6px 18px -8px rgba(var(--ar),.9),inset 0 1px 0 rgba(255,255,255,.3);
+  animation:none;
+}
+html body .tab.tab.active::after{content:none}
+html body .tab.tab.active svg{color:inherit}

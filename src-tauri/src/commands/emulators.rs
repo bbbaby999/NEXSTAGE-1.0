@@ -176,6 +176,33 @@ pub fn delete_emulator(db: State<Db>, id: i64) -> AppResult<()> {
     Ok(())
 }
 
+/// Abre o próprio emulador (sem jogo), na pasta dele — para configurar, instalar firmware/pacotes etc.
+/// Se ele já estiver aberto, traz a janela para a frente em vez de abrir outra cópia.
+/// A janela abre no mesmo monitor do NEXSTAGE (ver `game_window`).
+#[tauri::command]
+pub fn launch_emulator(app: tauri::AppHandle, db: State<Db>, id: i64) -> AppResult<()> {
+    let exe: String = {
+        let conn = db.conn()?;
+        conn.query_row("SELECT exe_path FROM emulators WHERE id=?1", [id], |r| r.get(0))
+            .map_err(|_| AppError::NotFound("Emulador não encontrado.".into()))?
+    };
+    let path = Path::new(&exe);
+    if !path.is_file() {
+        return Err(AppError::NotFound(format!("O executável do emulador não foi encontrado: {exe}. Atualize o caminho em Editar.")));
+    }
+    // já aberto: só traz para a frente (não abre outra cópia)
+    if crate::game_window::bring_exe_to_front(path) {
+        return Ok(());
+    }
+    let mut cmd = std::process::Command::new(path);
+    if let Some(dir) = path.parent() {
+        cmd.current_dir(dir);
+    }
+    let child = cmd.spawn().map_err(|e| AppError::Other(format!("Falha ao abrir o emulador: {e}")))?;
+    crate::game_window::follow(&app, crate::game_window::Track::Tree(child.id()));
+    Ok(())
+}
+
 /// O NEXSTAGE sabe aplicar "Iniciar jogos em tela cheia" a este emulador? (usado no formulário, antes de salvar)
 #[tauri::command]
 pub fn emulator_fullscreen_supported(name: String, exe_path: String) -> bool {

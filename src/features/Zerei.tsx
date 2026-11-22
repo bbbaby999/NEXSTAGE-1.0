@@ -69,6 +69,8 @@ export default function Zerei() {
   const [refreshing, setRefreshing] = useState<ZereiRefreshProgress | null>(null);
   /** Menu de ações da seleção pelo controle (☰ = ações, ▢ = mover para): sem subir até a barra. */
   const [selMenu, setSelMenu] = useState<"main" | "move" | null>(null);
+  /** "Mais opções" de um registro: botão direito sobre o cartão. */
+  const [entryMenu, setEntryMenu] = useState<{ entry: ZereiEntry; x: number; y: number; from: DOMRect } | null>(null);
   /** Confirmação antes de atualizar imagens (aviso, chaves de API e "substituir as existentes"). */
   const [askRefresh, setAskRefresh] = useState<{ ids: number[] | null; overwrite: boolean } | null>(null);
   const [keys, setKeys] = useState<{ sgdb: boolean; igdb: boolean; rawg: boolean } | null>(null);
@@ -191,7 +193,7 @@ export default function Zerei() {
     return [...r].sort(by[sort]);
   }, [all, q, status, platform, year, rating, sort]);
 
-  // ---- Controle: L2/R2, □ e Options (só sem janela/lista/menu/teclado por cima) ----
+  // ---- Controle: L2/R2, □ e Options no cartão (só sem janela/lista/menu/teclado por cima) ----
   const device = useInputDevice();
   const pad = device !== "keyboard";
   const live = useRef({ openId, tab, shown, sort, count: all.length, selecting });
@@ -216,11 +218,15 @@ export default function Zerei() {
       setSelMenu(b === "menu" ? "main" : "move");
       return;
     }
-    // Options: Coleção ↔ Estatísticas
+    // Options sobre um cartão: o mesmo menu do botão direito (capa ampliada no lugar + opções ao lado)
     if (b === "menu") {
+      const card = (document.activeElement as HTMLElement | null)?.closest?.<HTMLElement>("[data-zerei-id]");
+      const entry = card ? s.shown.find((x) => x.id === Number(card.dataset.zereiId)) : undefined;
+      if (!card || !entry) return;
       e.preventDefault();
-      play("move");
-      setTab((x) => (x === "list" ? "stats" : "list"));
+      const cover = card.querySelector(".cover") ?? card;
+      const r = cover.getBoundingClientRect();
+      setEntryMenu({ entry, x: r.left, y: r.top, from: r });
       return;
     }
     if (s.tab !== "list" || !s.count) return;
@@ -385,6 +391,14 @@ export default function Zerei() {
           </div>
         </Modal>
       )}
+      {entryMenu && (
+        <CaptureMenu from={entryMenu.from} hero={{ cover: entryMenu.entry.cover, title: entryMenu.entry.title, sub: entryMenu.entry.platform }} onClose={() => setEntryMenu(null)} actions={[
+          { label: t("Abrir"), icon: ICON.open, run: () => setOpenId(entryMenu.entry.id) },
+          { label: t("Editar"), icon: ICON.edit, run: () => setEditing({ entry: entryMenu.entry, initial: toInput(entryMenu.entry) }) },
+          { label: t("Selecionar"), icon: ICON.select, run: () => holdSelect(entryMenu.entry.id) },
+          { label: t("Excluir"), icon: ICON.trash, danger: true, run: () => { stopSelecting(); setSelected(new Set([entryMenu.entry.id])); setConfirmDel(true); } },
+        ]} />
+      )}
       {selMenu && (
         <CaptureMenu onClose={() => setSelMenu(null)} actions={selMenu === "move"
           ? STATUS_ORDER.map((x): MenuAction => ({ label: t(STATUS_LABEL[x]), icon: ICON.folder, run: () => { if (selected.size) moveSelected(x); } }))
@@ -497,7 +511,12 @@ export default function Zerei() {
                   aria-pressed={selecting ? selected.has(e.id) : undefined}
                   onClick={() => { if (swallowClick()) return; if (selecting) toggleSel(e.id); else setOpenId(e.id); }}
                   onPointerDown={(ev) => pressStart(e.id, ev)} onPointerMove={pressMove} onPointerUp={pressEnd} onPointerCancel={pressEnd}
-                  onContextMenu={(ev) => { if (press.current?.fired) ev.preventDefault(); }} onMouseMove={tilt.onMouseMove} onMouseLeave={tilt.onMouseLeave}
+                  onContextMenu={(ev) => {
+                    ev.preventDefault();
+                    if (press.current?.fired) return; // toque longo (seleção) não abre o menu
+                    const cover = ev.currentTarget.querySelector(".cover") ?? ev.currentTarget;
+                    setEntryMenu({ entry: e, x: ev.clientX, y: ev.clientY, from: cover.getBoundingClientRect() });
+                  }} onMouseMove={tilt.onMouseMove} onMouseLeave={tilt.onMouseLeave}
                   aria-label={`${e.title}, ${e.platform}, ${statusLabel(e.status)}`}>
                   <div className="cover">
                     {e.cover && <img className="cover-img" src={e.cover} alt="" loading="lazy" decoding="async" draggable={false}

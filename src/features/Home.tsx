@@ -14,6 +14,7 @@ import HomeBackdrop from "../components/HomeBackdrop";
 import Skeleton from "../components/Skeleton";
 import PlatformBadge from "../components/PlatformBadge";
 import { CaptureMenu, ICON, MenuAction } from "../components/CaptureUi";
+import { cardFocused } from "../components/GameMenu";
 import { itemSrc } from "../components/Viewer";
 import HomeUniverse from "../components/stats/HomeUniverse";
 import SteamUpdates from "../components/SteamUpdates";
@@ -47,6 +48,12 @@ export default function Home() {
   const [caps, setCaps] = useState<GalleryItem[]>([]);
   const [netShots, setNetShots] = useState<string[]>([]);
   const [menu, setMenu] = useState(false);
+  // botão ⋯ que abriu o menu (o menu "nasce" dele); pelo controle, sem botão: abre do ⋯ também
+  const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
+  const openMenu = (el?: HTMLElement | null) => {
+    setMenuAnchor((el ?? document.querySelector<HTMLElement>(".stage-more"))?.getBoundingClientRect() ?? null);
+    setMenu(true);
+  };
   // Jogo em foco (controle) ou sob o mouse no carrossel "Volte a jogar": troca só o plano de fundo.
   const [preview, setPreview] = useState<Game | null>(null);
   const [shown, setShown] = useState<Game | null>(null);
@@ -93,7 +100,7 @@ export default function Home() {
 
   // Botão Menu/Options do controle (ou tecla de menu) abre as opções extras.
   useEffect(() => {
-    const onCtx = () => { if (game && !document.querySelector(".overlay, .ctx-root, .sm-root:not(.leaving)")) setMenu(true); };
+    const onCtx = () => { if (game && !cardFocused() && !document.querySelector(".overlay, .ctx-root, .sm-root:not(.leaving)")) openMenu(); };
     window.addEventListener("nexstage:context", onCtx);
     return () => window.removeEventListener("nexstage:context", onCtx);
   }, [game]);
@@ -152,7 +159,7 @@ export default function Home() {
       <h1 className="sr-only">{t("Tela inicial")}</h1>
       <div className="stage-top">
       <div className="stage-hero" key={game.id} data-parallax>
-        <button data-focus className="stage-cover" onClick={openInLibrary} aria-label={t("Abrir {title} na Biblioteca", { title: game.title })}
+        <button data-focus className="stage-cover" data-game-id={game.id} onClick={openInLibrary} aria-label={t("Abrir {title} na Biblioteca", { title: game.title })}
           onMouseMove={coverTilt.onMouseMove} onMouseLeave={coverTilt.onMouseLeave}
           style={game.cover ? { backgroundImage: `url(${game.cover})` } : undefined}>
           {!game.cover && <span>{game.title.charAt(0).toUpperCase()}</span>}
@@ -175,7 +182,7 @@ export default function Home() {
           <div className="stage-actions">
             <Button variant="primary" className="stage-play" data-autofocus /* foco inicial da Home (lib/pageFocus.ts) */ onClick={play}>{t("Jogar")}</Button>
             <Button className="stage-open" onClick={openInLibrary}>{t("Página do jogo")}</Button>
-            <button data-focus type="button" className="stage-more" onClick={() => setMenu(true)} aria-label={t("Mais opções")} title={t("Mais opções")}>
+            <button data-focus type="button" className="stage-more" onClick={(e) => openMenu(e.currentTarget)} aria-label={t("Mais opções")} title={t("Mais opções")}>
               <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
                 <circle cx="5.5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="18.5" cy="12" r="1.7" />
               </svg>
@@ -210,7 +217,7 @@ export default function Home() {
       <SteamNewDlcs />
       {/* catálogo do PC Game Pass (experimental; some se o catálogo estiver indisponível ou desligado) */}
       <GamePassHome />
-      {menu && <CaptureMenu actions={actions} onClose={() => setMenu(false)} />}
+      {menu && <CaptureMenu actions={actions} anchor={menuAnchor} onClose={() => setMenu(false)} />}
     </div>
   );
 }
@@ -296,8 +303,7 @@ function Replay({ title, games, onOpen, onPreview, label, meta }: {
                 {!g.cover && <b>{g.title.charAt(0).toUpperCase()}</b>}
                 <PlatformBadge platform={g.platform} />
               </span>
-              <strong>{g.title}</strong>
-              <small>{meta(g)}</small>
+              <span className="replay-meta"><strong>{g.title}</strong><small>{meta(g)}</small></span>
             </span>
           </button>
         ))}

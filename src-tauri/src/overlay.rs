@@ -183,6 +183,12 @@ fn take_foreground_while(app: &AppHandle, keep: fn(&AppHandle) -> bool) {
     let _ = app;
 }
 
+/// Traz uma janela de outro programa para o primeiro plano (mesmo contorno da trava do Windows usado no overlay).
+#[cfg(windows)]
+pub fn force_window_foreground(h: *mut std::ffi::c_void) {
+    win::force_foreground(h);
+}
+
 #[cfg(windows)]
 mod win {
     use std::ffi::c_void;

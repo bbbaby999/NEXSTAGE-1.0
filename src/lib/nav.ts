@@ -361,6 +361,32 @@ if (typeof window !== "undefined") {
     lastKey.set(a, now);
   }, true);
 }
+/**
+ * Navegar com WASD (Configurações → Controles e atalhos, `app_settings.wasd_nav`): W/A/S/D viram as setas.
+ * Fora de campos de texto e sem Ctrl/Alt/Win. A tecla é trocada por uma seta sintética no mesmo alvo, então
+ * vale tudo o que já responde às setas (foco, carrosséis, listas, navegador de arquivos...).
+ * Usa a POSIÇÃO da tecla (e.code): em teclados AZERTY, Z/Q/S/D.
+ */
+const WASD: Record<string, string> = { KeyW: "ArrowUp", KeyA: "ArrowLeft", KeyS: "ArrowDown", KeyD: "ArrowRight" };
+let wasdOn = false;
+export function setWasdNav(on: boolean) { wasdOn = on; }
+export const loadWasdNav = () => api.getAppSetting("wasd_nav").then((v) => { wasdOn = v === "1"; }).catch(() => {});
+const typingIn = (el: EventTarget | null) =>
+  el instanceof HTMLElement && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
+if (typeof window !== "undefined") {
+  for (const type of ["keydown", "keyup"] as const) {
+    window.addEventListener(type, (e) => {
+      const arrow = WASD[e.code];
+      if (!wasdOn || !arrow || !e.isTrusted || e.ctrlKey || e.altKey || e.metaKey || typingIn(e.target)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      (e.target ?? window).dispatchEvent(new KeyboardEvent(type, {
+        key: arrow, code: arrow, repeat: e.repeat, shiftKey: e.shiftKey, bubbles: true, cancelable: true,
+      }));
+    }, true);
+  }
+}
+
 /** `false` = o mesmo comando acabou de chegar pelo teclado (controle convertido em teclas): ignora. */
 function firstOfPair(action: PadAction): boolean {
   const now = performance.now();
@@ -457,6 +483,7 @@ export function useSpatialNav() {
     };
     window.addEventListener("keydown", onKey);
     document.addEventListener("click", onClick, true);
+    loadWasdNav();
     const untrack = trackFocus();
 
     // Controles nativos

@@ -29,6 +29,8 @@ import PatchNotes from "./components/PatchNotes";
 import { APP_VERSION } from "./lib/version";
 import VirtualKeyboardHost from "./components/VirtualKeyboard";
 import FilePickerHost from "./components/FilePicker";
+import GameMenuHost from "./components/GameMenu";
+import TextMenuHost from "./components/TextMenu";
 import ProfileSelect from "./features/ProfileSelect";
 import Home from "./features/Home";
 import Library from "./features/Library";
@@ -280,6 +282,8 @@ function Shell() {
         </main>
       </div>
       <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} onGo={go} />
+      {/* "Mais opções" do jogo: botão direito sobre qualquer capa / Options com uma capa em foco */}
+      <GameMenuHost />
       {/* Modo Ocioso: só com perfil ativo e depois da abertura; trocar de perfil reinicia a contagem */}
       {phase === "done" && <IdleHost key={profile.id} profileId={profile.id} ingame={ingame} />}
     </>
@@ -290,6 +294,8 @@ function Shell() {
       <WaveBackground />
       <VirtualKeyboardHost />
       <FilePickerHost />
+      {/* botão direito em campos de texto: Copiar, Recortar, Colar, Selecionar tudo, Emojis */}
+      <TextMenuHost />
       {patchOpen && <PatchNotes onClose={() => setPatchOpen(false)} />}
       {/* trocar o idioma remonta a interface (o estado da sessão fica no SessionProvider, acima) */}
       {(revealed || phase === "done") && <Fragment key={`app-${lang}`}>{app}</Fragment>}

@@ -1,5 +1,6 @@
 pub mod activity;
 pub mod backup;
+pub mod clipboard;
 pub mod collections;
 pub mod controllers;
 pub mod gallery;

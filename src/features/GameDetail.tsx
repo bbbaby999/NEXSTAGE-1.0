@@ -38,6 +38,7 @@ import { TrophyIcon } from "../components/RaUnlockToasts";
 import type { GalleryItem, GameInfo, SteamAppStatus, StoreHit, WebShot } from "../types";
 import CandidatePicker from "../components/CandidatePicker";
 import { CaptureMenu, ICON, type MenuAction } from "../components/CaptureUi";
+import { cardFocused } from "../components/GameMenu";
 import { t, tk } from "../lib/i18n";
 
 const KIND: Record<string, string> = { snap: tk("Gameplay"), title: tk("Tela de título"), cover: tk("Capa"), background: tk("Fundo"), image: tk("Imagem") };
@@ -89,8 +90,14 @@ export default function GameDetail({ gameId }: { gameId: number }) {
   const [confirm, setConfirm] = useState(false);
   // "Mais opções" (Zerado, Capturas, Coleções, Editar jogo, Remover): também pelo botão Menu/Options do controle, como na Home
   const [menu, setMenu] = useState(false);
+  // "Mais opções" se abre a partir do próprio botão (também pelo botão Options do controle)
+  const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
+  const openMenu = (el?: HTMLElement | null) => {
+    setMenuAnchor((el ?? document.querySelector<HTMLElement>(".dp-more-btn"))?.getBoundingClientRect() ?? null);
+    setMenu(true);
+  };
   useEffect(() => {
-    const onCtx = () => { if (!document.querySelector(".overlay, .ctx-root, .pick-root, .sm-root:not(.leaving)")) setMenu(true); };
+    const onCtx = () => { if (!cardFocused() && !document.querySelector(".overlay, .ctx-root, .pick-root, .sm-root:not(.leaving)")) openMenu(); };
     window.addEventListener("nexstage:context", onCtx);
     return () => window.removeEventListener("nexstage:context", onCtx);
   }, []);
@@ -260,7 +267,7 @@ export default function GameDetail({ gameId }: { gameId: number }) {
                 onClick={() => run(async () => { await api.setFavorite(p.id, game.id, !game.favorite); reload(); })}>
                 {game.favorite ? t("★ Favorito") : t("☆ Favoritar")}
               </Button>
-              <Button className="dp-act" aria-haspopup="menu" onClick={() => setMenu(true)}>{t("Mais opções")}</Button>
+              <Button className="dp-act dp-more-btn" aria-haspopup="menu" onClick={(e) => openMenu(e.currentTarget)}>{t("Mais opções")}</Button>
             </div>
           </div>
         </div>
@@ -428,7 +435,7 @@ export default function GameDetail({ gameId }: { gameId: number }) {
       </div>
       )}
 
-      {menu && <CaptureMenu actions={moreActions} onClose={() => setMenu(false)} />}
+      {menu && <CaptureMenu actions={moreActions} anchor={menuAnchor} onClose={() => setMenu(false)} />}
       {confirm && (
         <Modal title={t("Remover {title} da biblioteca?", { title: game.title })} onClose={() => setConfirm(false)}>
           <p className="muted">{t("O jogo e o histórico de sessões dele saem da biblioteca deste perfil. Os arquivos do jogo no computador não são apagados.")}</p>

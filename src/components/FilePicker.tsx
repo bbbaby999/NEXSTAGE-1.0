@@ -42,8 +42,30 @@ const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } ca
 function recentList(): string[] {
   try { const v = JSON.parse(lsGet(LS_RECENT) ?? "[]"); return Array.isArray(v) ? v.filter((x) => typeof x === "string").slice(0, 6) : []; } catch { return []; }
 }
-function favList(): string[] {
-  try { const v = JSON.parse(lsGet(LS_FAVS) ?? "[]"); return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch { return []; }
+const parseFavs = (raw: string | null | undefined): string[] => {
+  try { const v = JSON.parse(raw ?? "[]"); return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch { return []; }
+};
+/** Cópia local (abre o navegador já com as favoritas, sem esperar o backend). */
+function favList(): string[] { return parseFavs(lsGet(LS_FAVS)); }
+/**
+ * Favoritas: UMA lista para todas as telas que usam o navegador de arquivos, guardada nas configurações do
+ * app (`app_settings.file_picker_favs`, entra no backup). O localStorage fica só como cópia para abrir rápido;
+ * favoritas antigas, que só existiam nele, são levadas para as configurações na primeira abertura.
+ */
+const FAVS_KEY = "file_picker_favs";
+async function loadFavs(): Promise<string[]> {
+  const saved = await api.getAppSetting(FAVS_KEY).catch(() => undefined);
+  if (saved === undefined) return favList(); // backend indisponível: fica a cópia local
+  const local = favList();
+  let list = saved === null ? [] : parseFavs(saved);
+  const missing = local.filter((f) => !list.some((x) => samePath(x, f)));
+  if (saved === null && missing.length) { list = [...list, ...missing]; saveFavs(list); }
+  lsSet(LS_FAVS, JSON.stringify(list));
+  return list;
+}
+function saveFavs(list: string[]) {
+  lsSet(LS_FAVS, JSON.stringify(list));
+  api.setAppSetting(FAVS_KEY, JSON.stringify(list)).catch(() => { /* fica a cópia local */ });
 }
 const samePath = (a: string, b: string) => a.replace(/[\\/]+$/, "").toLowerCase() === b.replace(/[\\/]+$/, "").toLowerCase();
 function remember(purpose: string | undefined, dir: string) {
@@ -166,6 +188,7 @@ function FilePicker({ req }: { req: PickRequest }) {
   const [overwrite, setOverwrite] = useState<string | null>(null);
   const [recent] = useState(recentList);
   const [favs, setFavs] = useState(favList);
+  useEffect(() => { let live = true; loadFavs().then((l) => { if (live) setFavs(l); }); return () => { live = false; }; }, []);
   const back = useRef<string[]>([]);
   const focusAfter = useRef<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -186,7 +209,7 @@ function FilePicker({ req }: { req: PickRequest }) {
     const on = !isFav(p);
     const next = on ? [...favs, p] : favs.filter((f) => !samePath(f, p));
     setFavs(next);
-    lsSet(LS_FAVS, JSON.stringify(next));
+    saveFavs(next);
     play(on ? "confirm" : "back");
   };
   /** Ⓧ/▢: a pasta em foco (no conteúdo ou na lateral); sem pasta em foco, a pasta atual. */

@@ -241,14 +241,27 @@ html[data-motion="reduced"] .bg-layer,html[data-motion="reduced"] .dp-hero-img{t
 .selbar{display:flex;gap:var(--s3);align-items:center;flex-wrap:wrap;margin:0 0 var(--s4);padding:var(--s3) var(--s4);border-radius:var(--r-lg);
   background:rgba(var(--ar),.14);border:1px solid rgba(var(--br),.4)}
 .ctx-root{position:fixed;inset:0;z-index:115}
-.ctx-backdrop{position:absolute;inset:0;background:rgba(3,4,8,.35)}
+.ctx-backdrop{position:absolute;inset:0;background:rgba(3,4,8,.35);animation:ctx-fade .22s ease-out both}
+@keyframes ctx-fade{from{opacity:0}to{opacity:1}}
+html[data-motion="reduced"] .ctx-backdrop{animation:none}
 .ctx-panel{position:absolute;min-width:260px;padding:var(--s2);border-radius:var(--r-lg);display:flex;flex-direction:column;gap:2px;
   background:linear-gradient(180deg,rgba(26,32,52,.97),rgba(9,12,21,.98));border:1px solid var(--glass-line);
-  box-shadow:var(--elev-3),inset 0 1px 0 var(--glass-hi);animation:pop var(--dur) var(--ease) both}
+  box-shadow:var(--elev-3),inset 0 1px 0 var(--glass-hi)}  /* abertura animada em CaptureUi.tsx (cresce a partir do botão/capa) */
 .ctx-panel.center{left:50%;top:50%;transform:translate(-50%,-50%)}
 .ctx-item{display:flex;gap:var(--s3);align-items:center;padding:12px 14px;border-radius:var(--r-md);background:none;border:none;color:var(--text);font:inherit;text-align:left;cursor:pointer}
 .ctx-item:hover{background:rgba(var(--ar),.2)}
 .ctx-item.danger{color:#ff8da1}
+/* Menu com o jogo em destaque (botão direito / Options sobre uma capa): a capa cresce no lugar (cópia por
+   cima do desfoque), o nome logo abaixo e as opções ao lado; posições calculadas em CaptureUi.tsx */
+.ctx-root.ctx-blur .ctx-backdrop{background:rgba(3,4,8,.45);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.ctx-hero-cover{position:fixed;border-radius:var(--r-md,14px);overflow:hidden;display:grid;place-items:center;cursor:pointer;
+  background:linear-gradient(160deg,#1b2650,#0c1020);font-size:3rem;font-weight:800;color:rgba(255,255,255,.25);
+  border:1px solid var(--b);box-shadow:0 0 0 2px var(--b),0 0 30px 2px rgba(var(--br),.6),var(--elev-3)}
+.ctx-hero-cover img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.ctx-hero-name{position:fixed;display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;pointer-events:none}
+.ctx-hero-name strong{color:#fff;text-shadow:1px 0 #000,-1px 0 #000,0 1px #000,0 -1px #000,1px 1px #000,-1px -1px #000,1px -1px #000,-1px 1px #000,0 3px 6px rgba(0,0,0,.85),0 0 14px color-mix(in srgb,currentColor 40%,transparent);
+  font-weight:600;font-size:1.05rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ctx-hero-name small{font-size:.78rem;color:#fff;text-shadow:1px 0 #000,-1px 0 #000,0 1px #000,0 -1px #000,0 2px 4px rgba(0,0,0,.8),0 0 10px color-mix(in srgb,currentColor 35%,transparent)}
 /* Visualizador de capturas: imagem ocupando quase toda a tela e as ações numa faixa no rodapé */
 .viewer{display:flex;flex-direction:column;padding:var(--s5) var(--s5) var(--s4)}
 .viewer-main{display:flex;flex-direction:column;gap:var(--s4);align-items:center;justify-content:center;width:100%;height:100%;min-height:0}
@@ -426,3 +439,9 @@ ul.plain{list-style:none;padding:0;margin:var(--s3) 0;display:flex;flex-directio
 .emu.missing{opacity:.92;border-style:dashed}
 .emu-dest{padding:var(--s2) var(--s3);border-radius:var(--r-md,8px);background:var(--glass);border:1px solid var(--glass-line);overflow-wrap:anywhere;font-size:.9rem}
 .emu-exists{padding:var(--s3);border-radius:var(--r-md,8px);border:1px solid rgba(255,180,84,.5);background:rgba(255,180,84,.08);color:var(--text)}
+/* Seletor de emojis do menu de texto (botão direito num campo) */
+.emoji-panel{padding:var(--s3,12px);max-width:min(440px,calc(100vw - 16px))}
+.emoji-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;max-height:min(320px,60vh);overflow-y:auto;scrollbar-width:thin}
+.emoji-btn{width:44px;height:44px;display:grid;place-items:center;font-size:1.45rem;line-height:1;border:none;border-radius:var(--r-md,12px);
+  background:none;cursor:pointer;color:inherit;font-family:"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif}
+html body .emoji-btn:is(:focus,:hover){background:linear-gradient(135deg,var(--a),var(--b));transform:scale(1.12)}

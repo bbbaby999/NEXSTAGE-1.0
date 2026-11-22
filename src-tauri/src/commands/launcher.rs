@@ -272,6 +272,8 @@ pub fn launch_game(app: AppHandle, db: State<Db>, profile_id: i64, game_id: i64)
         }
     };
     let started = Instant::now();
+    // janela do jogo no mesmo monitor do NEXSTAGE (antes de minimizar o launcher)
+    crate::game_window::follow(&app, crate::game_window::Track::Tree(child.id()));
     // Só marca como "iniciado" quando o processo realmente subiu (define a ordem da Home).
     if let Ok(conn) = db.conn() {
         let _ = conn.execute(
@@ -324,6 +326,7 @@ fn launch_store_app(app: &AppHandle, db: &Db, profile_id: i64, game_id: i64, aum
     use std::time::Duration;
     let roots = crate::msstore::process_roots(&aumid);
     crate::msstore::launch(&aumid).map_err(|e| AppError::Other(format!("Falha ao iniciar o jogo: {e}")))?;
+    crate::game_window::follow(app, crate::game_window::Track::Roots(roots.clone()));
     if let Ok(conn) = db.conn() {
         let _ = conn.execute(
             "UPDATE profile_games SET last_played_at=strftime('%Y-%m-%d %H:%M:%f','now') WHERE profile_id=?1 AND game_id=?2",
@@ -372,6 +375,9 @@ fn launch_via_steam(app: &AppHandle, db: &Db, profile_id: i64, game_id: i64, app
     app.opener()
         .open_url(format!("steam://run/{appid}"), None::<&str>)
         .map_err(|_| AppError::Other("Não foi possível pedir à Steam para iniciar o jogo.".into()))?;
+    if let Some(dir) = crate::steam::local::install_dir(appid) {
+        crate::game_window::follow(app, crate::game_window::Track::Roots(crate::game_window::roots_of(&dir)));
+    }
     if let Ok(conn) = db.conn() {
         let _ = conn.execute(
             "UPDATE profile_games SET last_played_at=strftime('%Y-%m-%d %H:%M:%f','now') WHERE profile_id=?1 AND game_id=?2",

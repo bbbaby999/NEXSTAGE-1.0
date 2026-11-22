@@ -21,6 +21,15 @@ export const NOTE_LABEL: Record<NoteType, string> = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "1.3.3",
+    date: "2026-11-22",
+    summary: tk("Melhorias visuais e correções de bugs."),
+    sections: [
+      { type: "ui", items: [tk("Melhorias visuais.")] },
+      { type: "fix", items: [tk("Correções de bugs.")] },
+    ],
+  },
+  {
     version: "1.3.2",
     date: "2026-11-21",
     summary: tk("Emuladores prontos para baixar e atualizar pelo app, 11 novas plataformas (GameCube, Wii, Nintendo 64, Mega Drive e mais) e o primeiro jogo integrado ao NexStage."),

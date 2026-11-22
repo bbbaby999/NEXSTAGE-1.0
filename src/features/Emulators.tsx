@@ -257,6 +257,8 @@ export default function Emulators() {
                 {upd[e.id]?.page && (upd[e.id]!.state === "noPackage" || (upd[e.id]!.state === "available" && !upd[e.id]!.installable)) && (
                   <Button onClick={() => openUrl(upd[e.id]!.page!).catch(() => {})}>{t("Ver versões")}</Button>
                 )}
+                <Button disabled={!e.exeExists} title={t("Abre o emulador, sem jogo (para configurar, instalar firmware etc.)")}
+                  onClick={() => api.launchEmulator(e.id).then(() => toast(t("Abrindo {name}…", { name: e.name }))).catch((er) => toast(errMsg(er), "err"))}>{t("Abrir")}</Button>
                 <Button onClick={() => { setDraft({ id: e.id, name: e.name, exePath: e.exePath, platforms: e.platforms, formats: e.formats, args: e.args, cover: e.cover, fullscreen: e.fullscreen, updateOn: e.updateSource !== "-", updateSource: e.updateSource && e.updateSource !== "-" ? e.updateSource : "" }); setNote(undefined); }}>{t("Editar")}</Button>
                 {confirm === e.id ? (
                   <Button variant="danger" onClick={async () => {

@@ -15,6 +15,7 @@ import DataSources from "../components/DataSources";
 import { applyHomeBlur, applyParticles, applyTheme, applyWaves, clampHomeBlur, CUSTOM_THEME, CustomColors, DEFAULT_CUSTOM, DEFAULT_THEME, parseCustom, resolveCustom, setCustomColors, setLedSync, THEMES } from "../lib/theme";
 import ColorPicker from "../components/ColorPicker";
 import Select from "../components/Select";
+import { setWasdNav } from "../lib/nav";
 import { setSoundConfig, play } from "../lib/sound";
 import { LayoutOverride, setLayoutOverride } from "../lib/inputDevice";
 import { MotionMode, setMotion } from "../lib/motion";
@@ -610,6 +611,7 @@ export default function Settings() {
   const [sound, setSound] = useState(true);
   const [volume, setVolume] = useState(50);
   const [layout, setLayout] = useState<LayoutOverride>("auto");
+  const [wasd, setWasd] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -630,6 +632,7 @@ export default function Settings() {
       setSound((await g("sound_enabled")) !== "0");
       setVolume(Number((await g("sound_volume")) ?? 50));
       setLayout(((await g("input_layout")) as LayoutOverride) ?? "auto");
+      setWasd((await g("wasd_nav")) === "1");
       setMotionState(((await g("motion")) as MotionMode) ?? "auto");
       setWaves((await api.getProfileSetting(p.id, "waves").catch(() => null)) !== "0");
       setParticles((await api.getProfileSetting(p.id, "particles").catch(() => null)) !== "0");
@@ -873,6 +876,10 @@ export default function Settings() {
               <Select<LayoutOverride> value={layout} width={220} title={t("Ícones de comandos")}
                 onChange={(v) => { setLayout(v); setLayoutOverride(v); saveApp("input_layout", v); }}
                 options={[[t("Automático"), "auto"], [t("Xbox"), "xbox"], [t("PlayStation"), "playstation"], [t("Nintendo"), "nintendo"], [t("Controle genérico"), "generic"], [t("Teclado e mouse"), "keyboard"]]} />
+            </div>
+            <div className="setting">
+              <div><strong>{t("Navegar com WASD")}</strong><small>{t("No teclado, W, A, S e D movem a seleção como as setas (fora dos campos de texto).")}</small></div>
+              <Button variant={wasd ? "primary" : "default"} onClick={() => { const v = !wasd; setWasd(v); setWasdNav(v); saveApp("wasd_nav", v ? "1" : "0"); }}>{wasd ? t("Ligado") : t("Desligado")}</Button>
             </div>
             <div className="setting">
               <div><strong>{t("Navegador de arquivos")}</strong><small>{t("Usado para escolher jogos, imagens, pastas e arquivos do PC. O do NEXSTAGE funciona com o controle; o do Windows é o seletor padrão do sistema.")}</small></div>

@@ -2934,5 +2934,18 @@ export const KEYS: string[] = [
  "Tela de emuladores: filtro Instalados / Não instalados.",
  "Ao instalar ou mover um emulador para um lugar onde já existe uma pasta com o mesmo nome, o app pergunta se quer substituí-la (a pasta antiga vai para a Lixeira).",
  "Navegador de arquivos: com o controle, △ leva aos botões Cancelar e Selecionar esta pasta, que antes eram difíceis de alcançar; segurar ○ cancela de uma vez.",
- "Navegador de arquivos: as pastas favoritas apareciam empilhadas no canto superior direito na página “Este computador”."
+ "Navegador de arquivos: as pastas favoritas apareciam empilhadas no canto superior direito na página “Este computador”.",
+ "Copiar",
+ "Recortar",
+ "Colar",
+ "Selecionar tudo",
+ "Emojis",
+ "Não foi possível copiar para a área de transferência.",
+ "Navegar com WASD",
+ "No teclado, W, A, S e D movem a seleção como as setas (fora dos campos de texto).",
+ "Abre o emulador, sem jogo (para configurar, instalar firmware etc.)",
+ "Abrindo {name}…",
+ "Melhorias visuais e correções de bugs.",
+ "Melhorias visuais.",
+ "Correções de bugs."
 ];
