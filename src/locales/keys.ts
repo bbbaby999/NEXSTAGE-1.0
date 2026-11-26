@@ -2947,5 +2947,8 @@ export const KEYS: string[] = [
  "Abrindo {name}…",
  "Melhorias visuais e correções de bugs.",
  "Melhorias visuais.",
- "Correções de bugs."
+ "Correções de bugs.",
+ "Pronto para o Tomb Survivors beta: nova capa, nova arte e nova descrição na página do jogo.",
+ "Tomb Survivors: nova capa, arte de fundo e descrição atualizada (novo mapa, personagens e chefes).",
+ "Recebe a atualização 0.5.0-beta do Tomb Survivors."
 ];

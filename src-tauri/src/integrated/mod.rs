@@ -52,8 +52,8 @@ pub const OFFICIAL: &[Official] = &[Official {
     signature_url: "https://github.com/bbbaby999/tomb-survivors-releases/releases/latest/download/manifest.json.sig",
     public_key: "PJrQZ38cygRWZlG5WguvZDPsmzNK8BYqPRqThL2jN8w=",
     description: [
-        "Roguelite de sobrevivência numa tumba egípcia. Uma exploradora enfrenta hordas de múmias, aranhas e escaravelhos por 10 minutos, escolhendo cartas de habilidade a cada nível, até despertar o Sacerdote-Guardião. Armas, relíquias, armadilhas e um tesouro que cresce entre as partidas.",
-        "A survival roguelite set in an Egyptian tomb. An explorer faces hordes of mummies, spiders and scarabs for 10 minutes, picking ability cards at every level, until the Guardian Priest awakens. Weapons, relics, traps and a treasure that grows between runs.",
+        "Roguelite de sobrevivência em ruínas antigas. Escolha sua personagem e enfrente hordas por 10 minutos numa tumba egípcia ou numa floresta tomada pela mata — de dia, de tarde ou à noite —, escolhendo cartas de habilidade a cada nível até despertar a chefe: Arachne ou Serephina, a Rainha Serpente. Armas, relíquias, um drone companheiro e um tesouro que cresce entre as partidas.",
+        "A survival roguelite set in ancient ruins. Pick your character and face hordes for 10 minutes in an Egyptian tomb or an overgrown forest — by day, at dusk or at night — choosing ability cards at every level until the boss awakens: Arachne or Serephina, the Serpent Queen. Weapons, relics, a companion drone and a treasure that grows between runs.",
     ],
     releases_url: "https://github.com/bbbaby999/tomb-survivors-releases/releases",
 }];

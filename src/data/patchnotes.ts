@@ -21,6 +21,15 @@ export const NOTE_LABEL: Record<NoteType, string> = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "1.3.4",
+    date: "2026-11-26",
+    summary: tk("Pronto para o Tomb Survivors beta: nova capa, nova arte e nova descrição na página do jogo."),
+    sections: [
+      { type: "ui", items: [tk("Tomb Survivors: nova capa, arte de fundo e descrição atualizada (novo mapa, personagens e chefes).")] },
+      { type: "improve", items: [tk("Recebe a atualização 0.5.0-beta do Tomb Survivors.")] },
+    ],
+  },
+  {
     version: "1.3.3",
     date: "2026-11-22",
     summary: tk("Melhorias visuais e correções de bugs."),

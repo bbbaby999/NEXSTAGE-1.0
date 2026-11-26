@@ -3046,4 +3046,7 @@ export default [
   "Améliorations visuelles et corrections de bugs.",
   "Améliorations visuelles.",
   "Corrections de bugs.",
+  "Prêt pour la bêta de Tomb Survivors : nouvelle jaquette, nouvelle illustration et nouvelle description sur la page du jeu.",
+  "Tomb Survivors : nouvelle jaquette, illustration de fond et description mise à jour (nouvelle carte, personnages et boss).",
+  "Reçoit la mise à jour 0.5.0-beta de Tomb Survivors.",
 ];
