@@ -255,6 +255,9 @@ export default function GameDetail({ gameId }: { gameId: number }) {
             <div className="dp-actions">
               {integrated.gameId && integrated.st?.job ? (
                 <Button variant="primary" className="dp-play stage-play" disabled>{jobLabel(integrated.st.job)}</Button>
+              ) : integrated.gameId && game.installed && integrated.st?.managed && integrated.st.updateAvailable ? (
+                // versão nova publicada: o botão principal vira "Atualizar" (instala por cima, mantendo os saves)
+                <Button variant="primary" className="dp-play stage-play" onClick={() => run(async () => { await api.integratedInstall(integrated.gameId!); integrated.reload(); })}>{t("Atualizar")}</Button>
               ) : integrated.gameId && !game.installed ? (
                 <Button variant="primary" className="dp-play stage-play" onClick={() => run(async () => { await api.integratedInstall(integrated.gameId!); integrated.reload(); })}>{t("Instalar")}</Button>
               ) : needInstall ? (

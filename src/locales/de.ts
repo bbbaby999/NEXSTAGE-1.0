@@ -3049,4 +3049,7 @@ export default [
   "Bereit für die Beta von Tomb Survivors: neues Cover, neues Artwork und neue Beschreibung auf der Spielseite.",
   "Tomb Survivors: neues Cover, Hintergrundbild und aktualisierte Beschreibung (neue Karte, Charaktere und Bosse).",
   "Erhält das Update 0.5.0-beta von Tomb Survivors.",
+  "Updates für integrierte Spiele sind leichter zu finden.",
+  "Die Seite eines integrierten Spiels sucht bei jedem Öffnen nach Updates.",
+  "Ist eine neue Version verfügbar, wird aus der Schaltfläche Spielen Aktualisieren.",
 ];

@@ -12,8 +12,8 @@ import type { Game, IntegratedJob, IntegratedStatus } from "../types";
 
 /** Executável oficial de cada jogo integrado (usado no filtro do seletor de arquivos). */
 const EXE: Record<string, string> = { "tomb-survivors": "TombSurvivors.exe" };
-/** Procura atualização uma vez por sessão do app (a página do jogo pode ser aberta várias vezes). */
-const checked = new Set<string>();
+/** Última procura de atualização por jogo (a página e o bloco NexStage montam juntos: evita procurar em dobro). */
+const lastCheck = new Map<string, number>();
 
 /**
  * Estado do jogo integrado (instalação, versão, atualização e download em andamento), compartilhado pela página
@@ -38,10 +38,12 @@ export function useIntegrated(game?: Game) {
     ];
     return () => { offs.forEach((p) => p.then((f) => f())); };
   }, [gameId]);
-  // primeira abertura na sessão: procura a versão publicada (sem internet, só não mostra atualização)
+  // toda vez que a página do jogo abre: procura a versão publicada (sem internet, só não mostra atualização)
   useEffect(() => {
-    if (!gameId || checked.has(gameId)) return;
-    checked.add(gameId);
+    if (!gameId) return;
+    const now = Date.now();
+    if (now - (lastCheck.get(gameId) ?? 0) < 5000) return;
+    lastCheck.set(gameId, now);
     api.integratedCheckUpdate(gameId).then(setSt).catch(() => {});
   }, [gameId]);
   return { gameId, st, setSt, reload };
