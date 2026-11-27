@@ -3052,4 +3052,8 @@ export default [
   "Updates für integrierte Spiele sind leichter zu finden.",
   "Die Seite eines integrierten Spiels sucht bei jedem Öffnen nach Updates.",
   "Ist eine neue Version verfügbar, wird aus der Schaltfläche Spielen Aktualisieren.",
+  "Cover, Hintergrund und Logo von Tomb Survivors korrigiert und Aktualisieren-Schaltfläche auch für Steam-Spiele.",
+  "Integrierte Spiele: Cover, Hintergrundbild und Logo werden angezeigt und mit der App aktualisiert.",
+  "Steam-Spiele mit ausstehendem Update: Aus Spielen wird Aktualisieren, das das Spiel in Steam öffnet.",
+  "Das Update erfolgt im Steam-Client.",
 ];

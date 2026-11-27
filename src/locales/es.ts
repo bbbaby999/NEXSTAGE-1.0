@@ -3052,4 +3052,8 @@ export default [
   "Actualizaciones de los juegos integrados más fáciles de encontrar.",
   "La página de un juego integrado busca actualizaciones cada vez que se abre.",
   "Con una versión nueva disponible, el botón Jugar pasa a ser Actualizar.",
+  "Portada, fondo y logo de Tomb Survivors corregidos y botón Actualizar también para juegos de Steam.",
+  "Juegos integrados: la portada, el arte de fondo y el logo aparecen y se actualizan junto con la app.",
+  "Juegos de Steam con actualización pendiente: el botón Jugar pasa a ser Actualizar y abre el juego en Steam.",
+  "La actualización se hace en el cliente de Steam.",
 ];

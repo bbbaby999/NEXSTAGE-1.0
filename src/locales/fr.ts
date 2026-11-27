@@ -3052,4 +3052,8 @@ export default [
   "Les mises à jour des jeux intégrés sont plus faciles à trouver.",
   "La page d'un jeu intégré recherche une mise à jour à chaque ouverture.",
   "Quand une nouvelle version est disponible, le bouton Jouer devient Mettre à jour.",
+  "Jaquette, fond et logo de Tomb Survivors corrigés, et bouton Mettre à jour aussi pour les jeux Steam.",
+  "Jeux intégrés : la jaquette, l'illustration de fond et le logo s'affichent et se mettent à jour avec l'app.",
+  "Jeux Steam avec une mise à jour en attente : le bouton Jouer devient Mettre à jour et ouvre le jeu dans Steam.",
+  "La mise à jour se fait dans le client Steam.",
 ];

@@ -3052,4 +3052,8 @@ export default [
   "Aggiornamenti dei giochi integrati più facili da trovare.",
   "La pagina di un gioco integrato cerca aggiornamenti ogni volta che viene aperta.",
   "Con una nuova versione disponibile, il pulsante Gioca diventa Aggiorna.",
+  "Copertina, sfondo e logo di Tomb Survivors corretti e pulsante Aggiorna anche per i giochi Steam.",
+  "Giochi integrati: copertina, immagine di sfondo e logo compaiono e si aggiornano insieme all'app.",
+  "Giochi Steam con aggiornamento in sospeso: il pulsante Gioca diventa Aggiorna e apre il gioco su Steam.",
+  "L'aggiornamento avviene nel client Steam.",
 ];

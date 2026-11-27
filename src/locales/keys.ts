@@ -2953,5 +2953,9 @@ export const KEYS: string[] = [
  "Recebe a atualização 0.5.0-beta do Tomb Survivors.",
  "Atualizações dos jogos integrados mais fáceis de encontrar.",
  "A página de um jogo integrado procura atualização toda vez que é aberta.",
- "Com versão nova disponível, o botão Jogar vira Atualizar."
+ "Com versão nova disponível, o botão Jogar vira Atualizar.",
+ "Capa, fundo e logo do Tomb Survivors corrigidos e botão Atualizar também para jogos da Steam.",
+ "Jogos integrados: capa, arte de fundo e logo aparecem e se atualizam junto com o app.",
+ "Jogos da Steam com atualização pendente: o botão Jogar vira Atualizar e abre o jogo na Steam.",
+ "A atualização acontece no cliente Steam."
 ];

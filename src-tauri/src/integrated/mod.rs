@@ -30,6 +30,8 @@ pub struct Official {
     pub data_file: &'static str,
     pub cover: &'static [u8],
     pub background: &'static [u8],
+    /// Logotipo (PNG transparente) mostrado no lugar do título na página do jogo.
+    pub logo: &'static [u8],
     /// Manifesto assinado da versão mais recente (repositório público de distribuição) e a assinatura.
     pub manifest_url: &'static str,
     pub signature_url: &'static str,
@@ -48,6 +50,7 @@ pub const OFFICIAL: &[Official] = &[Official {
     data_file: "TombSurvivors.pck",
     cover: include_bytes!("../../assets/integrated/tomb-survivors-cover.jpg"),
     background: include_bytes!("../../assets/integrated/tomb-survivors-background.jpg"),
+    logo: include_bytes!("../../assets/integrated/tomb-survivors-logo.png"),
     manifest_url: "https://github.com/bbbaby999/tomb-survivors-releases/releases/latest/download/manifest.json",
     signature_url: "https://github.com/bbbaby999/tomb-survivors-releases/releases/latest/download/manifest.json.sig",
     public_key: "PJrQZ38cygRWZlG5WguvZDPsmzNK8BYqPRqThL2jN8w=",
@@ -78,22 +81,76 @@ fn library_row(conn: &Connection, g: &Official) -> AppResult<i64> {
     {
         return Ok(id);
     }
-    let cover = crate::images::store_bytes(g.cover, "image/jpeg").ok();
-    let background = crate::images::store_bytes(g.background, "image/jpeg").ok();
+    let (cover, background, logo) = art_refs(g);
     let exe = installed_exe(conn, g).map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
     conn.execute(
-        "INSERT INTO games(title,platform,executable_path,launch_args,cover,background,source,external_id) VALUES(?1,'PC',?2,'',?3,?4,'nexstage',?5)",
-        params![g.name, exe, cover, background, g.id],
+        "INSERT INTO games(title,platform,executable_path,launch_args,cover,background,logo,source,external_id) VALUES(?1,'PC',?2,'',?3,?4,?5,'nexstage',?6)",
+        params![g.name, exe, cover, background, logo, g.id],
     )?;
     let id = conn.last_insert_rowid();
     conn.execute("UPDATE integrated_games SET library_game_id=?1 WHERE game_id=?2", params![id, g.id])?;
     Ok(id)
 }
 
-/// Garante o cadastro dos jogos oficiais (`integrated_games`) — idempotente.
+/// Grava na pasta de imagens a arte oficial embutida (capa, fundo/banner e logo) e devolve as referências.
+/// Falhas vão para o log (antes eram engolidas em silêncio e a entrada ficava sem imagem).
+fn art_refs(g: &Official) -> (Option<String>, Option<String>, Option<String>) {
+    let store = |bytes: &[u8], mime: &str, what: &str| match crate::images::store_bytes(bytes, mime) {
+        Ok(r) => Some(r),
+        Err(e) => {
+            crate::diaglog::write("aviso", "integrated", &format!("{}: {what} não gravada: {e}", g.id));
+            None
+        }
+    };
+    (store(g.cover, "image/jpeg", "capa"), store(g.background, "image/jpeg", "fundo"), store(g.logo, "image/png", "logo"))
+}
+
+/// Marca da arte oficial embutida nesta versão do app (muda quando a capa/fundo/logo mudam).
+fn art_mark(g: &Official) -> String {
+    use sha2::{Digest, Sha256};
+    let mut h = Sha256::new();
+    for b in [g.cover, g.background, g.logo] {
+        h.update((b.len() as u64).to_le_bytes());
+        h.update(b);
+    }
+    format!("{:x}", h.finalize())[..16].to_string()
+}
+
+/// Aplica a arte oficial à linha da biblioteca quando ela mudou nesta versão do app ou está faltando.
+fn refresh_art(conn: &Connection, g: &Official) -> AppResult<()> {
+    let key = format!("integrated_art:{}", g.id);
+    let mark = art_mark(g);
+    let seen: Option<String> = conn.query_row("SELECT value FROM app_settings WHERE key=?1", [&key], |r| r.get(0)).optional()?;
+    let missing: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM games WHERE source='nexstage' AND external_id=?1 AND (cover IS NULL OR cover='' OR background IS NULL OR background='' OR logo IS NULL OR logo='')",
+            [g.id],
+            |r| r.get::<_, i64>(0),
+        )
+        .unwrap_or(0)
+        > 0;
+    if seen.as_deref() == Some(mark.as_str()) && !missing {
+        return Ok(());
+    }
+    let (cover, background, logo) = art_refs(g);
+    if cover.is_none() || background.is_none() || logo.is_none() {
+        return Ok(()); // tenta de novo na próxima abertura
+    }
+    conn.execute(
+        "UPDATE games SET cover=?1, background=?2, logo=?3 WHERE source='nexstage' AND external_id=?4",
+        params![cover, background, logo, g.id],
+    )?;
+    conn.execute("INSERT OR REPLACE INTO app_settings(key,value) VALUES(?1,?2)", params![key, mark])?;
+    Ok(())
+}
+
+/// Garante o cadastro dos jogos oficiais (`integrated_games`) e a arte oficial atualizada — idempotente.
 pub fn seed(conn: &Connection) -> AppResult<()> {
     for g in OFFICIAL {
         conn.execute("INSERT OR IGNORE INTO integrated_games(game_id,name) VALUES(?1,?2)", params![g.id, g.name])?;
+        if let Err(e) = refresh_art(conn, g) {
+            crate::diaglog::write("aviso", "integrated", &format!("arte de {}: {e}", g.id));
+        }
     }
     Ok(())
 }
@@ -588,6 +645,27 @@ mod tests {
         ensure_library(&c, 1).unwrap();
         let back: i64 = c.query_row("SELECT COUNT(*) FROM profile_games WHERE profile_id=1", [], |r| r.get(0)).unwrap();
         assert_eq!(back, 0);
+    }
+
+    #[test]
+    fn art_fills_missing_and_follows_new_versions() {
+        let _ = crate::images::init(&std::env::temp_dir().join(format!("nexstage-test-{}-integrated-art", std::process::id())));
+        let (_p, d) = db("art");
+        let c = d.conn().unwrap();
+        c.execute_batch("INSERT INTO profiles(id,username,display_name) VALUES(1,'a','A');").unwrap();
+        ensure_library(&c, 1).unwrap();
+        // entrada antiga sem arte (como ficou em instalações anteriores)
+        c.execute("UPDATE games SET cover=NULL, background=NULL, logo=NULL WHERE source='nexstage'", []).unwrap();
+        seed(&c).unwrap();
+        let (cv, bg, lg): (Option<String>, Option<String>, Option<String>) =
+            c.query_row("SELECT cover, background, logo FROM games WHERE source='nexstage'", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap();
+        assert!(cv.is_some() && bg.is_some() && lg.is_some(), "capa, fundo e logo preenchidos");
+        // marca de outra versão do app: reaplica a arte embutida
+        c.execute("UPDATE app_settings SET value='antiga' WHERE key='integrated_art:tomb-survivors'", []).unwrap();
+        c.execute("UPDATE games SET cover='nximg:velha.jpg' WHERE source='nexstage'", []).unwrap();
+        seed(&c).unwrap();
+        let cv2: String = c.query_row("SELECT cover FROM games WHERE source='nexstage'", [], |r| r.get(0)).unwrap();
+        assert_eq!(Some(cv2), cv, "capa nova aplicada");
     }
 
     /// Ponta a ponta com o release REAL publicado (precisa de internet; ~200 MB):

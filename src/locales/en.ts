@@ -3052,4 +3052,8 @@ export default [
   "Integrated game updates are easier to find.",
   "An integrated game's page checks for updates every time it opens.",
   "When a new version is available, the Play button becomes Update.",
+  "Tomb Survivors cover, background and logo fixed, and an Update button for Steam games too.",
+  "Integrated games: cover, background art and logo show up and update along with the app.",
+  "Steam games with a pending update: the Play button becomes Update and opens the game in Steam.",
+  "The update happens in the Steam client.",
 ];

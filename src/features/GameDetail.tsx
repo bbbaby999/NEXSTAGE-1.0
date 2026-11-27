@@ -109,15 +109,16 @@ export default function GameDetail({ gameId }: { gameId: number }) {
   const [steamSt, setSteamSt] = useState<SteamAppStatus | null>(null);
 
   // Jogos da Steam: estado de instalação lido do cliente local. Reconfere ao voltar para a janela e,
-  // enquanto não estiver instalado, a cada 15 s (o download acontece no cliente Steam).
+  // enquanto não estiver instalado ou tiver atualização pendente, a cada 15 s (o download acontece na Steam).
   const steamAppId = game?.steamAppId ?? null;
   useEffect(() => {
     if (steamAppId === null) { setSteamSt(null); return; }
     let alive = true;
     let installed = false;
-    const check = () => api.steamAppStatus(steamAppId).then((s) => { if (alive) { installed = isInstalled(s.install); setSteamSt(s); } }).catch(() => {});
+    let pending = false;   // atualização pendente na Steam: continua conferindo até terminar
+    const check = () => api.steamAppStatus(steamAppId).then((s) => { if (alive) { installed = isInstalled(s.install); pending = s.install === "updating"; setSteamSt(s); } }).catch(() => {});
     check();
-    const iv = setInterval(() => { if (!installed) check(); }, 15000);
+    const iv = setInterval(() => { if (!installed || pending) check(); }, 15000);
     window.addEventListener("focus", check);
     return () => { alive = false; clearInterval(iv); window.removeEventListener("focus", check); };
   }, [steamAppId]);
@@ -260,6 +261,9 @@ export default function GameDetail({ gameId }: { gameId: number }) {
                 <Button variant="primary" className="dp-play stage-play" onClick={() => run(async () => { await api.integratedInstall(integrated.gameId!); integrated.reload(); })}>{t("Atualizar")}</Button>
               ) : integrated.gameId && !game.installed ? (
                 <Button variant="primary" className="dp-play stage-play" onClick={() => run(async () => { await api.integratedInstall(integrated.gameId!); integrated.reload(); })}>{t("Instalar")}</Button>
+              ) : game.steamAppId !== null && steamSt?.install === "updating" ? (
+                // Steam com atualização pendente: o botão principal vira "Atualizar" (a atualização acontece na Steam)
+                <Button variant="primary" className="dp-play stage-play" onClick={() => run(async () => { await api.steamOpenPage(game.steamAppId!); }, t("A atualização acontece no cliente Steam."))}>{t("Atualizar")}</Button>
               ) : needInstall ? (
                 <Button variant="primary" className="dp-play stage-play" onClick={install} disabled={steamSt!.install === "installing"}>
                   {steamSt!.install === "installing" ? t("Instalando na Steam…") : t("Instalar")}</Button>

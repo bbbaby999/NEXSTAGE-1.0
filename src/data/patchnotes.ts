@@ -21,6 +21,15 @@ export const NOTE_LABEL: Record<NoteType, string> = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "1.3.6",
+    date: "2026-11-26",
+    summary: tk("Capa, fundo e logo do Tomb Survivors corrigidos e botão Atualizar também para jogos da Steam."),
+    sections: [
+      { type: "fix", items: [tk("Jogos integrados: capa, arte de fundo e logo aparecem e se atualizam junto com o app.")] },
+      { type: "ui", items: [tk("Jogos da Steam com atualização pendente: o botão Jogar vira Atualizar e abre o jogo na Steam.")] },
+    ],
+  },
+  {
     version: "1.3.5",
     date: "2026-11-26",
     summary: tk("Atualizações dos jogos integrados mais fáceis de encontrar."),
